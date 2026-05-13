@@ -126,3 +126,131 @@ When you're ready for v2:
    with real fetches.
 
 See `docs/wallet/WALLET_AUTH.md` for the auth-side spec.
+
+---
+
+# V2 — Backend hookup (Neon Postgres + auth + leaderboard)
+
+This section walks through wiring the real backend after the v1 SPA-only
+deploy is already live. All paths assume you've already done the steps above
+and `/api/health` returns 200.
+
+## 1. Install new server deps locally
+
+`package.json` already has `ethers`, `jose`, and `@neondatabase/serverless`
+declared. Install them on your machine so the next push includes the
+lockfile entries:
+
+```powershell
+cd C:\Users\Isuma\Repositories\WordChain\nft-wordchain
+npm install
+```
+
+Vercel will install the same deps automatically on every deploy.
+
+## 2. Provision Neon Postgres (free tier)
+
+1. Go to **https://console.neon.tech/signup** and create an account (use
+   the same email as your Vercel account for cleanliness).
+2. Click **Create project**. Settings:
+   - Project name: `wordchain` (or anything).
+   - Postgres version: latest stable.
+   - Region: same continent as your Vercel deployment for low latency.
+3. After creation, the dashboard shows a connection string under the
+   **Connection Details** panel. It looks like:
+   ```
+   postgresql://wordchain_owner:************@ep-xxx-yyy.us-east-1.aws.neon.tech/wordchain?sslmode=require
+   ```
+4. Copy that string. This is your `DATABASE_URL`.
+
+## 3. Run the migration
+
+In the Neon dashboard, click **SQL Editor** (left sidebar). Paste the
+contents of `migrations/0001_init.sql` from this repo and click **Run**.
+The editor returns "Query executed successfully" for each `CREATE TABLE`.
+
+Verify with:
+```sql
+SELECT count(*) FROM nonces;
+SELECT count(*) FROM scores;
+SELECT count(*) FROM profiles;
+```
+All three should return 0.
+
+## 4. Set Vercel environment variables
+
+In Vercel → Project → **Settings → Environment Variables**, add three
+entries (mark them all sensitive):
+
+| Name | Value | Notes |
+|---|---|---|
+| `DATABASE_URL` | the Neon connection string from step 2 | All environments |
+| `JWT_SECRET` | generate with `openssl rand -base64 48` | All environments |
+| `JWT_TTL_SECONDS` | `86400` | All environments (optional; defaults to 86400) |
+
+Click **Save** for each. Vercel rebuilds aren't needed for env-var changes
+— the next request to a function will pick them up — but a **redeploy**
+the next time you push will guarantee a clean state.
+
+> **No openssl on your machine?** Generate the secret with PowerShell:
+> ```powershell
+> -join ((1..64) | %{ [char][int]((48..57) + (97..122) + (65..90) | Get-Random) })
+> ```
+
+## 5. Push and verify all endpoints
+
+```powershell
+git add .
+git commit -m "V2: backend hookup — auth endpoints + leaderboard + JWT login"
+git push
+```
+
+Wait ~90 seconds for the deploy. Then test each endpoint from PowerShell:
+
+```powershell
+$base = "https://<your-deploy-url>"
+
+# Smoke test (no auth, no DB) — should still work
+curl "$base/api/health"
+
+# Issue a nonce — server should respond with a UUID-tagged string
+curl -X POST -H "Content-Type: application/json" `
+  -d '{"address":"0x0000000000000000000000000000000000000000"}' `
+  "$base/api/auth/nonce"
+
+# Empty leaderboard — should return { event, week, top: [], you: null }
+curl "$base/api/leaderboard/oceanevent"
+```
+
+If all three respond cleanly, the backend pipeline is live.
+
+## 6. Real login from the browser
+
+1. Open the deployed splash, click **CONNECT WALLET**, pick MetaMask.
+2. The extension prompts you twice:
+   - First prompt: "share account with site" → approve.
+   - Second prompt: "sign message" → approve. The message is the server
+     nonce (`wordchain-login: <uuid>`).
+3. The pill on the splash should now show your address.
+4. Go into the Deep Sea event (unlock for 5 GALA if needed), open the
+   leaderboard. You should see the empty top-N message and a "you're
+   signed in" state instead of the connect-wallet nudge.
+5. Complete a level. The auto-submit fires `POST /api/leaderboard/score`
+   in the background. Reopen the leaderboard — your row should now be
+   there as rank #1.
+
+If anything misbehaves, check the function logs in Vercel → Project →
+**Logs** (filtered to the relevant endpoint).
+
+## Common gotchas
+
+- **CORS errors locally** — `vercel dev` and Vite together: set
+  `ALLOWED_ORIGINS` env var to `http://localhost:5173,http://localhost:3000`
+  in `.env`. Production doesn't need it (same origin).
+- **`DATABASE_URL is not set` 500** — env var not added to the right
+  environment in Vercel (Preview vs Production). Add it to all three.
+- **`Nonce expired`** — the 5-minute TTL elapsed. Reconnect the wallet
+  to trigger a fresh nonce.
+- **`Signature does not match…`** — usually a wallet that returned
+  `eth|...` and we forgot to strip the prefix. The client's
+  `signMessage()` handles this — if you see it, file a bug.

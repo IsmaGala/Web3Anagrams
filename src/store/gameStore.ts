@@ -20,6 +20,29 @@ function saveProgress(worldId: string, levelIndex: number, score: number) {
   }
 }
 
+/** Fire-and-forget leaderboard submission. Called after the local breakdown
+ *  is computed. No-ops gracefully when:
+ *    • the world isn't an event world
+ *    • the player isn't connected / not signed in
+ *    • the network/server is unavailable (we don't want game UX to depend on it)
+ *  Server keeps the best-of-week score, so resubmitting on a worse run is safe. */
+function submitEventScoreIfApplicable(worldId: string, score: number) {
+  // Lazy lookup of the world so the import graph stays simple.
+  import('../data/worldData').then(({ WORLDS: ALL }) => {
+    const world = ALL.find(w => w.id === worldId)
+    if (!world?.event) return
+    return import('./walletStore').then(({ useWalletStore }) => {
+      if (!useWalletStore.getState().jwt) return
+      return import('../utils/apiClient').then(({ api }) =>
+        api.post('/api/leaderboard/score', { eventId: worldId, score })
+      )
+    })
+  }).catch(err => {
+    // Non-fatal — log for debugging but never disrupt gameplay.
+    console.warn('Leaderboard submission failed:', err)
+  })
+}
+
 /** Drop levels whose validated word list is below the playable minimum.
  *  validateLevel already logs a warning for these; here we simply exclude
  *  them from the rotation so the player never lands on a too-thin level. */
@@ -346,6 +369,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const breakdown = computeScoreBreakdown(newScore, levelMisses, levelHintsUsed, levelStartTime)
         set({ lastBreakdown: breakdown, score: breakdown.final })
         saveProgress(_worldId, currentLevelIndex, breakdown.final)
+        // For event worlds, also submit to the server leaderboard if the
+        // player is signed in. Fire-and-forget — server failure should never
+        // block the local progression UI.
+        submitEventScoreIfApplicable(_worldId, breakdown.final)
         setTimeout(() => {
           if (gameMode === 'daily') get().triggerDailyWin()
           else {

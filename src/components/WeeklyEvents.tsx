@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
+import { useWalletStore } from '../store/walletStore'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
 import { timeToNextWeek, formatWeekCountdown } from '../utils/gameUtils'
 import { playSfx } from '../utils/sfx'
+import { api } from '../utils/apiClient'
 
 // Weekly Events hub. Lists every world flagged as `event:true`. Each card
 // shows: name/subtitle/description, level count, cost, current-week unlock
@@ -250,28 +252,64 @@ export default function WeeklyEvents() {
 // Renders inside an event card when the leaderboard is toggled open. Also
 // exported so we can mount it inside LevelSelect later if needed.
 
+interface LeaderboardEntry { rank: number; address: string; score: number }
+interface LeaderboardResponse { event: string; week: number; top: LeaderboardEntry[]; you: LeaderboardEntry | null }
+
+function shortAddr(a: string): string {
+  return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a
+}
+
 export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent: string }) {
   const getTotalScore         = useProgressStore(s => s.getTotalScore)
   const getCompletedCount     = useProgressStore(s => s.getCompletedCount)
   const claimEventReward      = useProgressStore(s => s.markEventRewardClaimed)
   const isRewardClaimed       = useProgressStore(s => s.isEventRewardClaimedThisWeek)
   const showToast             = useGameStore(s => s.showToast)
+  // Wallet store — needed so this component re-renders when login state flips.
+  const walletAddress         = useWalletStore(s => s.address)
+  const jwt                   = useWalletStore(s => s.jwt)
 
-  const score     = getTotalScore(worldId)
-  const completed = getCompletedCount(worldId)
-  const totalLevels = (WORLDS.find(w => w.id === worldId)?.levels.length) ?? 0
-  const claimed   = isRewardClaimed(worldId)
-  const eligible  = completed > 0 && !claimed
+  const score        = getTotalScore(worldId)
+  const completed    = getCompletedCount(worldId)
+  const totalLevels  = (WORLDS.find(w => w.id === worldId)?.levels.length) ?? 0
+  const claimed      = isRewardClaimed(worldId)
+
+  // Server-side data
+  const [board, setBoard] = useState<LeaderboardResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true); setError(null)
+      try {
+        const data = await api.get<LeaderboardResponse>(`/api/leaderboard/${encodeURIComponent(worldId)}`)
+        if (!cancelled) setBoard(data)
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? 'Could not load leaderboard')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  // Re-fetch when the player's JWT changes (login/logout) so the `you` row
+  // appears or disappears appropriately, and when their local score changes
+  // so a freshly-submitted run is reflected.
+  }, [worldId, jwt, score])
+
+  // Rank-driven reward — if the server returned a top-3 rank for the player,
+  // they're eligible to claim that tier; otherwise no reward this week.
+  const serverRank = board?.you?.rank ?? null
+  const rewardTier = serverRank && serverRank <= 3 ? REWARDS.find(r => r.rank === serverRank) : null
+  const eligible   = !!rewardTier && !claimed
 
   function handleClaim() {
-    if (!eligible) return
-    // Placeholder logic until backend supplies real rank. Grant the rank-3
-    // hint pack as a participation reward. Replace with rank-driven REWARDS
-    // lookup once a real leaderboard is wired up.
-    const reward = REWARDS.find(r => r.rank === PLACEHOLDER_RANK)!
-    useGameStore.setState(s => ({ hints: s.hints + reward.hints }) as any)
+    if (!eligible || !rewardTier) return
+    useGameStore.setState(s => ({ hints: s.hints + rewardTier.hints }) as any)
     claimEventReward(worldId)
-    showToast(`✓ Rank #${reward.rank} reward claimed · +${reward.hints} hints`)
+    showToast(`✓ Rank #${rewardTier.rank} reward claimed · +${rewardTier.hints} hints`)
   }
 
   return (
@@ -279,33 +317,92 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
       style={{ background:'rgba(0,0,0,0.4)', border:`2px solid ${accent}44` }}>
 
       <div className="font-fredoka text-sm mb-2" style={{ color: accent, letterSpacing:'1.5px' }}>
-        LEADERBOARD
+        LEADERBOARD {board && <span style={{ color:'rgba(255,255,255,0.4)' }}>· WEEK {board.week}</span>}
       </div>
 
-      {/* Backend-pending notice */}
-      <p className="font-nunito font-bold text-xs mb-3"
-        style={{ color:'rgba(255,255,255,0.45)', lineHeight:1.45 }}>
-        Global rankings come online once the leaderboard backend is connected. Until then your
-        score is saved locally and claim pays out the participation reward.
-      </p>
+      {/* Login nudge — visible until the player connects + signs in. */}
+      {!walletAddress && (
+        <p className="font-nunito font-bold text-xs mb-3"
+          style={{ color:'rgba(255,255,255,0.5)', lineHeight:1.45 }}>
+          Connect a wallet on the splash to submit your score and appear on the leaderboard.
+        </p>
+      )}
+      {walletAddress && !jwt && (
+        <p className="font-nunito font-bold text-xs mb-3"
+          style={{ color:'rgba(255,255,255,0.5)', lineHeight:1.45 }}>
+          You're connected but not signed in. Reconnect on the splash to refresh your session.
+        </p>
+      )}
 
       {/* Reward tiers */}
       <div className="grid grid-cols-3 gap-1.5 mb-3">
         {REWARDS.map(r => (
           <div key={r.rank} className="rounded-lg p-2 text-center"
-            style={{ background:'rgba(255,255,255,0.05)', border:'1.5px solid rgba(255,255,255,0.1)' }}>
+            style={{
+              background: serverRank === r.rank ? `${accent}33` : 'rgba(255,255,255,0.05)',
+              border: serverRank === r.rank
+                ? `1.5px solid ${accent}`
+                : '1.5px solid rgba(255,255,255,0.1)',
+            }}>
             <div className="text-xl leading-none mb-0.5">{r.icon}</div>
             <div className="font-fredoka text-xs" style={{ color:'#fde68a' }}>{r.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Player row */}
+      {/* Top entries from the server */}
+      {loading && (
+        <p className="font-nunito font-bold text-xs mb-2" style={{ color:'rgba(255,255,255,0.45)' }}>
+          Loading leaderboard…
+        </p>
+      )}
+      {error && (
+        <p className="font-nunito font-bold text-xs mb-2 px-2 py-1 rounded"
+          style={{ background:'rgba(127,29,29,0.35)', border:'1px solid #b91c1c', color:'#fecaca' }}>
+          ⚠ {error}
+        </p>
+      )}
+      {board && board.top.length === 0 && !loading && !error && (
+        <p className="font-nunito font-bold text-xs mb-2" style={{ color:'rgba(255,255,255,0.45)' }}>
+          No scores submitted this week yet. Be the first.
+        </p>
+      )}
+      {board && board.top.length > 0 && (
+        <div className="flex flex-col gap-1 mb-3">
+          {board.top.slice(0, 10).map(entry => {
+            const isYou = !!walletAddress && entry.address.toLowerCase() === walletAddress.toLowerCase()
+            return (
+              <div key={entry.address + ':' + entry.rank}
+                className="flex items-center justify-between rounded-lg px-2 py-1.5"
+                style={{
+                  background: isYou ? `${accent}22` : 'rgba(255,255,255,0.04)',
+                  border:     isYou ? `1.5px solid ${accent}66` : '1px solid rgba(255,255,255,0.06)',
+                }}>
+                <div className="flex items-center gap-2">
+                  <span className="font-fredoka text-xs"
+                    style={{ color: entry.rank <= 3 ? '#fde68a' : 'rgba(255,255,255,0.6)', minWidth: 24 }}>
+                    #{entry.rank}
+                  </span>
+                  <span className="font-nunito font-bold text-xs"
+                    style={{ color: isYou ? '#fff' : 'rgba(255,255,255,0.6)' }}>
+                    {isYou ? 'YOU' : shortAddr(entry.address)}
+                  </span>
+                </div>
+                <span className="font-fredoka text-xs" style={{ color: isYou ? accent : 'rgba(255,255,255,0.55)' }}>
+                  ⭐ {entry.score.toLocaleString()}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Local-progress summary row (always visible). */}
       <div className="flex items-center justify-between rounded-lg px-3 py-2 mb-3"
         style={{ background:`${accent}22`, border:`1.5px solid ${accent}66` }}>
         <div className="flex items-center gap-2">
           <span className="font-fredoka text-xs px-1.5 py-0.5 rounded"
-            style={{ background:'rgba(0,0,0,0.4)', color:'#fff' }}>YOU</span>
+            style={{ background:'rgba(0,0,0,0.4)', color:'#fff' }}>YOU · LOCAL</span>
           <span className="font-nunito font-bold text-xs" style={{ color:'rgba(255,255,255,0.65)' }}>
             {completed}/{totalLevels} levels
           </span>
@@ -315,7 +412,7 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
         </span>
       </div>
 
-      {/* Claim button */}
+      {/* Claim button — only enabled when server-rank ≤ 3 and not yet claimed. */}
       {claimed ? (
         <button disabled className="btn-3d w-full py-2"
           style={{
@@ -342,7 +439,15 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
             fontFamily:'Fredoka One,cursive', fontSize:'0.85rem', letterSpacing:'1px',
             cursor: eligible ? 'pointer' : 'not-allowed',
           }}>
-          {eligible ? 'CLAIM REWARD' : (completed === 0 ? 'COMPLETE A LEVEL TO QUALIFY' : 'NOTHING TO CLAIM')}
+          {eligible && rewardTier
+            ? `CLAIM RANK #${rewardTier.rank} · +${rewardTier.hints} HINTS`
+            : !walletAddress
+              ? 'CONNECT WALLET TO QUALIFY'
+              : !jwt
+                ? 'SIGN IN TO QUALIFY'
+                : serverRank === null
+                  ? 'NOT ON THE BOARD YET'
+                  : 'TOP 3 ONLY — KEEP CLIMBING'}
         </button>
       )}
     </div>

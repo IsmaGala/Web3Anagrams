@@ -8,18 +8,24 @@ import { detectWallets } from '../utils/wallet'
 // own rejection / error message inline on failure.
 
 export default function WalletConnectModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const connect      = useWalletStore(s => s.connect)
-  const connecting   = useWalletStore(s => s.connecting)
-  const storeError   = useWalletStore(s => s.error)
+  const connectAndLogin = useWalletStore(s => s.connectAndLogin)
+  const connecting      = useWalletStore(s => s.connecting)
+  const loggingIn       = useWalletStore(s => s.loggingIn)
+  const storeError      = useWalletStore(s => s.error)
   const [localError, setLocalError] = useState<string | null>(null)
 
   if (!open) return null
   const present = detectWallets()
+  const busy    = connecting || loggingIn
   const error   = localError ?? storeError
 
+  // connectAndLogin: pops the wallet's account prompt, then immediately
+  // signs the server nonce and exchanges it for a JWT. The player sees
+  // two extension prompts in a row — one for "share account" and one for
+  // "sign this nonce to log in".
   async function pick(type: 'metamask' | 'gala') {
     setLocalError(null)
-    const ok = await connect(type)
+    const ok = await connectAndLogin(type)
     if (ok) onClose()
   }
 
@@ -33,7 +39,8 @@ export default function WalletConnectModal({ open, onClose }: { open: boolean; o
           Link a wallet to claim your identity. Signing happens locally — no GALA is spent.
         </p>
 
-        <button onClick={() => pick('metamask')} disabled={connecting || !present.metamask}
+        <button onClick={() => pick('metamask')} disabled={busy || !present.metamask}
+          /* during a login the modal stays open and just dims */
           className="btn-3d w-full py-3 mb-3"
           style={{
             background: present.metamask
@@ -53,7 +60,7 @@ export default function WalletConnectModal({ open, onClose }: { open: boolean; o
           </div>
         </button>
 
-        <button onClick={() => pick('gala')} disabled={connecting || !present.gala}
+        <button onClick={() => pick('gala')} disabled={busy || !present.gala}
           className="btn-3d w-full py-3 mb-4"
           style={{
             background: present.gala
@@ -85,7 +92,7 @@ export default function WalletConnectModal({ open, onClose }: { open: boolean; o
           </p>
         )}
 
-        <button onClick={onClose} disabled={connecting} className="btn-3d w-full py-3"
+        <button onClick={onClose} disabled={busy} className="btn-3d w-full py-3"
           style={{
             background:'linear-gradient(160deg,#1e293b,#0f172a)',
             border:'3px solid #475569', borderBottom:'3px solid #0f172a',
