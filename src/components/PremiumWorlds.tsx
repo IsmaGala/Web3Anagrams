@@ -3,6 +3,7 @@ import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { World } from '../data/worlds'
+import { playSfx } from '../utils/sfx'
 
 // Premium worlds storefront. Each entry shows a card with name/subtitle/
 // description/level count/cost. Locked worlds show an "UNLOCK FOR X GALA"
@@ -25,6 +26,7 @@ export default function PremiumWorlds() {
   const premiumWorlds = WORLDS.filter(w => w.premium && !w.event)
 
   function handlePlay(world: World) {
+    playSfx('uiTap')
     setWorldId(world.id)
     setScreen('levelSelect')
   }
@@ -46,7 +48,7 @@ export default function PremiumWorlds() {
 
       {/* Back */}
       <div className="self-start mb-5">
-        <button onClick={goToSplash} className="btn-3d flex items-center gap-2 px-5 py-3"
+        <button onClick={() => { playSfx('uiTap'); goToSplash() }} className="btn-3d flex items-center gap-2 px-5 py-3"
           style={{ background:'linear-gradient(160deg,#0e7490,#155e75)',
             border:'3px solid #22d3ee', borderBottom:'3px solid #042f2e',
             boxShadow:'0 5px 0 #042f2e', borderRadius:'14px',
@@ -128,7 +130,7 @@ export default function PremiumWorlds() {
                   ENTER ›
                 </button>
               ) : (
-                <button onClick={() => setConfirmWorld(world)} className="btn-3d w-full py-3"
+                <button onClick={() => { playSfx('uiTap'); setConfirmWorld(world) }} className="btn-3d w-full py-3"
                   disabled={!canAfford}
                   style={{
                     background: canAfford

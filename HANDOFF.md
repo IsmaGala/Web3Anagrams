@@ -33,3 +33,15 @@ the anchor.
 GALA has exactly one sink in this game — hints. Giving GALA away as a daily
 reward leaks supply with no matching demand. From this point forward, daily
 rewards stay inside the hint economy.
+
+## Reference docs
+
+- [`docs/wallet/WALLET_AUTH.md`](docs/wallet/WALLET_AUTH.md) — MetaMask + Gala
+  Wallet auth, address formats, nonce-sign flow, EIP-191 vs EIP-712, 12 caveats.
+  Source of truth for `src/utils/wallet.ts`.
+- [`docs/wallet/gala-dex.md`](docs/wallet/gala-dex.md) — Gala DEX (swap.gala.com)
+  integration. Pinned for the future economy phase (on-chain purchases,
+  GALA/GUSDC swap). Not used in current code.
+- [`docs/deploy/VERCEL.md`](docs/deploy/VERCEL.md) — Vercel hookup steps,
+  smoke-test verification, what to add for v2 backend (Neon Postgres,
+  auth endpoints, leaderboard queries).

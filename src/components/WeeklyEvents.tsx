@@ -4,6 +4,7 @@ import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
 import { timeToNextWeek, formatWeekCountdown } from '../utils/gameUtils'
+import { playSfx } from '../utils/sfx'
 
 // Weekly Events hub. Lists every world flagged as `event:true`. Each card
 // shows: name/subtitle/description, level count, cost, current-week unlock
@@ -45,6 +46,7 @@ export default function WeeklyEvents() {
   const events = WORLDS.filter(w => w.event)
 
   function handlePlay(world: World) {
+    playSfx('uiTap')
     setWorldId(world.id)
     setScreen('levelSelect')
   }
@@ -64,7 +66,7 @@ export default function WeeklyEvents() {
       style={{ background:'linear-gradient(180deg,#0c4a6e 0%,#0a2540 60%,#0d0220 100%)' }}>
 
       <div className="self-start mb-5">
-        <button onClick={goToSplash} className="btn-3d flex items-center gap-2 px-5 py-3"
+        <button onClick={() => { playSfx('uiTap'); goToSplash() }} className="btn-3d flex items-center gap-2 px-5 py-3"
           style={{ background:'linear-gradient(160deg,#075985,#0c4a6e)',
             border:'3px solid #0ea5e9', borderBottom:'3px solid #0c4a6e',
             boxShadow:'0 5px 0 #082f49', borderRadius:'14px',
@@ -152,7 +154,7 @@ export default function WeeklyEvents() {
                   ENTER EVENT ›
                 </button>
               ) : (
-                <button onClick={() => setConfirmEvent(world)} disabled={!canAfford}
+                <button onClick={() => { playSfx('uiTap'); setConfirmEvent(world) }} disabled={!canAfford}
                   className="btn-3d w-full py-3 mb-2"
                   style={{
                     background: canAfford
@@ -170,7 +172,7 @@ export default function WeeklyEvents() {
                 </button>
               )}
 
-              <button onClick={() => setShowLeaderboard(isOpen ? null : world.id)}
+              <button onClick={() => { playSfx('uiTap'); setShowLeaderboard(isOpen ? null : world.id) }}
                 className="btn-3d w-full py-2"
                 style={{
                   background:'rgba(0,0,0,0.3)',

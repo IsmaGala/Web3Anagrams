@@ -163,10 +163,13 @@ const VOICES: Record<Voice, number[]> = {
   dailyWin:      [0.7, 0.05, 440, 0.01, 0.12, 0.30, 1, 1.1,   0, 0, 220, 0.10, 0, 0, 0, 0, 0.15, 1, 0.15, 0],
   // Daily failed: descending dark tone
   dailyLose:     [0.55, 0.05, 280, 0.01, 0.10, 0.30, 2, 1.4, -8, 0,  0, 0, 0, 0, 0, 0, 0, 1, 0.12, 0],
-  // Shop purchase: quick double-note "ka-ching"
-  purchase:      [0.6, 0.05, 1675, 0.005, 0.02, 0.10, 1, 2.7,  0, 0,    0, 0, 0, 0, 0, 0.4, 0, 1, 0.04, 0],
-  // Generic UI tap (back button, menu choice)
-  uiTap:         [0.3, 0, 480, 0.001, 0.01, 0.04, 1, 0.8,    0, 0,    0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+  // Shop purchase: softer "ka-ching" — warmer freq, less bitcrush, lower
+  // volume. Was sharp/loud before; now feels rewarding without being shrill.
+  purchase:      [0.32, 0.04, 1100, 0.008, 0.03, 0.14, 1, 1.6, 0, 0,    0, 0, 0, 0, 0, 0.15, 0, 1, 0.04, 0],
+  // Menu confirm tap — warm triangle blip with a small upward pitch jump
+  // (+200 Hz at 25 ms) so it feels like a "click → confirmed" gesture
+  // rather than just a click. Soft enough to play on every menu press.
+  uiTap:         [0.26, 0, 660, 0.001, 0.02, 0.06, 1, 1,    0, 0,  200, 0.025, 0, 0, 0, 0, 0, 1, 0.02, 0],
   // Optional: short warning beep when daily timer hits critical
   timerWarn:     [0.4, 0, 660, 0.001, 0.02, 0.08, 1, 1,      0, 0,    0, 0, 0, 0, 0, 0, 0, 1, 0.02, 0],
 }

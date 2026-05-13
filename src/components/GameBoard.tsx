@@ -7,6 +7,7 @@ import { DailyWinOverlay, DailyLoseOverlay, DailyQuitConfirmOverlay } from './Da
 import LevelCompleteOverlay from './LevelCompleteOverlay'
 import SfxToggle from './SfxToggle'
 import Toast from './Toast'
+import { playSfx } from '../utils/sfx'
 
 export default function GameBoard() {
   const gameMode    = useGameStore(s => s.gameMode)
@@ -35,6 +36,7 @@ export default function GameBoard() {
   const msgColor = messageType === 'great' ? '#a78bfa' : messageType === 'error' ? '#f87171' : 'rgba(196,181,253,0.7)'
 
   function handleBack() {
+    playSfx('uiTap')
     if (isDaily) {
       // Mid-daily: ask before abandoning. If the round already resolved
       // (win/lose overlay showing) just exit cleanly.

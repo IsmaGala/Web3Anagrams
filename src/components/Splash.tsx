@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
+import { useWalletStore } from '../store/walletStore'
 import { getStreak, timeToMidnight } from '../utils/gameUtils'
+import { shortAddress } from '../utils/wallet'
+import { playSfx } from '../utils/sfx'
 import SfxToggle from './SfxToggle'
+import WalletConnectModal from './WalletConnectModal'
+
+// Wraps a click handler with the menu-confirm tap SFX. Keeps every button's
+// onClick site short.
+function tap<T extends any[]>(fn: (...args: T) => void) {
+  return (...args: T) => { playSfx('uiTap'); fn(...args) }
+}
 
 export default function Splash() {
   const goToGame       = useGameStore(s => s.goToGame)
@@ -16,6 +26,9 @@ export default function Splash() {
   useProgressStore(s => s.dailyAttempt)
   const todaysAttempt  = useProgressStore(s => s.getTodaysDailyAttempt)()
 
+  const walletAddress  = useWalletStore(s => s.address)
+  const walletDisconnect = useWalletStore(s => s.disconnect)
+  const [showWalletModal, setShowWalletModal] = useState(false)
   const [countdown, setCountdown] = useState(timeToMidnight())
   const streak = getStreak()
 
@@ -64,17 +77,36 @@ export default function Splash() {
           by Gala Games
         </p>
 
-        <div className="flex items-center gap-2 mb-5 px-5 py-2 rounded-full"
-          style={{ background:'rgba(255,255,255,0.07)', border:'2px solid rgba(255,255,255,0.12)' }}>
-          <span style={{ color:'#a78bfa' }}>◈</span>
-          <span className="font-nunito font-bold text-sm" style={{ color:'rgba(255,255,255,0.4)', letterSpacing:'2px' }}>CONNECT WALLET</span>
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-            style={{ background:'rgba(245,158,11,0.2)', color:'#fbbf24', border:'1px solid rgba(245,158,11,0.3)' }}>
-            SOON
-          </span>
-        </div>
+        {/* Wallet pill — opens connect modal when empty, shows address +
+            disconnect when connected. */}
+        {walletAddress ? (
+          <div className="flex items-center gap-2 mb-5 px-4 py-2 rounded-full"
+            style={{ background:'rgba(124,58,237,0.15)', border:'2px solid rgba(167,139,250,0.4)' }}>
+            <span style={{ color:'#a78bfa' }}>◈</span>
+            <span className="font-nunito font-bold text-sm" style={{ color:'#c4b5fd', letterSpacing:'1px' }}>
+              {shortAddress(walletAddress)}
+            </span>
+            <button onClick={walletDisconnect}
+              className="font-nunito font-bold text-xs ml-1 px-2 py-0.5 rounded-full"
+              style={{ background:'rgba(0,0,0,0.3)', color:'rgba(196,181,253,0.7)',
+                border:'1px solid rgba(167,139,250,0.3)' }}>
+              DISCONNECT
+            </button>
+          </div>
+        ) : (
+          <button onClick={tap(() => setShowWalletModal(true))}
+            className="flex items-center gap-2 mb-5 px-5 py-2 rounded-full"
+            style={{ background:'rgba(255,255,255,0.07)', border:'2px solid rgba(167,139,250,0.3)',
+              cursor:'pointer' }}>
+            <span style={{ color:'#a78bfa' }}>◈</span>
+            <span className="font-nunito font-bold text-sm" style={{ color:'rgba(196,181,253,0.85)', letterSpacing:'2px' }}>
+              CONNECT WALLET
+            </span>
+            <span className="text-xs">›</span>
+          </button>
+        )}
 
-        <button onClick={() => goToGame('single')} className="btn-3d w-full mb-3"
+        <button onClick={tap(() => goToGame('single'))} className="btn-3d w-full mb-3"
           style={{ background:'linear-gradient(160deg, #7c3aed, #6d28d9)',
             border:'4px solid #a78bfa', borderBottom:'4px solid #4c1d95',
             boxShadow:'0 8px 0 #3b0764, 0 0 30px rgba(124,58,237,0.4)',
@@ -88,7 +120,7 @@ export default function Splash() {
 
         {/* Daily — three visual modes */}
         {dailyState === 'available' && (
-          <button onClick={() => goToGame('daily')} className="btn-3d w-full mb-3"
+          <button onClick={tap(() => goToGame('daily'))} className="btn-3d w-full mb-3"
             style={{ background:'linear-gradient(160deg, #d97706, #b45309)',
               border:'4px solid #fbbf24', borderBottom:'4px solid #78350f',
               boxShadow:'0 8px 0 #451a03, 0 0 30px rgba(217,119,6,0.4)',
@@ -139,7 +171,7 @@ export default function Splash() {
         )}
 
         {dailyState === 'lost' && (
-          <button onClick={payToRetryDaily} disabled={!canAffordRetry} className="btn-3d w-full mb-3"
+          <button onClick={tap(payToRetryDaily)} disabled={!canAffordRetry} className="btn-3d w-full mb-3"
             style={{
               background: canAffordRetry
                 ? 'linear-gradient(160deg, #7f1d1d, #991b1b)'
@@ -168,7 +200,7 @@ export default function Splash() {
           </button>
         )}
 
-        <button onClick={goToPremium} className="btn-3d w-full mb-3"
+        <button onClick={tap(goToPremium)} className="btn-3d w-full mb-3"
           style={{ background:'linear-gradient(160deg, #0e7490, #155e75)',
             border:'4px solid #22d3ee', borderBottom:'4px solid #042f2e',
             boxShadow:'0 8px 0 #042f2e, 0 0 30px rgba(34,211,238,0.4)',
@@ -185,7 +217,7 @@ export default function Splash() {
           </div>
         </button>
 
-        <button onClick={goToEvents} className="btn-3d w-full mb-5"
+        <button onClick={tap(goToEvents)} className="btn-3d w-full mb-5"
           style={{ background:'linear-gradient(160deg, #075985, #0c4a6e)',
             border:'4px solid #0ea5e9', borderBottom:'4px solid #082f49',
             boxShadow:'0 8px 0 #082f49, 0 0 30px rgba(14,165,233,0.4)',
@@ -206,6 +238,8 @@ export default function Splash() {
           NFT WORDCHAIN v1.0
         </p>
       </div>
+
+      <WalletConnectModal open={showWalletModal} onClose={() => setShowWalletModal(false)} />
     </div>
   )
 }

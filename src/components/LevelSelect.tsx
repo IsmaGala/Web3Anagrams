@@ -4,6 +4,7 @@ import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { WorldId } from '../data/worlds'
 import { LeaderboardPanel } from './WeeklyEvents'
+import { playSfx } from '../utils/sfx'
 
 export default function LevelSelect() {
   const setScreen         = useGameStore(s => (s as any).setScreen)
@@ -44,7 +45,7 @@ export default function LevelSelect() {
 
       {/* Back — destination depends on whether we came from PREMIUM, EVENTS, or WORLDS */}
       <div className="self-start mb-5 flex items-center gap-2 w-full max-w-sm">
-        <button onClick={() => setScreen(backScreen)}
+        <button onClick={() => { playSfx('uiTap'); setScreen(backScreen) }}
           className="btn-3d flex items-center gap-2 px-5 py-3"
           style={{ background:'linear-gradient(160deg,#4c1d95,#3b0764)',
             border:'3px solid #7c3aed', borderBottom:'3px solid #2e1065',
@@ -53,7 +54,7 @@ export default function LevelSelect() {
           ‹ {backLabel}
         </button>
         {world.event && (
-          <button onClick={() => setShowLeaderboard(s => !s)}
+          <button onClick={() => { playSfx('uiTap'); setShowLeaderboard(s => !s) }}
             className="btn-3d ml-auto flex items-center gap-1 px-4 py-3"
             style={{ background:'linear-gradient(160deg,#075985,#0c4a6e)',
               border:'3px solid #0ea5e9', borderBottom:'3px solid #082f49',

@@ -2,6 +2,7 @@ import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { World } from '../data/worlds'
+import { playSfx } from '../utils/sfx'
 
 export default function WorldSelect() {
   const setScreen         = useGameStore(s => (s as any).setScreen)
@@ -12,6 +13,7 @@ export default function WorldSelect() {
 
   function handleWorldClick(world: World) {
     if (world.comingSoon || !isWorldUnlocked(world.id)) return
+    playSfx('uiTap')
     setWorldId(world.id)
     setScreen('levelSelect')
   }
@@ -22,7 +24,7 @@ export default function WorldSelect() {
 
       {/* Back */}
       <div className="self-start mb-6">
-        <button onClick={goToSplash} className="btn-3d flex items-center gap-2 px-5 py-3"
+        <button onClick={() => { playSfx('uiTap'); goToSplash() }} className="btn-3d flex items-center gap-2 px-5 py-3"
           style={{ background:'linear-gradient(160deg,#4c1d95,#3b0764)',
             border:'3px solid #7c3aed', borderBottom:'3px solid #2e1065',
             boxShadow:'0 5px 0 #1e0050', borderRadius:'14px',
