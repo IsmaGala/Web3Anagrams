@@ -22,11 +22,6 @@ const REWARDS: { rank: number; label: string; hints: number; icon: string }[] = 
   { rank: 3, label: '5 hints',    hints: 5,   icon: '🥉' },
 ]
 
-// Until a real backend is wired, every successful weekly entry pays out the
-// 3rd-place participation reward (5 hints) on claim. When you plug a server
-// in, replace this with the actual final rank lookup.
-const PLACEHOLDER_RANK = 3
-
 export default function WeeklyEvents() {
   const goToSplash             = useGameStore(s => s.goToSplash)
   const setScreen              = useGameStore(s => (s as any).setScreen)
