@@ -58,6 +58,43 @@ const DAILY_HINT_REWARD = 5     // hints granted on daily win (GALA reward remov
 const INITIAL_HINTS     = 3
 const INITIAL_GALA      = 10000
 
+// ── Local economy persistence ────────────────────────────────────────────────
+// Until on-chain GALA is wired, the player's GALA + hints are session-local.
+// We mirror them to localStorage so a page reload (or MetaMask switching
+// accounts, which can trigger one) doesn't reset the balance to 10k.
+//
+// When v3 lands and the GALA balance comes from GalaChain, delete the
+// hydration on init and replace the subscription with a chain-fetch.
+
+const ECONOMY_KEY = 'wc_economy_v1'
+
+interface PersistedEconomy { galaBalance: number; hints: number }
+
+function loadEconomy(): PersistedEconomy {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(ECONOMY_KEY) : null
+    if (!raw) return { galaBalance: INITIAL_GALA, hints: INITIAL_HINTS }
+    const obj = JSON.parse(raw) as Partial<PersistedEconomy>
+    return {
+      galaBalance: typeof obj.galaBalance === 'number' && obj.galaBalance >= 0 ? obj.galaBalance : INITIAL_GALA,
+      hints:       typeof obj.hints       === 'number' && obj.hints       >= 0 ? obj.hints       : INITIAL_HINTS,
+    }
+  } catch { return { galaBalance: INITIAL_GALA, hints: INITIAL_HINTS } }
+}
+
+function saveEconomy(payload: PersistedEconomy) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(ECONOMY_KEY, JSON.stringify(payload))
+    }
+  } catch {}
+}
+
+export function wipeEconomy() {
+  try { if (typeof localStorage !== 'undefined') localStorage.removeItem(ECONOMY_KEY) } catch {}
+  useGameStore.setState({ galaBalance: INITIAL_GALA, hints: INITIAL_HINTS })
+}
+
 // ── Store interface ────────────────────────────────────────────────────────────
 
 interface GameStore extends GameState {
@@ -136,8 +173,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   score:             0,
   selected:          [],
   dragging:          false,
-  galaBalance:       INITIAL_GALA,
-  hints:             INITIAL_HINTS,
+  galaBalance:       loadEconomy().galaBalance,
+  hints:             loadEconomy().hints,
   dailySecondsLeft:  DAILY_DURATION,
   dailyComplete:     false,
   dailyFailed:       false,
@@ -528,6 +565,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!next) unlockSfx()
   },
 }))
+
+// ── Persistence subscription ─────────────────────────────────────────────────
+// Whenever galaBalance or hints change, mirror the new values to localStorage.
+// We compare against a snapshot to avoid writing on unrelated state changes
+// (the splash countdown, message toasts, etc. would all otherwise trigger a
+// write on every frame).
+
+let lastEconomy = { galaBalance: useGameStore.getState().galaBalance, hints: useGameStore.getState().hints }
+useGameStore.subscribe((state) => {
+  if (state.galaBalance !== lastEconomy.galaBalance || state.hints !== lastEconomy.hints) {
+    lastEconomy = { galaBalance: state.galaBalance, hints: state.hints }
+    saveEconomy(lastEconomy)
+  }
+})
 
 // ── Selectors ──────────────────────────────────────────────────────────────────
 

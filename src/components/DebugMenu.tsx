@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useGameStore } from '../store/gameStore'
+import { useGameStore, wipeEconomy } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { WorldId } from '../data/worlds'
@@ -217,6 +217,11 @@ export default function DebugMenu() {
       </div>
 
       <div style={header}>ECONOMY · GALA</div>
+      <div className="flex flex-wrap gap-1 mb-1">
+        <button style={btnDanger} onClick={wipeEconomy} title="Reset GALA + hints to fresh-player defaults (10000 / 3) and clear wc_economy_v1">
+          wipe economy
+        </button>
+      </div>
       <div className="flex flex-wrap gap-1">
         <button style={btnAccent} onClick={() => addGala(100)}>+100</button>
         <button style={btnAccent} onClick={() => addGala(1000)}>+1k</button>
