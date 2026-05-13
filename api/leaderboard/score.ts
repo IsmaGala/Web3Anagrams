@@ -9,10 +9,10 @@
 // spoofing.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sql } from '../_lib/db'
-import { applyCors } from '../_lib/cors'
-import { requireAuth } from '../_lib/jwt'
-import { currentWeekId } from '../_lib/week'
+import { sql } from '../_lib/db.js'
+import { applyCors } from '../_lib/cors.js'
+import { requireAuth } from '../_lib/jwt.js'
+import { currentWeekId } from '../_lib/week.js'
 
 const MAX_SCORE = 100_000      // sanity cap; tune as the scoring model grows
 

@@ -13,10 +13,10 @@
 // Rank uses RANK() so ties share a position.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sql } from '../_lib/db'
-import { applyCors } from '../_lib/cors'
-import { requireAuth } from '../_lib/jwt'
-import { currentWeekId } from '../_lib/week'
+import { sql } from '../_lib/db.js'
+import { applyCors } from '../_lib/cors.js'
+import { requireAuth } from '../_lib/jwt.js'
+import { currentWeekId } from '../_lib/week.js'
 
 const TOP_N = 100
 

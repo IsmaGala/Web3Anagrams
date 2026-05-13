@@ -13,9 +13,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyMessage } from 'ethers'
-import { sql } from '../_lib/db'
-import { applyCors } from '../_lib/cors'
-import { signSession } from '../_lib/jwt'
+import { sql } from '../_lib/db.js'
+import { applyCors } from '../_lib/cors.js'
+import { signSession } from '../_lib/jwt.js'
 
 function isHexAddress(s: unknown): s is string {
   return typeof s === 'string' && /^0x[a-fA-F0-9]{40}$/.test(s)

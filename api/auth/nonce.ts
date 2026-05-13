@@ -10,8 +10,8 @@
 // rotates the nonce — no rate-limiting beyond what Vercel/Neon enforce.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sql } from '../_lib/db'
-import { applyCors } from '../_lib/cors'
+import { sql } from '../_lib/db.js'
+import { applyCors } from '../_lib/cors.js'
 
 const TTL_MS = 5 * 60 * 1000   // 5 minutes
 
