@@ -6,6 +6,7 @@ import { ETERNALNIGHT_LEVELS } from './eternalnightLevels'
 import { AREA51_LEVELS }       from './area51Levels'
 import { ASIMOV_LEVELS }       from './asimovLevels'
 import { NATURE_LEVELS }       from './natureLevels'
+import { OCEAN_EVENT_LEVELS }  from './oceanEventLevels'
 
 export const WORLDS: World[] = [
   {
@@ -97,6 +98,20 @@ export const WORLDS: World[] = [
     premium:     true,
     cost:        3250,
     levels:      NATURE_LEVELS,
+  },
+  {
+    id:          'oceanevent',
+    name:        'Deep Sea',
+    subtitle:    'This Week\'s Event',
+    icon:        '🌊',
+    description: 'A 10-level dive into the deep — waves, coral, sharks, krakens and the lost city of Atlantis. Unlocks for 5 GALA per week. Top the leaderboard for hint pack rewards.',
+    color:       '#0ea5e9',
+    gradient:    'linear-gradient(135deg, #0c4a6e 0%, #075985 50%, #0369a1 100%)',
+    levelCount:  OCEAN_EVENT_LEVELS.length,
+    unlockAfter: 0,
+    event:       true,
+    cost:        5,
+    levels:      OCEAN_EVENT_LEVELS,
   },
   {
     id:          'coming_soon',

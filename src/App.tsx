@@ -7,6 +7,7 @@ import WorldSelect from './components/WorldSelect'
 import LevelSelect from './components/LevelSelect'
 import GameBoard from './components/GameBoard'
 import PremiumWorlds from './components/PremiumWorlds'
+import WeeklyEvents from './components/WeeklyEvents'
 import DebugMenu from './components/DebugMenu'
 import './styles/global.css'
 
@@ -32,7 +33,7 @@ export default function App() {
       {screen === 'levelSelect' && <LevelSelect />}
       {screen === 'game'        && <GameBoard />}
       {screen === 'premium'     && <PremiumWorlds />}
-      {/* Dev-only overlay; renders nothing in production. */}
+      {screen === 'events'      && <WeeklyEvents />}
       <DebugMenu />
     </>
   )

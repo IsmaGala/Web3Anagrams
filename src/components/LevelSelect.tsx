@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { WorldId } from '../data/worlds'
+import { LeaderboardPanel } from './WeeklyEvents'
 
 export default function LevelSelect() {
   const setScreen         = useGameStore(s => (s as any).setScreen)
@@ -10,9 +12,15 @@ export default function LevelSelect() {
   const isLevelUnlocked   = useProgressStore(s => s.isLevelUnlocked)
   const getCompletedCount = useProgressStore(s => s.getCompletedCount)
   const getTotalScore     = useProgressStore(s => s.getTotalScore)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
 
   const world = WORLDS.find(w => w.id === worldId)
   if (!world) return null
+
+  // Back button destination: events worlds → events hub, premium → premium,
+  // everything else → worldSelect.
+  const backScreen = world.event ? 'events' : world.premium ? 'premium' : 'worldSelect'
+  const backLabel  = world.event ? 'EVENTS' : world.premium ? 'PREMIUM' : 'WORLDS'
 
   const completed  = getCompletedCount(worldId)
   const totalScore = getTotalScore(worldId)
@@ -34,17 +42,32 @@ export default function LevelSelect() {
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
       style={{ background:'linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)' }}>
 
-      {/* Back — for premium worlds the parent screen is PREMIUM, for the rest it's WORLDS */}
-      <div className="self-start mb-5">
-        <button onClick={() => setScreen(world.premium ? 'premium' : 'worldSelect')}
+      {/* Back — destination depends on whether we came from PREMIUM, EVENTS, or WORLDS */}
+      <div className="self-start mb-5 flex items-center gap-2 w-full max-w-sm">
+        <button onClick={() => setScreen(backScreen)}
           className="btn-3d flex items-center gap-2 px-5 py-3"
           style={{ background:'linear-gradient(160deg,#4c1d95,#3b0764)',
             border:'3px solid #7c3aed', borderBottom:'3px solid #2e1065',
             boxShadow:'0 5px 0 #1e0050', borderRadius:'14px',
             color:'#e9d5ff', fontFamily:'Fredoka One,cursive', fontSize:'1rem' }}>
-          ‹ {world.premium ? 'PREMIUM' : 'WORLDS'}
+          ‹ {backLabel}
         </button>
+        {world.event && (
+          <button onClick={() => setShowLeaderboard(s => !s)}
+            className="btn-3d ml-auto flex items-center gap-1 px-4 py-3"
+            style={{ background:'linear-gradient(160deg,#075985,#0c4a6e)',
+              border:'3px solid #0ea5e9', borderBottom:'3px solid #082f49',
+              boxShadow:'0 5px 0 #082f49', borderRadius:'14px',
+              color:'#bae6fd', fontFamily:'Fredoka One,cursive', fontSize:'0.9rem' }}>
+            🏆 {showLeaderboard ? 'HIDE' : 'BOARD'}
+          </button>
+        )}
       </div>
+      {world.event && showLeaderboard && (
+        <div className="w-full max-w-sm mb-5">
+          <LeaderboardPanel worldId={world.id} accent={world.color} />
+        </div>
+      )}
 
       {/* World header */}
       <div className="flex items-center gap-3 mb-2">

@@ -48,6 +48,13 @@ export default function DebugMenu() {
   const markPremiumUnlocked = useProgressStore(s => s.markPremiumUnlocked)
   const isPremiumUnlocked   = useProgressStore(s => s.isPremiumUnlocked)
   const resetProgress       = useProgressStore(s => s.reset)
+  const unlockEventForWeek  = useProgressStore(s => s.unlockEventForWeek)
+  const isEventUnlocked     = useProgressStore(s => s.isEventUnlockedThisWeek)
+  const forceEventReset     = useProgressStore(s => s.forceEventReset)
+  const goToEvents          = useGameStore(s => s.goToEvents)
+  const clearDailyAttempt   = useProgressStore(s => s.clearDailyAttempt)
+  const setDailyAttempt     = useProgressStore(s => s.setDailyAttempt)
+  const todaysDailyAttempt  = useProgressStore(s => s.getTodaysDailyAttempt)()
 
   // ─── Action helpers ────────────────────────────────────────────────────
   function addGala(n: number) {
@@ -261,6 +268,35 @@ export default function DebugMenu() {
           )
         })}
         <button style={btnAccent} onClick={unlockAllPremium}>grant ALL premium</button>
+      </div>
+
+      <div style={header}>WEEKLY EVENTS</div>
+      <div className="flex flex-wrap gap-1">
+        <button style={btn} onClick={goToEvents}>open events</button>
+      </div>
+      <div className="flex flex-col gap-1 mt-1">
+        {WORLDS.filter(w => w.event).map(w => {
+          const open = isEventUnlocked(w.id)
+          return (
+            <div key={w.id} className="flex items-center gap-1">
+              <span style={{ ...subtle, flex:1, color: open ? '#7dd3fc' : 'rgba(226,232,240,0.55)' }}>
+                {w.icon} {w.name} {open ? '✓ open' : '(locked)'}
+              </span>
+              <button style={btn} onClick={() => unlockEventForWeek(w.id)}>grant</button>
+              <button style={btnDanger} onClick={() => forceEventReset(w.id)}>reset</button>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={header}>DAILY LOCKOUT</div>
+      <div style={subtle}>
+        today: <b style={{color:'#a5f3fc'}}>{todaysDailyAttempt ? todaysDailyAttempt.status : 'available'}</b>
+      </div>
+      <div className="flex flex-wrap gap-1 mt-1">
+        <button style={btn}        onClick={clearDailyAttempt}>clear</button>
+        <button style={btnAccent}  onClick={() => setDailyAttempt('won')}>set won</button>
+        <button style={btnDanger}  onClick={() => setDailyAttempt('lost')}>set lost</button>
       </div>
 
       <div style={header}>GAME (current round)</div>

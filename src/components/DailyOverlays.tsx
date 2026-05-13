@@ -8,6 +8,7 @@ export function DailyWinOverlay() {
   const foundWords  = useGameStore(s => s.foundWords)
   const level       = useGameStore(selectCurrentLevel)
   const secondsLeft = useGameStore(s => s.dailySecondsLeft)
+  const breakdown   = useGameStore(s => s.lastBreakdown)
 
   if (!show) return null
 
@@ -19,29 +20,55 @@ export function DailyWinOverlay() {
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center px-6"
       style={{ background:'rgba(0,0,0,0.85)', backdropFilter:'blur(14px)' }}>
       <div className="w-full max-w-xs text-center slide-up">
-        <div className="text-7xl mb-4" style={{ animation:'bounce 0.6s ease infinite alternate' }}>🏆</div>
-        <h2 className="font-fredoka text-4xl mb-1 gradient-text-daily">CHAIN COMPLETE!</h2>
-        <p className="font-nunito font-bold mb-4" style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.9rem' }}>
+        <div className="text-7xl mb-3" style={{ animation:'bounce 0.6s ease infinite alternate' }}>🏆</div>
+        <h2 className="font-fredoka text-3xl mb-1 gradient-text-daily">CHAIN COMPLETE!</h2>
+        <p className="font-nunito font-bold mb-3" style={{ color:'rgba(255,255,255,0.5)', fontSize:'0.85rem' }}>
           {found}/{total} words · {formatTime(timeUsed)}
         </p>
 
-        {/* Reward — 5 hints (GALA is no longer awarded; hints are the only sink, so we keep the economy closed) */}
-        <div className="flex items-center justify-center gap-3 py-4 px-6 rounded-2xl mb-6 mx-auto w-fit"
+        {/* Score breakdown */}
+        {breakdown && (
+          <div className="rounded-2xl mb-3 mx-auto"
+            style={{ background:'rgba(0,0,0,0.4)', border:'2px solid rgba(251,191,36,0.35)', padding:'10px 14px' }}>
+            <DailyRow label="Words"       value={`+${breakdown.base}`}            tone="add" />
+            <DailyRow label={`Misses ×${breakdown.misses}`}    value={`−${breakdown.missesPenalty}`} tone={breakdown.missesPenalty ? 'sub' : 'neutral'} />
+            <DailyRow label={`Hints ×${breakdown.hintsUsed}`}   value={`−${breakdown.hintsPenalty}`}  tone={breakdown.hintsPenalty ? 'sub' : 'neutral'} />
+            <DailyRow label={`Time ${formatTime(breakdown.elapsedSec)}`} value={breakdown.timeBonus > 0 ? `+${breakdown.timeBonus}` : '0'} tone={breakdown.timeBonus > 0 ? 'add' : 'neutral'} />
+            <div className="h-px my-1.5" style={{ background:'rgba(251,191,36,0.3)' }} />
+            <div className="flex items-center justify-between">
+              <span className="font-fredoka text-sm" style={{ color:'#fde68a', letterSpacing:'1px' }}>FINAL</span>
+              <span className="font-fredoka text-xl text-white">⭐ {breakdown.final.toLocaleString()}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Reward — 5 hints */}
+        <div className="flex items-center justify-center gap-3 py-3 px-5 rounded-2xl mb-4 mx-auto w-fit"
           style={{ background:'linear-gradient(160deg,rgba(217,119,6,0.3),rgba(180,83,9,0.2))',
-            border:'3px solid rgba(251,191,36,0.4)', boxShadow:'0 5px 0 rgba(0,0,0,0.4)' }}>
-          <span className="text-3xl">💡</span>
-          <span className="font-fredoka text-4xl" style={{ color:'#fbbf24' }}>+5 HINTS</span>
+            border:'3px solid rgba(251,191,36,0.4)', boxShadow:'0 4px 0 rgba(0,0,0,0.4)' }}>
+          <span className="text-2xl">💡</span>
+          <span className="font-fredoka text-3xl" style={{ color:'#fbbf24' }}>+5 HINTS</span>
         </div>
 
-        <button onClick={goToSplash} className="btn-3d w-full py-4"
+        <button onClick={goToSplash} className="btn-3d w-full py-3"
           style={{ background:'linear-gradient(160deg,#d97706,#b45309)',
             border:'4px solid #fbbf24', borderBottom:'4px solid #78350f',
-            boxShadow:'0 8px 0 #451a03, 0 0 30px rgba(217,119,6,0.5)',
+            boxShadow:'0 6px 0 #451a03, 0 0 24px rgba(217,119,6,0.5)',
             borderRadius:'20px', color:'#fff',
-            fontFamily:'Fredoka One,cursive', fontSize:'1.4rem' }}>
+            fontFamily:'Fredoka One,cursive', fontSize:'1.2rem' }}>
           BACK TO MENU
         </button>
       </div>
+    </div>
+  )
+}
+
+function DailyRow({ label, value, tone }: { label: string; value: string; tone: 'add' | 'sub' | 'neutral' }) {
+  const color = tone === 'add' ? '#a7f3d0' : tone === 'sub' ? '#fca5a5' : 'rgba(255,255,255,0.5)'
+  return (
+    <div className="flex items-center justify-between" style={{ fontSize:'0.78rem' }}>
+      <span className="font-nunito font-bold" style={{ color:'rgba(255,255,255,0.65)' }}>{label}</span>
+      <span className="font-fredoka" style={{ color }}>{value}</span>
     </div>
   )
 }

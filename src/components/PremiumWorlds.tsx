@@ -21,7 +21,8 @@ export default function PremiumWorlds() {
 
   const [confirmWorld, setConfirmWorld] = useState<World | null>(null)
 
-  const premiumWorlds = WORLDS.filter(w => w.premium)
+  // Premium-only — event worlds live in their own Weekly Events screen.
+  const premiumWorlds = WORLDS.filter(w => w.premium && !w.event)
 
   function handlePlay(world: World) {
     setWorldId(world.id)

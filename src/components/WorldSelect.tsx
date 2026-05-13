@@ -37,7 +37,7 @@ export default function WorldSelect() {
       </p>
 
       <div className="w-full max-w-sm flex flex-col gap-5">
-        {WORLDS.filter(w => !w.premium).map((world, wi, arr) => {
+        {WORLDS.filter(w => !w.premium && !w.event).map((world, wi, arr) => {
           const unlocked   = isWorldUnlocked(world.id)
           const completed  = getCompletedCount(world.id)
           const progress   = world.levelCount > 0 ? Math.min(completed / world.levelCount, 1) : 0

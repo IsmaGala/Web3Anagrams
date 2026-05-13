@@ -1,4 +1,4 @@
-import type { Level } from '../types'
+import type { Level, ScoreBreakdown } from '../types'
 
 // ── Word Count Bounds ─────────────────────────────────────────────────────────
 
@@ -151,6 +151,38 @@ export function wordFeedback(word: string): string {
   return '✓ MINTED!'
 }
 
+// ── Score breakdown (granularity for leaderboard) ─────────────────────────────
+//
+// The final score for a run isn't just sum-of-word-scores anymore. We mix in
+// three additional signals so two players with the same word list can still
+// be ranked apart on the leaderboard:
+//   • misses          — failed submissions cost a flat fee per attempt
+//   • hints used      — letter reveals cost a heavier fee (they leak info)
+//   • completion time — a positive bonus for finishing under target time;
+//                        slow runs simply get no bonus (no time penalty)
+//
+// Tune these four constants to shift difficulty / leaderboard sensitivity.
+
+export const MISS_PENALTY          = 5    // points lost per invalid submission
+export const HINT_PENALTY          = 25   // points lost per hint deployed
+export const TARGET_TIME_SECONDS   = 120  // "fast" reference time (2 minutes)
+export const TIME_BONUS_PER_SEC    = 2    // points per second under target
+
+export function computeScoreBreakdown(
+  base: number,
+  misses: number,
+  hintsUsed: number,
+  levelStartTime: number,
+  now: number = Date.now(),
+): ScoreBreakdown {
+  const elapsedSec    = Math.max(0, Math.round((now - levelStartTime) / 1000))
+  const missesPenalty = misses    * MISS_PENALTY
+  const hintsPenalty  = hintsUsed * HINT_PENALTY
+  const timeBonus     = Math.max(0, Math.round((TARGET_TIME_SECONDS - elapsedSec) * TIME_BONUS_PER_SEC))
+  const final         = Math.max(0, base - missesPenalty - hintsPenalty + timeBonus)
+  return { base, misses, missesPenalty, hintsUsed, hintsPenalty, elapsedSec, timeBonus, final }
+}
+
 // ── Streak helpers ────────────────────────────────────────────────────────────
 
 const STREAK_KEY    = 'wc_streak'
@@ -176,7 +208,50 @@ export function getStreak(): number {
 
 // ── Daily timer ───────────────────────────────────────────────────────────────
 
-export const DAILY_DURATION = 5 * 60 // seconds
+export const DAILY_DURATION    = 8 * 60   // seconds (8 minutes)
+export const DAILY_WORDS_TARGET = 13      // total words to find in a daily run
+
+// Curate the daily word list so the player gets a mix of long / mid / short
+// rather than a single tier. We stratify the validated word pool into three
+// buckets and pick a fixed number from each, always preserving the theme
+// word (typically the longest). When the pool has fewer than `target`
+// words we just return the whole thing.
+//
+// Distribution for target=13:  4 long  ·  5 mid  ·  4 short  =  13
+//
+// "Long" / "short" mean positional buckets after sorting by length desc and
+// alphabetical tiebreaker — not absolute character counts — so this works
+// across levels with very different theme lengths.
+
+export function pickDailyWordMix(words: string[], theme: string, target: number = DAILY_WORDS_TARGET): string[] {
+  if (words.length <= target) return [...words]
+
+  const sorted = [...words].sort((a, b) => b.length - a.length || a.localeCompare(b))
+
+  const longCount  = Math.ceil(target * 0.30)
+  const shortCount = Math.ceil(target * 0.30)
+  const midCount   = target - longCount - shortCount
+
+  const long      = sorted.slice(0, longCount)
+  const shortPool = sorted.slice(-shortCount)
+  const midPool   = sorted.slice(longCount, sorted.length - shortCount)
+
+  // Spread the mid picks evenly across the middle bucket so we capture a
+  // range of lengths rather than clumping at one end.
+  const mid: string[] = []
+  if (midPool.length > 0) {
+    const step = midPool.length / midCount
+    for (let i = 0; i < midCount; i++) mid.push(midPool[Math.min(Math.floor(i * step), midPool.length - 1)])
+  }
+
+  const result = [...long, ...mid, ...shortPool]
+  // Theme word should always be findable in the daily — swap into the
+  // shortest slot if for some reason it didn't land in the long bucket.
+  if (words.includes(theme) && !result.includes(theme)) {
+    result[result.length - 1] = theme
+  }
+  return result
+}
 
 export function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -204,6 +279,17 @@ export function randomFlavor(): string {
   return LOSE_FLAVORS[Math.floor(Math.random() * LOSE_FLAVORS.length)]
 }
 
+// ── Date keys ─────────────────────────────────────────────────────────────────
+// "YYYY-MM-DD" in the player's local timezone — used to stamp daily attempts
+// so we can detect when a stored attempt is from a previous day.
+
+export function todaysDateKey(now: Date = new Date()): string {
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 // ── Countdown to midnight ─────────────────────────────────────────────────────
 
 export function timeToMidnight(): string {
@@ -215,4 +301,30 @@ export function timeToMidnight(): string {
   const m    = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0')
   const s    = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0')
   return `${h}:${m}:${s}`
+}
+
+// ── Weekly event helpers ──────────────────────────────────────────────────
+// Week IDs are anchored to the Unix epoch so every player sees the same week
+// boundary regardless of timezone. A week is 7 * 24 * 60 * 60 * 1000 ms.
+// This keeps the "weekly event" reset deterministic without needing a server.
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
+export function currentWeekId(now: number = Date.now()): number {
+  return Math.floor(now / WEEK_MS)
+}
+
+/** ms until the next week boundary — used for the "resets in" countdown. */
+export function timeToNextWeek(now: number = Date.now()): number {
+  const next = (currentWeekId(now) + 1) * WEEK_MS
+  return next - now
+}
+
+/** Format ms as "Xd HH:MM:SS" — used on the events screen. */
+export function formatWeekCountdown(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const d = Math.floor(total / 86400)
+  const h = Math.floor((total % 86400) / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  return `${d}d ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 }

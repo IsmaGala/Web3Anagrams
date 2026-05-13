@@ -5,6 +5,8 @@ import {
   wordScore, wordFeedback, validateLevel,
   DAILY_DURATION, updateStreak,
   MIN_WORDS_PER_LEVEL,
+  computeScoreBreakdown,
+  pickDailyWordMix,
 } from '../utils/gameUtils'
 import { playSfx, isSfxMuted, setSfxMuted, unlockSfx } from '../utils/sfx'
 import { useProgressStore } from './progressStore'
@@ -47,8 +49,13 @@ interface GameStore extends GameState {
   goToSplash:      () => void
   goToLevelSelect: () => void
   goToPremium:     () => void
+  goToEvents:      () => void
   // Premium
   purchaseWorld:   (worldId: string, cost: number) => boolean
+  // Weekly events
+  purchaseEvent:   (worldId: string, cost: number) => boolean
+  // Daily retry
+  payToRetryDaily: () => boolean
 
   // Level lifecycle
   loadLevels:       (raw: Level[]) => void
@@ -112,6 +119,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   dailyComplete:     false,
   dailyFailed:       false,
   showQuitConfirm:   false,
+  levelMisses:       0,
+  levelHintsUsed:    0,
+  levelStartTime:    Date.now(),
+  lastBreakdown:     undefined,
   message:           '',
   messageType:       '',
   currentWord:       '',
@@ -145,12 +156,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!levels.length) return
     const lvl     = levels[currentLevelIndex % levels.length]
     const isDaily = gameMode === 'daily'
-    const msg     = isDaily ? '⏱ 5 minutes — no hints!' : `Find ${lvl.words.length} words!`
+    const msg     = isDaily ? '⏱ 8 minutes — no hints!' : `Find ${lvl.words.length} words!`
     set({
       foundWords:      new Set(),
       hintedSlots:     {},
       selected:        [],
       dragging:        false,
+      // Reset the per-round trackers so the breakdown only reflects this run.
+      levelMisses:     0,
+      levelHintsUsed:  0,
+      levelStartTime:  Date.now(),
+      lastBreakdown:   undefined,
+      score:           0,
       currentWord:     '',
       wordDef:         '',
       message:         msg,
@@ -169,9 +186,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
   goToGame: (mode) => {
     const { allLevels } = get()
     if (mode === 'daily') {
-      const pick = pickDailyLevel(allLevels)
+      // Don't let the player re-enter the daily once today's attempt has
+      // resolved. Splash gates this already but defense-in-depth — also
+      // catches programmatic entry paths.
+      if (useProgressStore.getState().getTodaysDailyAttempt()) {
+        get().showToast('Daily already played — comes back at midnight')
+        return
+      }
+      const picked = pickDailyLevel(allLevels)
+      // Daily-specific curation: trim the full word list down to a mixed
+      // 13-word set (long/mid/short) so the daily feels distinct from a
+      // regular level — same rules for everyone since the underlying word
+      // list is deterministic.
+      const dailyLevel = { ...picked, words: pickDailyWordMix(picked.words, picked.theme) }
       updateStreak()
-      set({ gameMode: mode, screen: 'game', levels: [pick], currentLevelIndex: 0, score: 0 })
+      set({ gameMode: mode, screen: 'game', levels: [dailyLevel], currentLevelIndex: 0, score: 0 })
       setTimeout(() => get().initLevel(), 0)
     } else {
       set({ screen: 'worldSelect' })
@@ -195,6 +224,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Navigate to the premium (paid worlds) storefront.
   goToPremium: () => set({ screen: 'premium' }),
+
+  // Navigate to the weekly events hub.
+  goToEvents: () => set({ screen: 'events' }),
+
+  // Spend GALA to unlock the current week's event. The unlock resets every
+  // Monday (epoch-anchored week). Returns true if purchase succeeded.
+  purchaseEvent: (worldId, cost) => {
+    const { galaBalance } = get()
+    if (galaBalance < cost) {
+      playSfx('wordInvalid')
+      get().showToast('⚠ Insufficient GALA balance')
+      return false
+    }
+    set({ galaBalance: galaBalance - cost })
+    useProgressStore.getState().unlockEventForWeek(worldId as any)
+    playSfx('purchase')
+    get().showToast(`✓ Event unlocked · ${cost} GALA spent`)
+    return true
+  },
 
   // Spend GALA to unlock a premium world. Returns true if purchase succeeded.
   // The actual unlock is persisted in progressStore so it survives reloads.
@@ -291,7 +339,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       get()._setMessage(wordFeedback(word), 'great')
 
       if (lvl.words.every(w => next.has(w))) {
-        saveProgress(_worldId, currentLevelIndex, newScore)
+        // Compute the final score breakdown — base words minus misses & hints
+        // penalty plus a speed bonus — and save THAT to progress (so the
+        // leaderboard sees the granular figure, not just word totals).
+        const { levelMisses, levelHintsUsed, levelStartTime } = get()
+        const breakdown = computeScoreBreakdown(newScore, levelMisses, levelHintsUsed, levelStartTime)
+        set({ lastBreakdown: breakdown, score: breakdown.final })
+        saveProgress(_worldId, currentLevelIndex, breakdown.final)
         setTimeout(() => {
           if (gameMode === 'daily') get().triggerDailyWin()
           else {
@@ -314,6 +368,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return
     }
 
+    // Track misses for the score breakdown — only counts genuine "not in
+    // chain" misfires, not repeats (those are softer feedback).
+    set({ levelMisses: get().levelMisses + 1 })
     playSfx('wordInvalid')
     get()._setMessage('Not in the chain', 'error')
   },
@@ -340,7 +397,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const nextIdx  = word.split('').findIndex((_, i) => !revealed.includes(i))
     if (nextIdx === -1) return
 
-    set({ hintedSlots: { ...hintedSlots, [word]: [...revealed, nextIdx] }, hints: hints - 1 })
+    set({
+      hintedSlots: { ...hintedSlots, [word]: [...revealed, nextIdx] },
+      hints: hints - 1,
+      levelHintsUsed: get().levelHintsUsed + 1,
+    })
     playSfx('hint')
     get()._setMessage('Hint deployed!', 'info')
   },
@@ -369,10 +430,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   triggerDailyWin: () => {
     playSfx('dailyWin')
+    useProgressStore.getState().setDailyAttempt('won')
     set({ dailyComplete: true, hints: get().hints + DAILY_HINT_REWARD })
   },
   triggerDailyLose: () => {
     playSfx('dailyLose')
+    useProgressStore.getState().setDailyAttempt('lost')
     set({ dailyFailed: true, dailySecondsLeft: 0 })
   },
 
@@ -384,8 +447,31 @@ export const useGameStore = create<GameStore>((set, get) => ({
   requestQuitDaily: () => set({ showQuitConfirm: true }),
   cancelQuitDaily:  () => set({ showQuitConfirm: false }),
   confirmQuitDaily: () => {
+    // Quitting mid-daily counts as a lost attempt — the daily locks until
+    // midnight unless the player spends 1 GALA to retry.
+    useProgressStore.getState().setDailyAttempt('lost')
     set({ showQuitConfirm: false })
     get().goToSplash()
+  },
+
+  // Pay 1 GALA to clear today's "lost" daily attempt and immediately enter
+  // a fresh run. Returns true on success.
+  payToRetryDaily: () => {
+    const { galaBalance } = get()
+    const attempt = useProgressStore.getState().getTodaysDailyAttempt()
+    if (!attempt || attempt.status !== 'lost') return false
+    if (galaBalance < 1) {
+      playSfx('wordInvalid')
+      get().showToast('⚠ Need 1 GALA to retry the daily')
+      return false
+    }
+    set({ galaBalance: galaBalance - 1 })
+    useProgressStore.getState().clearDailyAttempt()
+    playSfx('purchase')
+    get().showToast('✓ Daily retry purchased · 1 GALA spent')
+    // Hop straight into a fresh daily run.
+    get().goToGame('daily')
+    return true
   },
 
   // ── UI Helpers ────────────────────────────────────────────────────────────
