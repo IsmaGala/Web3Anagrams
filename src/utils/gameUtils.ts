@@ -304,19 +304,59 @@ export function timeToMidnight(): string {
 }
 
 // ── Weekly event helpers ──────────────────────────────────────────────────
-// Week IDs are anchored to the Unix epoch so every player sees the same week
-// boundary regardless of timezone. A week is 7 * 24 * 60 * 60 * 1000 ms.
-// This keeps the "weekly event" reset deterministic without needing a server.
+// Week IDs anchor to "Monday 16:00 PST" — the moment a new event begins.
+// Every Mon 16:00 PST the id increments by 1, regardless of where the player
+// is in the world. The leaderboard's week_id column therefore aligns exactly
+// with one event's competition window (Mon 16:00 → Sun 00:00 = ACTIVE,
+// followed by ~40h of SETTLED claim time before the next id flip).
+//
+// Implementation: we read the PST wall-clock components, repack them as a
+// UTC timestamp, and divide by 7 days from a fixed anchor. The anchor is
+// Mon Jan 5, 1970 16:00 PST treated as UTC, which makes the math trivial.
+// Intl.DateTimeFormat handles DST automatically — we never hand-roll an
+// 8h/7h offset, which is the canonical source of week-id bugs.
+//
+// DST note: across a spring-forward or fall-back transition, the duration
+// between successive Mon 16:00 PST moments is 168h ± 1h. The week-id
+// remains a clean integer at every boundary because the PST-as-UTC math
+// is symmetric on both sides of the transition. The countdown helper
+// `timeToNextWeek` may drift by up to an hour for ~24h around the
+// transition; that's cosmetic and acceptable.
+
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-export function currentWeekId(now: number = Date.now()): number {
-  return Math.floor(now / WEEK_MS)
+// Mon Jan 5, 1970 16:00 (treating PST wall-clock as UTC). The first
+// Monday at-or-after the Unix epoch (which was a Thursday). Anchoring
+// here means weekId == 0 is the first event week.
+const EVENT_WEEK_ANCHOR_PST_MS = Date.UTC(1970, 0, 5, 16, 0, 0)
+
+/** Repacks `d`'s PST wall-clock components into a UTC timestamp. The result
+ *  is NOT a real UTC moment — it's "this same wall-clock, as if PST were
+ *  UTC" — and is useful only for week-id arithmetic. */
+function pstAsUtcMs(d: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value, 10)
+  return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'))
 }
 
-/** ms until the next week boundary — used for the "resets in" countdown. */
-export function timeToNextWeek(now: number = Date.now()): number {
-  const next = (currentWeekId(now) + 1) * WEEK_MS
-  return next - now
+export function currentWeekId(now: Date | number = new Date()): number {
+  const d = typeof now === 'number' ? new Date(now) : now
+  return Math.floor((pstAsUtcMs(d) - EVENT_WEEK_ANCHOR_PST_MS) / WEEK_MS)
+}
+
+/** ms until the next week boundary (next Mon 16:00 PST). DEPRECATED for
+ *  the events page countdown — use `timeToNextPhaseChange` instead. Kept
+ *  for any caller that genuinely wants "next week id flip" timing. */
+export function timeToNextWeek(now: Date | number = new Date()): number {
+  const d = typeof now === 'number' ? new Date(now) : now
+  const t = pstAsUtcMs(d)
+  const nextBoundary = (currentWeekId(d) + 1) * WEEK_MS + EVENT_WEEK_ANCHOR_PST_MS
+  return nextBoundary - t
 }
 
 /** Format ms as "Xd HH:MM:SS" — used on the events screen. */
@@ -329,10 +369,10 @@ export function formatWeekCountdown(ms: number): string {
   return `${d}d ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 }
 
-// ── Weekly event PHASE (not the same as week ID) ─────────────────────────────
-// The week ID partitions leaderboard data into 7-day chunks anchored to the
-// Unix epoch. The *phase* is the human-readable lifecycle state of the current
-// event from the player's point of view:
+// ── Weekly event PHASE ────────────────────────────────────────────────────
+// The week ID partitions leaderboard data into 7-day chunks that align with
+// Mon 16:00 PST event boundaries (see EVENT_WEEK_ANCHOR_PST_MS above). The
+// *phase* is the human-readable lifecycle state of the current event:
 //
 //   ACTIVE   — players can play levels and submit scores.
 //              Mon 16:00 PST → Sun 00:00 PST  (≈ 5d 8h)
@@ -340,36 +380,37 @@ export function formatWeekCountdown(ms: number): string {
 //              rank-based reward, but new scores cannot be earned.
 //              Sun 00:00 PST → next Mon 16:00 PST  (≈ 40h)
 //
-// Times are in America/Los_Angeles (handles PST↔PDT automatically). We read
-// the local weekday + hour via Intl.DateTimeFormat rather than hand-rolling
-// an offset, because doing the latter requires re-implementing DST rules and
-// is a perennial source of subtle bugs.
-//
-// The phase is purely a UI gate today — server-side score submission is not
-// yet aware of phase, so a determined client could still POST a score during
-// settled phase. Tightening the server is a follow-up.
+// Both client and server (api/_lib/week.ts) compute phase the same way so
+// the score-submission gate matches the play-button gate. Server uses 423
+// Locked for rejections during settled.
 
 export type EventPhase = 'active' | 'settled'
 
-/** Decompose a Date into America/Los_Angeles weekday + hour. Sunday = 0. */
-function pstDayHour(d: Date): { day: number; hour: number } {
+/** Decompose a Date into PST weekday + hour + minute + second. Sunday = 0.
+ *  Re-derives every component via Intl.DateTimeFormat so DST is handled
+ *  correctly without any manual offsetting. */
+function pstParts(d: Date): { day: number; hour: number; minute: number; second: number } {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Los_Angeles',
     weekday: 'short',
-    hour: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
     hour12: false,
   }).formatToParts(d)
   const weekday = parts.find(p => p.type === 'weekday')?.value ?? 'Sun'
-  const hourRaw = parts.find(p => p.type === 'hour')?.value ?? '0'
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)?.value ?? '0', 10)
   // Intl with hour12:false can occasionally emit '24' for midnight — normalize.
-  const hour = parseInt(hourRaw, 10) % 24
   const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
-  return { day: dayMap[weekday] ?? 0, hour }
+  return {
+    day:    dayMap[weekday] ?? 0,
+    hour:   get('hour') % 24,
+    minute: get('minute'),
+    second: get('second'),
+  }
 }
 
 /** Current event phase based on America/Los_Angeles wall-clock. */
 export function eventPhase(now: Date = new Date()): EventPhase {
-  const { day, hour } = pstDayHour(now)
+  const { day, hour } = pstParts(now)
   // Settled windows:
   //   • Sunday — any time
   //   • Monday before 16:00 — still recovering from the previous event
@@ -381,4 +422,27 @@ export function eventPhase(now: Date = new Date()): EventPhase {
 /** Human-readable label for when the current phase will flip. */
 export function eventPhaseEndsAt(now: Date = new Date()): string {
   return eventPhase(now) === 'active' ? 'Sun 00:00 PST' : 'Mon 16:00 PST'
+}
+
+/** Milliseconds until the current event phase boundary.
+ *
+ *    ACTIVE  → returns ms until next Sun 00:00 PST (event end)
+ *    SETTLED → returns ms until next Mon 16:00 PST (next event start)
+ *
+ *  Both client UI (the events page countdown) and any client-side eligibility
+ *  decisions should prefer this over `timeToNextWeek`, since the week-id flip
+ *  and the event-end moment are 8 hours apart. */
+export function timeToNextPhaseChange(now: Date = new Date()): number {
+  const p = pstParts(now)
+  const daysSinceMon = (p.day - 1 + 7) % 7
+  // Seconds since "this week's Mon 00:00 PST".
+  const sec = daysSinceMon * 86400 + p.hour * 3600 + p.minute * 60 + p.second
+  const ACTIVE_START_SEC = 16 * 3600    // Mon 16:00 PST
+  const ACTIVE_END_SEC   = 6  * 86400   // Sun 00:00 PST
+  const WEEK_SEC         = 7  * 86400
+  let targetSec: number
+  if      (sec < ACTIVE_START_SEC) targetSec = ACTIVE_START_SEC                    // settled → active
+  else if (sec < ACTIVE_END_SEC)   targetSec = ACTIVE_END_SEC                      // active → settled
+  else                              targetSec = WEEK_SEC + ACTIVE_START_SEC         // settled → active
+  return (targetSec - sec) * 1000
 }

@@ -1,11 +1,31 @@
-// Server-side mirror of src/utils/gameUtils.ts::currentWeekId(). Both the
-// client and the server stamp scores with the same epoch-anchored week-id
-// so the leaderboard week boundary is identical for everyone, timezone-free.
+// Server-side mirror of src/utils/gameUtils.ts. Both client and server need
+// to agree on currentWeekId — score submissions go through the server and
+// land in a row keyed by (address, event_id, week_id). If the two halves
+// disagreed by even a minute around the boundary, the same competition would
+// be split across two leaderboard partitions.
+//
+// Week IDs anchor to Mon 16:00 PST (event start). See gameUtils.ts for the
+// detailed comment.
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-export function currentWeekId(now: number = Date.now()): number {
-  return Math.floor(now / WEEK_MS)
+// Mon Jan 5, 1970 16:00 (treating PST wall-clock as UTC). Matches client.
+const EVENT_WEEK_ANCHOR_PST_MS = Date.UTC(1970, 0, 5, 16, 0, 0)
+
+function pstAsUtcMs(d: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(d)
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)!.value, 10)
+  return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'))
+}
+
+export function currentWeekId(now: Date | number = new Date()): number {
+  const d = typeof now === 'number' ? new Date(now) : now
+  return Math.floor((pstAsUtcMs(d) - EVENT_WEEK_ANCHOR_PST_MS) / WEEK_MS)
 }
 
 // ── Event phase (matches client gameUtils.ts::eventPhase) ───────────────────

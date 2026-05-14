@@ -4,7 +4,7 @@ import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
-import { timeToNextWeek, formatWeekCountdown, eventPhase, currentWeekId } from '../utils/gameUtils'
+import { formatWeekCountdown, eventPhase, currentWeekId, timeToNextPhaseChange } from '../utils/gameUtils'
 import { playSfx } from '../utils/sfx'
 import { api } from '../utils/apiClient'
 
@@ -45,11 +45,16 @@ export default function WeeklyEvents() {
   // The composite key avoids "all the cards for one world toggle together"
   // when a world has both a current and past entry visible.
   const [showLeaderboard, setShowLeaderboard] = useState<string | null>(null)
-  const [countdown, setCountdown] = useState(timeToNextWeek())
-
-  // Tick the countdown once per second so the player can see the reset clock.
+  // Phase-aware countdown — ticks every second toward whichever boundary
+  // we're approaching:
+  //   ACTIVE  → counts down to Sun 00:00 PST (event end)
+  //   SETTLED → counts down to Mon 16:00 PST (next event start)
+  // Note we read `phase` from eventPhase() on every tick rather than at mount
+  // because the countdown can naturally cross a boundary while the page is
+  // open, and we want the label/numbers to flip without a manual refresh.
+  const [countdown, setCountdown] = useState(timeToNextPhaseChange())
   useEffect(() => {
-    const id = setInterval(() => setCountdown(timeToNextWeek()), 1000)
+    const id = setInterval(() => setCountdown(timeToNextPhaseChange()), 1000)
     return () => clearInterval(id)
   }, [])
 
@@ -116,10 +121,21 @@ export default function WeeklyEvents() {
         ROTATING WORLDS · LEADERBOARD REWARDS
       </p>
 
+      {/* Phase-aware countdown. The label and color shift based on what the
+          countdown is pointing at: a brighter "ENDS IN" while the event is
+          running (urgency for last-minute climbers), a softer "NEXT EVENT IN"
+          during the post-competition claim window. */}
       <div className="flex items-center gap-3 px-4 py-2 rounded-full mb-2"
-        style={{ background:'rgba(14,165,233,0.1)', border:'2px solid rgba(14,165,233,0.3)' }}>
-        <span className="font-nunito font-bold text-xs" style={{ color:'rgba(186,230,253,0.5)' }}>RESETS IN</span>
-        <span className="font-fredoka text-base" style={{ color:'#7dd3fc' }}>{formatWeekCountdown(countdown)}</span>
+        style={{
+          background: phase === 'active' ? 'rgba(14,165,233,0.1)' : 'rgba(167,139,250,0.1)',
+          border:     phase === 'active' ? '2px solid rgba(14,165,233,0.3)' : '2px solid rgba(167,139,250,0.3)',
+        }}>
+        <span className="font-nunito font-bold text-xs" style={{ color: phase === 'active' ? 'rgba(186,230,253,0.5)' : 'rgba(196,181,253,0.55)' }}>
+          {phase === 'active' ? 'EVENT ENDS IN' : 'NEXT EVENT IN'}
+        </span>
+        <span className="font-fredoka text-base" style={{ color: phase === 'active' ? '#7dd3fc' : '#c4b5fd' }}>
+          {formatWeekCountdown(countdown)}
+        </span>
       </div>
 
       <div className="flex items-center gap-2 px-4 py-2 rounded-full mb-7"
