@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
-import { getStreak, timeToMidnight } from '../utils/gameUtils'
+import { WORLDS } from '../data/worldData'
+import {
+  getStreak, timeToMidnight,
+  eventPhase, currentWeekId, startWeekIdFromDate,
+  timeToNextPhaseChange, formatCountdownShort,
+} from '../utils/gameUtils'
 import { shortAddress } from '../utils/wallet'
 import { playSfx } from '../utils/sfx'
 import SfxToggle from './SfxToggle'
@@ -35,12 +40,52 @@ export default function Splash() {
   // action explicit and reassures the player their data is safe on the server.
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
   const [countdown, setCountdown] = useState(timeToMidnight())
+  // Separate ticker for the event-phase countdown surfaced on the WEEKLY
+  // EVENTS button caption. Same 1Hz cadence as the daily countdown.
+  const [eventCountdown, setEventCountdown] = useState(timeToNextPhaseChange())
   const streak = getStreak()
 
   useEffect(() => {
-    const id = setInterval(() => setCountdown(timeToMidnight()), 1000)
+    const id = setInterval(() => {
+      setCountdown(timeToMidnight())
+      setEventCountdown(timeToNextPhaseChange())
+    }, 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Subscribe to unlockedPremium so the PREMIUM caption updates immediately
+  // after a purchase without needing a re-mount.
+  const unlockedPremium = useProgressStore(s => s.unlockedPremium)
+
+  // Dynamic captions for the Premium and Weekly Events buttons. Both are
+  // memoized against the inputs that actually change — premium status for
+  // one, event scheduling + phase for the other — so we don't recompute
+  // on every unrelated re-render.
+
+  const premiumCaption = useMemo(() => {
+    const premiumWorlds = WORLDS.filter(w => w.premium)
+    const total  = premiumWorlds.length
+    const owned  = premiumWorlds.filter(w => unlockedPremium[w.id]).length
+    const locked = total - owned
+    if (total === 0)   return 'UNLOCK NEW WORLDS WITH GALA'
+    if (locked === 0)  return `ALL ${total} WORLDS UNLOCKED`
+    return `${owned} OF ${total} UNLOCKED · ${locked} NEW`
+  }, [unlockedPremium])
+
+  // The events caption depends on phase + the currently-scheduled active or
+  // upcoming event world. We recompute on every countdown tick (via the
+  // eventCountdown dep) so the time fragment stays fresh.
+  const eventCaption = useMemo(() => {
+    const phase = eventPhase()
+    const thisWeek = currentWeekId()
+    // ACTIVE phase: the event that started this week is the headline.
+    // SETTLED phase: the headline is whichever event is starting next.
+    const targetWeek = phase === 'active' ? thisWeek : thisWeek + 1
+    const event = WORLDS.find(w => w.event && w.startDate && startWeekIdFromDate(w.startDate) === targetWeek)
+    if (!event) return 'LEADERBOARD HINT-PACK REWARDS'
+    const verb = phase === 'active' ? 'ENDS' : 'STARTS'
+    return `${event.name.toUpperCase()} · ${verb} IN ${formatCountdownShort(eventCountdown)}`
+  }, [eventCountdown])
 
   // Daily card state machine
   const dailyState: 'available' | 'won' | 'lost' = !todaysAttempt
@@ -239,7 +284,7 @@ export default function Splash() {
             <div className="flex-1 text-left">
               <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>PREMIUM</div>
               <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(207,250,254,0.7)' }}>
-                UNLOCK NEW WORLDS WITH GALA
+                {premiumCaption}
               </div>
             </div>
             <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
@@ -256,7 +301,7 @@ export default function Splash() {
             <div className="flex-1 text-left">
               <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>WEEKLY EVENTS</div>
               <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(186,230,253,0.7)' }}>
-                LEADERBOARD HINT-PACK REWARDS
+                {eventCaption}
               </div>
             </div>
             <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>

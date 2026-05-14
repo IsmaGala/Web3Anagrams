@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from './store/gameStore'
 import { useProgressStore } from './store/progressStore'
 import { useWalletStore } from './store/walletStore'
@@ -10,6 +10,7 @@ import GameBoard from './components/GameBoard'
 import PremiumWorlds from './components/PremiumWorlds'
 import WeeklyEvents from './components/WeeklyEvents'
 import DebugMenu from './components/DebugMenu'
+import OnboardingOverlay, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingOverlay'
 import { pullAndApply, schedulePush, flushPush } from './utils/profileSync'
 import './styles/global.css'
 
@@ -19,6 +20,10 @@ export default function App() {
   const markLevelComplete = useProgressStore(s => s.markLevelComplete)
   const jwt = useWalletStore(s => s.jwt)
   const didPullForJwt = useRef<string | null>(null)
+  // First-run onboarding. We snapshot the localStorage flag once on mount so
+  // the overlay opens at most once per session; dismissal both flips the
+  // flag and removes the overlay.
+  const [showOnboarding, setShowOnboarding] = useState(() => !hasSeenOnboarding())
 
   useEffect(() => {
     const allLevels = WORLDS.flatMap(w => w.levels)
@@ -69,6 +74,9 @@ export default function App() {
       {screen === 'premium'     && <PremiumWorlds />}
       {screen === 'events'      && <WeeklyEvents />}
       <DebugMenu />
+      {showOnboarding && (
+        <OnboardingOverlay onDone={() => { markOnboardingSeen(); setShowOnboarding(false) }} />
+      )}
     </>
   )
 }

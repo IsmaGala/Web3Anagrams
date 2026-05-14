@@ -228,6 +228,12 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   reset: () => {
     const empty = emptyProgress()
     save(empty); savePremium({}); saveEvents({}); saveDaily(null)
+    // Reset the first-run onboarding flag so a deliberate full wipe shows
+    // the walkthrough again — debug-menu callers expect a truly fresh
+    // state, and a brand-new player on a passed-around device benefits.
+    // We do NOT reset on wallet disconnect (the same human is usually
+    // reconnecting; re-showing the walkthrough would be annoying).
+    try { localStorage.removeItem('wc_onboarding_seen_v1') } catch {}
     set({ worlds: empty, unlockedPremium: {}, eventState: {}, dailyAttempt: null })
   },
 

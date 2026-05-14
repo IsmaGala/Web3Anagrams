@@ -385,6 +385,21 @@ export function formatWeekCountdown(ms: number): string {
   return `${d}d ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 }
 
+/** Compact countdown for small UI surfaces (splash captions). Shows only
+ *  the two largest units, e.g. "2d 7h", "8h 30m", "45m", or "10s". Keeps
+ *  the string short enough to live inside a button subtitle. */
+export function formatCountdownShort(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const d = Math.floor(total / 86400)
+  const h = Math.floor((total % 86400) / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`
+  if (m > 0) return `${m}m`
+  return `${s}s`
+}
+
 // ── Weekly event PHASE ────────────────────────────────────────────────────
 // The week ID partitions leaderboard data into 7-day chunks that align with
 // Mon 16:00 PST event boundaries (see EVENT_WEEK_ANCHOR_PST_MS above). The
