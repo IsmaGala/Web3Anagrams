@@ -41,7 +41,7 @@ interface WalletState extends Partial<PersistedWallet> {
   connect:        (type: WalletType) => Promise<boolean>
   login:          () => Promise<boolean>     // sign nonce → exchange for JWT
   connectAndLogin:(type: WalletType) => Promise<boolean>
-  disconnect:     () => void
+  disconnect:     () => Promise<void>        // flushes pending sync, wipes local state
   restore:        () => void
   clearJwt:       () => void
 }
@@ -185,10 +185,51 @@ export const useWalletStore = create<WalletState>((set, get) => {
       return await get().login()
     },
 
-    disconnect: () => {
+    disconnect: async () => {
+      // Wallet = identity. Disconnecting must return the device to a
+      // pre-login state: no progress, no premium unlocks, no economy. The
+      // server is the source of truth — reconnecting pulls everything back
+      // via profileSync.pullAndApply.
+      //
+      // The order is load-bearing:
+      //   1. flushPush — persist anything in the 2s debounce window. JWT
+      //      is still set here so the push authenticates.
+      //   2. Clear JWT in the wallet store. schedulePush early-returns on
+      //      a missing JWT, so any subscriber fired by the upcoming wipes
+      //      becomes a no-op — that prevents the wiped state from being
+      //      pushed to the server.
+      //   3. cancelPendingPush — kill any timer flushPush didn't catch
+      //      (and re-cancel after the wipes for belt-and-suspenders).
+      //   4. Wipe in-memory + localStorage state: progress, premium, events,
+      //      daily, economy. Navigate the UI to splash.
+      //   5. Clear the rest of the wallet state and detach listeners.
+      //
+      // Each dynamic import is wrapped in try/catch so a stale import map
+      // can't prevent the wallet from disconnecting.
+      try {
+        const { flushPush } = await import('../utils/profileSync')
+        await flushPush()
+      } catch {}
+
+      // Clear the JWT BEFORE wiping state — see comment above. The rest of
+      // the wallet fields stay set so subscribers (e.g. leaderboard panel)
+      // see "logged out" rather than "wiped mid-render".
+      set({ jwt: null })
+
+      try {
+        const { cancelPendingPush } = await import('../utils/profileSync')
+        cancelPendingPush()
+        const { useProgressStore } = await import('./progressStore')
+        useProgressStore.getState().reset()
+        const { wipeEconomy, useGameStore } = await import('./gameStore')
+        wipeEconomy()
+        useGameStore.getState().goToSplash()
+        cancelPendingPush()   // safety: any stragglers scheduled during wipes
+      } catch {}
+
       save(null)
       if (unsub) { unsub(); unsub = null }
-      set({ address: undefined, walletType: undefined, chainId: undefined, jwt: null, error: null, connecting: false, loggingIn: false })
+      set({ address: undefined, walletType: undefined, chainId: undefined, error: null, connecting: false, loggingIn: false })
     },
 
     restore: () => {
