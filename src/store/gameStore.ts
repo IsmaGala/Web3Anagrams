@@ -21,20 +21,29 @@ function saveProgress(worldId: string, levelIndex: number, score: number) {
 }
 
 /** Fire-and-forget leaderboard submission. Called after the local breakdown
- *  is computed. No-ops gracefully when:
+ *  is committed to progressStore. No-ops gracefully when:
  *    • the world isn't an event world
  *    • the player isn't connected / not signed in
  *    • the network/server is unavailable (we don't want game UX to depend on it)
- *  Server keeps the best-of-week score, so resubmitting on a worse run is safe. */
-function submitEventScoreIfApplicable(worldId: string, score: number) {
+ *
+ *  We submit the player's CUMULATIVE score across every completed level in
+ *  this event — not just the level that was just finished — so the server
+ *  leaderboard reflects the same total the player sees locally. The server
+ *  keeps GREATEST per (address, event_id, week_id), so a late improvement
+ *  to any level pushes the rank up; a regression keeps the prior best. */
+function submitEventScoreIfApplicable(worldId: string, _justFinishedScore: number) {
   // Lazy lookup of the world so the import graph stays simple.
   import('../data/worldData').then(({ WORLDS: ALL }) => {
     const world = ALL.find(w => w.id === worldId)
     if (!world?.event) return
     return import('./walletStore').then(({ useWalletStore }) => {
       if (!useWalletStore.getState().jwt) return
+      // Read AFTER markLevelComplete has committed (the caller did that
+      // synchronously before invoking us). The total reflects best-of-attempts
+      // per level, summed across every completed level in this event world.
+      const totalScore = useProgressStore.getState().getTotalScore(worldId as any)
       return import('../utils/apiClient').then(({ api }) =>
-        api.post('/api/leaderboard/score', { eventId: worldId, score })
+        api.post('/api/leaderboard/score', { eventId: worldId, score: totalScore })
       )
     })
   }).catch(err => {
