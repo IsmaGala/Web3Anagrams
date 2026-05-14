@@ -266,13 +266,19 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
 
   const score        = getTotalScore(worldId)
   const completed    = getCompletedCount(worldId)
-  const totalLevels  = (WORLDS.find(w => w.id === worldId)?.levels.length) ?? 0
+  const worldMeta    = WORLDS.find(w => w.id === worldId)
+  const totalLevels  = worldMeta?.levels.length ?? 0
+  const worldIcon    = worldMeta?.icon ?? '🏆'
   const claimed      = isRewardClaimed(worldId)
 
   // Server-side data
   const [board, setBoard] = useState<LeaderboardResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
+  // Bumping `refreshTick` re-runs the fetch effect. Used by the manual
+  // refresh button so a player can poll for new entries without closing
+  // and reopening the panel.
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -290,9 +296,10 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
     load()
     return () => { cancelled = true }
   // Re-fetch when the player's JWT changes (login/logout) so the `you` row
-  // appears or disappears appropriately, and when their local score changes
-  // so a freshly-submitted run is reflected.
-  }, [worldId, jwt, score])
+  // appears or disappears appropriately, when their local score changes so
+  // a freshly-submitted run is reflected, or when the manual refresh button
+  // is tapped.
+  }, [worldId, jwt, score, refreshTick])
 
   // Rank-driven reward — if the server returned a top-3 rank for the player,
   // they're eligible to claim that tier; otherwise no reward this week.
@@ -311,8 +318,27 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
     <div className="mt-3 p-3 rounded-xl"
       style={{ background:'rgba(0,0,0,0.4)', border:`2px solid ${accent}44` }}>
 
-      <div className="font-fredoka text-sm mb-2" style={{ color: accent, letterSpacing:'1.5px' }}>
-        LEADERBOARD {board && <span style={{ color:'rgba(255,255,255,0.4)' }}>· WEEK {board.week}</span>}
+      {/* Header row — title on the left, manual refresh on the right. The
+          refresh button bumps `refreshTick`, which is in the fetch effect's
+          dep list. Disabled while a fetch is already in flight so a player
+          can't pile up requests. */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-fredoka text-sm" style={{ color: accent, letterSpacing:'1.5px' }}>
+          LEADERBOARD {board && <span style={{ color:'rgba(255,255,255,0.4)' }}>· WEEK {board.week}</span>}
+        </div>
+        <button
+          onClick={() => { playSfx('uiTap'); setRefreshTick(t => t + 1) }}
+          disabled={loading}
+          aria-label="Refresh leaderboard"
+          className="rounded-full px-2 py-1 text-xs font-bold"
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            border: `1px solid ${accent}44`,
+            color: loading ? 'rgba(255,255,255,0.3)' : `${accent}cc`,
+            cursor: loading ? 'wait' : 'pointer',
+          }}>
+          <span className={`inline-block ${loading ? 'animate-spin' : ''}`}>↻</span>
+        </button>
       </div>
 
       {/* Login nudge — visible until the player connects + signs in. */}
@@ -347,20 +373,51 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
 
       {/* Top entries from the server */}
       {loading && (
-        <p className="font-nunito font-bold text-xs mb-2" style={{ color:'rgba(255,255,255,0.45)' }}>
-          Loading leaderboard…
-        </p>
+        // Three faded skeleton rows that mirror the entry layout. Pulses
+        // gently so the player gets a "something is happening" signal
+        // without us needing a spinner widget.
+        <div className="flex flex-col gap-1 mb-3" aria-label="Loading leaderboard">
+          {[0, 1, 2].map(i => (
+            <div key={i}
+              className="flex items-center justify-between rounded-lg px-2 py-1.5 animate-pulse"
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}>
+              <div className="flex items-center gap-2">
+                <span className="inline-block rounded"
+                  style={{ width: 18, height: 10, background: 'rgba(255,255,255,0.12)' }} />
+                <span className="inline-block rounded"
+                  style={{ width: 90, height: 10, background: 'rgba(255,255,255,0.10)' }} />
+              </div>
+              <span className="inline-block rounded"
+                style={{ width: 48, height: 10, background: 'rgba(255,255,255,0.10)' }} />
+            </div>
+          ))}
+        </div>
       )}
-      {error && (
+      {error && !loading && (
         <p className="font-nunito font-bold text-xs mb-2 px-2 py-1 rounded"
           style={{ background:'rgba(127,29,29,0.35)', border:'1px solid #b91c1c', color:'#fecaca' }}>
           ⚠ {error}
         </p>
       )}
       {board && board.top.length === 0 && !loading && !error && (
-        <p className="font-nunito font-bold text-xs mb-2" style={{ color:'rgba(255,255,255,0.45)' }}>
-          No scores submitted this week yet. Be the first.
-        </p>
+        // Visual empty state — fresh-week card with the event icon and an
+        // encouraging line. More inviting than a flat "no scores yet" text.
+        <div className="flex flex-col items-center text-center py-4 mb-3 rounded-xl"
+          style={{ background: `${accent}11`, border: `1.5px dashed ${accent}55` }}>
+          <span className="text-3xl mb-1" style={{ filter: `drop-shadow(0 4px 8px ${accent}55)` }}>
+            {worldIcon}
+          </span>
+          <p className="font-fredoka text-xs" style={{ color: `${accent}`, letterSpacing: '1px' }}>
+            FRESH WEEK
+          </p>
+          <p className="font-nunito font-bold text-xs mt-0.5"
+            style={{ color:'rgba(255,255,255,0.55)' }}>
+            No scores yet — finish a level to claim rank #1.
+          </p>
+        </div>
       )}
       {board && board.top.length > 0 && (
         <div className="flex flex-col gap-1 mb-3">
@@ -389,6 +446,35 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
               </div>
             )
           })}
+          {/* Sticky "where you stand" row — only when the player has a rank
+              that's outside the top 10. Inside top 10 they're already
+              highlighted in the list above; this avoids double-rendering. */}
+          {board.you && board.you.rank > 10 && (
+            <>
+              <div className="text-center font-fredoka text-xs my-0.5"
+                style={{ color: 'rgba(255,255,255,0.25)', letterSpacing: '2px' }}>
+                · · ·
+              </div>
+              <div className="flex items-center justify-between rounded-lg px-2 py-1.5"
+                style={{
+                  background: `${accent}22`,
+                  border:     `1.5px solid ${accent}66`,
+                }}>
+                <div className="flex items-center gap-2">
+                  <span className="font-fredoka text-xs"
+                    style={{ color: 'rgba(255,255,255,0.85)', minWidth: 24 }}>
+                    #{board.you.rank}
+                  </span>
+                  <span className="font-nunito font-bold text-xs" style={{ color:'#fff' }}>
+                    YOU
+                  </span>
+                </div>
+                <span className="font-fredoka text-xs" style={{ color: accent }}>
+                  ⭐ {board.you.score.toLocaleString()}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -397,7 +483,7 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
         style={{ background:`${accent}22`, border:`1.5px solid ${accent}66` }}>
         <div className="flex items-center gap-2">
           <span className="font-fredoka text-xs px-1.5 py-0.5 rounded"
-            style={{ background:'rgba(0,0,0,0.4)', color:'#fff' }}>YOU · LOCAL</span>
+            style={{ background:'rgba(0,0,0,0.4)', color:'#fff' }}>YOU</span>
           <span className="font-nunito font-bold text-xs" style={{ color:'rgba(255,255,255,0.65)' }}>
             {completed}/{totalLevels} levels
           </span>
@@ -434,6 +520,10 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
             fontFamily:'Fredoka One,cursive', fontSize:'0.85rem', letterSpacing:'1px',
             cursor: eligible ? 'pointer' : 'not-allowed',
           }}>
+          {/* Disabled-state copy reads the player's exact situation rather
+              than a generic catch-all. The "climb N spots" string surfaces
+              the actual gap to top-3 so the player knows what they're
+              shooting for instead of just "keep climbing". */}
           {eligible && rewardTier
             ? `CLAIM RANK #${rewardTier.rank} · +${rewardTier.hints} HINTS`
             : !walletAddress
@@ -441,8 +531,8 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
               : !jwt
                 ? 'SIGN IN TO QUALIFY'
                 : serverRank === null
-                  ? 'NOT ON THE BOARD YET'
-                  : 'TOP 3 ONLY — KEEP CLIMBING'}
+                  ? 'PLAY A LEVEL TO QUALIFY'
+                  : `#${serverRank} · CLIMB ${serverRank - 3} ${serverRank - 3 === 1 ? 'SPOT' : 'SPOTS'}`}
         </button>
       )}
     </div>
