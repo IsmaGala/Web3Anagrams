@@ -16,7 +16,10 @@
 //   • level completion  → OR (either side completed → completed)
 //   • premium unlocks   → UNION
 //   • daily attempt     → latest dateKey wins; ties prefer 'won'
-//   • event state       → max(unlockedWeek), max(claimedWeek) per event
+//   • event state       → UNION of (worldId, weekId) records; within each
+//                         record, OR the {unlocked, claimed} flags. Legacy
+//                         {unlockedWeek, claimedWeek} entries are folded in
+//                         via normalizeEventEntry before merging.
 //   • economy           → MAX(galaBalance), MAX(hints) (friendly to player)
 //
 // Future work: when GALA moves on-chain, drop economy from the payload and
@@ -33,7 +36,17 @@ import type { WorldId } from '../data/worlds'
 
 interface LevelProgress { completed: boolean; score: number }
 interface WorldProgress { levels: Record<string, LevelProgress> }
-interface EventStateEntry { unlockedWeek?: number; claimedWeek?: number }
+interface EventWeekRecord { unlocked: boolean; claimed: boolean }
+/** Per-week event record. JSON keys are strings; the weekId is a number on
+ *  the client. Shape mirrors progressStore's EventState. The pre-stacking
+ *  shape `{ unlockedWeek, claimedWeek }` is migrated by normalizeEventEntry
+ *  below so a payload pulled from the server before the stacking deploy can
+ *  still be merged correctly. */
+interface EventStateEntry {
+  weeks?:        Record<string, EventWeekRecord>
+  unlockedWeek?: number   // legacy
+  claimedWeek?:  number   // legacy
+}
 interface DailyAttemptRecord { dateKey: string; status: 'won' | 'lost' }
 
 export interface PlayerStatePayload {
@@ -105,18 +118,50 @@ function mergeBoolMap<K extends string>(a: Partial<Record<K, boolean>>, b: Parti
   return out
 }
 
+/** Fold legacy `{ unlockedWeek, claimedWeek }` into the per-week `weeks` map.
+ *  Returns the entry's weeks map (always populated; possibly empty). */
+function normalizeEventEntry(entry: EventStateEntry | undefined): Record<string, EventWeekRecord> {
+  if (!entry) return {}
+  const weeks: Record<string, EventWeekRecord> = { ...(entry.weeks ?? {}) }
+  if (typeof entry.unlockedWeek === 'number') {
+    const k = String(entry.unlockedWeek)
+    weeks[k] = {
+      unlocked: true,
+      claimed: weeks[k]?.claimed || entry.claimedWeek === entry.unlockedWeek,
+    }
+  }
+  if (typeof entry.claimedWeek === 'number') {
+    const k = String(entry.claimedWeek)
+    weeks[k] = { unlocked: weeks[k]?.unlocked ?? true, claimed: true }
+  }
+  return weeks
+}
+
 function mergeEventState(
   a: Partial<Record<WorldId, EventStateEntry>>,
   b: Partial<Record<WorldId, EventStateEntry>>,
 ): Partial<Record<WorldId, EventStateEntry>> {
-  const out: Partial<Record<WorldId, EventStateEntry>> = { ...a }
-  for (const k of Object.keys(b) as WorldId[]) {
-    const av = a[k] ?? {}
-    const bv = b[k] ?? {}
-    out[k] = {
-      unlockedWeek: Math.max(av.unlockedWeek ?? 0, bv.unlockedWeek ?? 0) || undefined,
-      claimedWeek:  Math.max(av.claimedWeek  ?? 0, bv.claimedWeek  ?? 0) || undefined,
+  // Union of (worldId, weekId) records. Within each record we OR the flags:
+  // if either side saw the week as unlocked or claimed, the merged state
+  // reflects that. Mirrors the "MAX/UNION wins" friendliness of the rest of
+  // the merge layer — we never lose participation evidence.
+  const out: Partial<Record<WorldId, EventStateEntry>> = {}
+  const keys = new Set<WorldId>([
+    ...(Object.keys(a) as WorldId[]),
+    ...(Object.keys(b) as WorldId[]),
+  ])
+  for (const k of keys) {
+    const aw = normalizeEventEntry(a[k])
+    const bw = normalizeEventEntry(b[k])
+    const merged: Record<string, EventWeekRecord> = { ...aw }
+    for (const wk of Object.keys(bw)) {
+      const av = merged[wk]
+      const bv = bw[wk]
+      merged[wk] = av
+        ? { unlocked: av.unlocked || bv.unlocked, claimed: av.claimed || bv.claimed }
+        : { ...bv }
     }
+    out[k] = { weeks: merged }
   }
   return out
 }

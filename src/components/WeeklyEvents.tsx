@@ -4,7 +4,7 @@ import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
-import { timeToNextWeek, formatWeekCountdown, eventPhase } from '../utils/gameUtils'
+import { timeToNextWeek, formatWeekCountdown, eventPhase, currentWeekId } from '../utils/gameUtils'
 import { playSfx } from '../utils/sfx'
 import { api } from '../utils/apiClient'
 
@@ -22,16 +22,29 @@ const REWARDS: { rank: number; label: string; hints: number; icon: string }[] = 
   { rank: 3, label: '5 hints',    hints: 5,   icon: '🥉' },
 ]
 
+interface EventCardEntry {
+  world:    World
+  weekId:   number
+  isCurrent: boolean
+}
+
 export default function WeeklyEvents() {
   const goToSplash             = useGameStore(s => s.goToSplash)
   const setScreen              = useGameStore(s => (s as any).setScreen)
   const setWorldId             = useGameStore(s => (s as any).setWorldId)
   const purchaseEvent          = useGameStore(s => s.purchaseEvent)
   const galaBalance            = useGameStore(s => s.galaBalance)
-  const isEventUnlockedThisWeek = useProgressStore(s => s.isEventUnlockedThisWeek)
+  const isEventUnlockedForWeek = useProgressStore(s => s.isEventUnlockedForWeek)
+  const getPendingClaimWeeks   = useProgressStore(s => s.getPendingClaimWeeks)
+  // Subscribe to eventState so the entries list re-computes when the player
+  // unlocks or claims, without each helper needing its own selector.
+  useProgressStore(s => s.eventState)
 
   const [confirmEvent, setConfirmEvent] = useState<World | null>(null)
-  const [showLeaderboard, setShowLeaderboard] = useState<WorldId | null>(null)
+  // Track which (worldId, weekId) tuple has its leaderboard panel open.
+  // The composite key avoids "all the cards for one world toggle together"
+  // when a world has both a current and past entry visible.
+  const [showLeaderboard, setShowLeaderboard] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(timeToNextWeek())
 
   // Tick the countdown once per second so the player can see the reset clock.
@@ -40,7 +53,29 @@ export default function WeeklyEvents() {
     return () => clearInterval(id)
   }, [])
 
-  const events = WORLDS.filter(w => w.event)
+  const phase = eventPhase()
+  const thisWeek = currentWeekId()
+
+  // Build the list of cards to render. For each event world:
+  //   • Include the current week if we're in ACTIVE phase (anyone can buy in)
+  //     OR the player already entered this week (settled-phase "claim now"
+  //     card for participants).
+  //   • Include every PAST week where the player joined but hasn't claimed —
+  //     these "stack" across weeks per the product spec.
+  // Non-entered events during settled phase get filtered out (they leave the
+  // page once the event finishes, matching "you lose access").
+  const eventWorlds = WORLDS.filter(w => w.event)
+  const entries: EventCardEntry[] = []
+  for (const world of eventWorlds) {
+    const unlockedThisWeek = isEventUnlockedForWeek(world.id, thisWeek)
+    if (phase === 'active' || unlockedThisWeek) {
+      entries.push({ world, weekId: thisWeek, isCurrent: true })
+    }
+    const pendingPast = getPendingClaimWeeks(world.id).filter(w => w < thisWeek)
+    for (const pw of pendingPast) {
+      entries.push({ world, weekId: pw, isCurrent: false })
+    }
+  }
 
   function handlePlay(world: World) {
     playSfx('uiTap')
@@ -95,20 +130,31 @@ export default function WeeklyEvents() {
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-5">
-        {events.map(world => {
-          const unlocked  = isEventUnlockedThisWeek(world.id)
+        {entries.map(({ world, weekId, isCurrent }) => {
           const cost      = world.cost ?? 0
           const canAfford = galaBalance >= cost
-          const isOpen    = showLeaderboard === world.id
+          const cardKey   = `${world.id}:${weekId}`
+          const isOpen    = showLeaderboard === cardKey
+          // The "entered" flag is only meaningful for the current-week card
+          // (past-week cards exist only because the player was entered).
+          const enteredCurrent = isCurrent && isEventUnlockedForWeek(world.id, weekId)
+          // Phase-driven action:
+          //   • current + active + entered     → ENTER EVENT button
+          //   • current + active + not entered → UNLOCK · X GALA button
+          //   • current + settled (entered)    → EVENT ENDED · CLAIM badge
+          //   • past                           → EVENT ENDED · CLAIM badge
+          const isFinished = !isCurrent || phase === 'settled'
 
           return (
-            <div key={world.id} className="btn-3d w-full text-left"
+            <div key={cardKey} className="btn-3d w-full text-left"
               style={{
                 background: world.gradient,
                 border: `4px solid ${world.color}`,
                 borderBottom: `4px solid ${world.color}88`,
                 boxShadow: `0 8px 0 ${world.color}44, 0 0 28px ${world.color}33`,
                 borderRadius:'20px', padding:'20px',
+                // Past-week cards are subtly dimmer so the active card stands out.
+                opacity: isCurrent ? 1 : 0.92,
               }}>
 
               <div className="flex items-center gap-4 mb-3">
@@ -119,7 +165,13 @@ export default function WeeklyEvents() {
                   <div className="font-fredoka text-xl text-white">{world.name}</div>
                   <div className="font-nunito font-bold text-sm" style={{ color:'rgba(255,255,255,0.55)' }}>{world.subtitle}</div>
                 </div>
-                {unlocked ? (
+                {isFinished ? (
+                  <span className="font-fredoka text-xs px-3 py-1 rounded-full"
+                    style={{ background:'rgba(0,0,0,0.35)', color:'#fde68a',
+                      border:`2px solid ${world.color}66`, letterSpacing:'1px' }}>
+                    FINISHED
+                  </span>
+                ) : enteredCurrent ? (
                   <span className="font-fredoka text-xs px-3 py-1 rounded-full"
                     style={{ background:'rgba(14,165,233,0.2)', color:'#7dd3fc',
                       border:`2px solid ${world.color}66`, letterSpacing:'1px' }}>
@@ -133,12 +185,27 @@ export default function WeeklyEvents() {
                 )}
               </div>
 
-              <p className="font-nunito font-bold text-xs mb-4 leading-snug"
-                style={{ color:'rgba(255,255,255,0.65)' }}>
-                {world.description}
-              </p>
+              {isCurrent && (
+                <p className="font-nunito font-bold text-xs mb-4 leading-snug"
+                  style={{ color:'rgba(255,255,255,0.65)' }}>
+                  {world.description}
+                </p>
+              )}
 
-              {unlocked ? (
+              {/* Action row — depends on phase + entry status. */}
+              {isFinished ? (
+                // Finished events: no play affordance, just a CTA pointing the
+                // player at the leaderboard panel where they can claim.
+                <div className="w-full py-3 mb-2 rounded-xl text-center"
+                  style={{
+                    background:'rgba(0,0,0,0.35)',
+                    border:`3px dashed ${world.color}55`,
+                    color:'rgba(255,255,255,0.7)', fontFamily:'Fredoka One,cursive',
+                    fontSize:'0.95rem', letterSpacing:'1px',
+                  }}>
+                  EVENT ENDED · CHECK LEADERBOARD BELOW
+                </div>
+              ) : enteredCurrent ? (
                 <button onClick={() => handlePlay(world)} className="btn-3d w-full py-3 mb-2"
                   style={{
                     background: `linear-gradient(160deg,${world.color},${world.color}cc)`,
@@ -169,7 +236,7 @@ export default function WeeklyEvents() {
                 </button>
               )}
 
-              <button onClick={() => { playSfx('uiTap'); setShowLeaderboard(isOpen ? null : world.id) }}
+              <button onClick={() => { playSfx('uiTap'); setShowLeaderboard(isOpen ? null : cardKey) }}
                 className="btn-3d w-full py-2"
                 style={{
                   background:'rgba(0,0,0,0.3)',
@@ -183,16 +250,22 @@ export default function WeeklyEvents() {
               </button>
 
               {isOpen && (
-                <LeaderboardPanel worldId={world.id} accent={world.color} />
+                <LeaderboardPanel
+                  worldId={world.id}
+                  accent={world.color}
+                  weekId={isCurrent ? undefined : weekId}
+                />
               )}
             </div>
           )
         })}
 
-        {events.length === 0 && (
+        {entries.length === 0 && (
           <p className="font-nunito font-bold text-center"
             style={{ color:'rgba(186,230,253,0.3)' }}>
-            No events running this week. Check back soon.
+            {phase === 'settled'
+              ? 'No events to claim. The next event starts Monday 4pm PST.'
+              : 'No events running this week. Check back soon.'}
           </p>
         )}
       </div>
@@ -254,22 +327,31 @@ function shortAddr(a: string): string {
   return a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a
 }
 
-export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent: string }) {
+export function LeaderboardPanel({ worldId, accent, weekId }: { worldId: WorldId; accent: string; weekId?: number }) {
   const getTotalScore         = useProgressStore(s => s.getTotalScore)
   const getCompletedCount     = useProgressStore(s => s.getCompletedCount)
   const claimEventReward      = useProgressStore(s => s.markEventRewardClaimed)
-  const isRewardClaimed       = useProgressStore(s => s.isEventRewardClaimedThisWeek)
+  const isClaimedForWeek      = useProgressStore(s => s.isEventClaimedForWeek)
+  // Subscribe to eventState so a claim mutation re-renders the panel.
+  useProgressStore(s => s.eventState)
   const showToast             = useGameStore(s => s.showToast)
   // Wallet store — needed so this component re-renders when login state flips.
   const walletAddress         = useWalletStore(s => s.address)
   const jwt                   = useWalletStore(s => s.jwt)
+
+  // Which week does this panel represent? Defaults to "the current one".
+  // Past-week panels are rendered for entered events whose competition window
+  // has closed — see the stacked-cards layout in the main events component.
+  const thisWeek   = currentWeekId()
+  const targetWeek = weekId ?? thisWeek
+  const isPastWeek = targetWeek < thisWeek
 
   const score        = getTotalScore(worldId)
   const completed    = getCompletedCount(worldId)
   const worldMeta    = WORLDS.find(w => w.id === worldId)
   const totalLevels  = worldMeta?.levels.length ?? 0
   const worldIcon    = worldMeta?.icon ?? '🏆'
-  const claimed      = isRewardClaimed(worldId)
+  const claimed      = isClaimedForWeek(worldId, targetWeek)
 
   // Server-side data
   const [board, setBoard] = useState<LeaderboardResponse | null>(null)
@@ -285,7 +367,14 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
     async function load() {
       setLoading(true); setError(null)
       try {
-        const data = await api.get<LeaderboardResponse>(`/api/leaderboard/${encodeURIComponent(worldId)}`)
+        // Past weeks are fetched explicitly with ?week=N. Current week
+        // requests omit the param so the server's idea of "now" wins —
+        // which is harmless because the server's currentWeekId matches the
+        // client's (both are epoch-anchored, timezone-free).
+        const url = isPastWeek
+          ? `/api/leaderboard/${encodeURIComponent(worldId)}?week=${targetWeek}`
+          : `/api/leaderboard/${encodeURIComponent(worldId)}`
+        const data = await api.get<LeaderboardResponse>(url)
         if (!cancelled) setBoard(data)
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? 'Could not load leaderboard')
@@ -297,25 +386,25 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
     return () => { cancelled = true }
   // Re-fetch when the player's JWT changes (login/logout) so the `you` row
   // appears or disappears appropriately, when their local score changes so
-  // a freshly-submitted run is reflected, or when the manual refresh button
-  // is tapped.
-  }, [worldId, jwt, score, refreshTick])
+  // a freshly-submitted run is reflected, when the manual refresh button is
+  // tapped, or when the target week changes (e.g. a past-week card mounts).
+  }, [worldId, jwt, score, refreshTick, targetWeek, isPastWeek])
 
   // Rank-driven reward — if the server returned a top-3 rank for the player,
-  // they're eligible to claim that tier… BUT only after the event's active
-  // window has closed (Sun 00:00 PST). Letting players claim mid-event would
-  // mean they could lock in a rank-1 reward and then keep playing to widen
-  // their lead, which defeats the "weekly competition" framing. See
-  // gameUtils.eventPhase for the time-window definition.
+  // they're eligible to claim that tier. The phase gate ("settled or later")
+  // protects mid-event claims for the CURRENT week. For past weeks the gate
+  // is automatically satisfied — by definition a past week's competition has
+  // ended, so a participant can still claim any time. See gameUtils.eventPhase.
   const phase      = eventPhase()
   const serverRank = board?.you?.rank ?? null
   const rewardTier = serverRank && serverRank <= 3 ? REWARDS.find(r => r.rank === serverRank) : null
-  const eligible   = !!rewardTier && !claimed && phase === 'settled'
+  const claimWindowOpen = isPastWeek || phase === 'settled'
+  const eligible   = !!rewardTier && !claimed && claimWindowOpen
 
   function handleClaim() {
     if (!eligible || !rewardTier) return
     useGameStore.setState(s => ({ hints: s.hints + rewardTier.hints }) as any)
-    claimEventReward(worldId)
+    claimEventReward(worldId, targetWeek)
     showToast(`✓ Rank #${rewardTier.rank} reward claimed · +${rewardTier.hints} hints`)
   }
 
@@ -483,22 +572,29 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
         </div>
       )}
 
-      {/* Local-progress summary row (always visible). */}
-      <div className="flex items-center justify-between rounded-lg px-3 py-2 mb-3"
-        style={{ background:`${accent}22`, border:`1.5px solid ${accent}66` }}>
-        <div className="flex items-center gap-2">
-          <span className="font-fredoka text-xs px-1.5 py-0.5 rounded"
-            style={{ background:'rgba(0,0,0,0.4)', color:'#fff' }}>YOU</span>
-          <span className="font-nunito font-bold text-xs" style={{ color:'rgba(255,255,255,0.65)' }}>
-            {completed}/{totalLevels} levels
+      {/* Local-progress summary row — only meaningful for the CURRENT week's
+          panel. For past weeks the player's per-level progress was wiped
+          when they entered the new week, so the local count/score numbers
+          would be misleading. The server leaderboard rows above still show
+          their authoritative score for the past week. */}
+      {!isPastWeek && (
+        <div className="flex items-center justify-between rounded-lg px-3 py-2 mb-3"
+          style={{ background:`${accent}22`, border:`1.5px solid ${accent}66` }}>
+          <div className="flex items-center gap-2">
+            <span className="font-fredoka text-xs px-1.5 py-0.5 rounded"
+              style={{ background:'rgba(0,0,0,0.4)', color:'#fff' }}>YOU</span>
+            <span className="font-nunito font-bold text-xs" style={{ color:'rgba(255,255,255,0.65)' }}>
+              {completed}/{totalLevels} levels
+            </span>
+          </div>
+          <span className="font-fredoka text-sm" style={{ color: accent }}>
+            ⭐ {score.toLocaleString()}
           </span>
         </div>
-        <span className="font-fredoka text-sm" style={{ color: accent }}>
-          ⭐ {score.toLocaleString()}
-        </span>
-      </div>
+      )}
 
-      {/* Claim button — only enabled when server-rank ≤ 3 and not yet claimed. */}
+      {/* Claim button — enabled when server-rank ≤ 3, not yet claimed, and
+          the claim window is open (settled phase OR past week). */}
       {claimed ? (
         <button disabled className="btn-3d w-full py-2"
           style={{
@@ -509,7 +605,7 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
             borderRadius:'10px',
             color:'rgba(255,255,255,0.5)', fontFamily:'Fredoka One,cursive', fontSize:'0.85rem',
           }}>
-          ✓ REWARD CLAIMED THIS WEEK
+          ✓ REWARD CLAIMED
         </button>
       ) : (
         <button onClick={handleClaim} disabled={!eligible} className="btn-3d w-full py-2"
@@ -526,12 +622,10 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
             cursor: eligible ? 'pointer' : 'not-allowed',
           }}>
           {/* Disabled-state copy reads the player's exact situation rather
-              than a generic catch-all. The "climb N spots" string surfaces
-              the actual gap to top-3 so the player knows what they're
-              shooting for instead of just "keep climbing". A top-3 player
-              who is still mid-event gets a "waiting for week-end" message
-              so they know the reward will become claimable, not that
-              something is broken. */}
+              than a generic catch-all. For a past week we surface the
+              player's final rank (no climbing possible — competition's over).
+              For the current week we surface either "wait for week end" or
+              the actual gap to top-3 so they know what they're shooting for. */}
           {eligible && rewardTier
             ? `CLAIM RANK #${rewardTier.rank} · +${rewardTier.hints} HINTS`
             : !walletAddress
@@ -539,10 +633,12 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
               : !jwt
                 ? 'SIGN IN TO QUALIFY'
                 : serverRank === null
-                  ? 'PLAY A LEVEL TO QUALIFY'
-                  : serverRank <= 3 && phase === 'active'
-                    ? 'EVENT IN PROGRESS · CLAIM AT WEEK END'
-                    : `#${serverRank} · CLIMB ${serverRank - 3} ${serverRank - 3 === 1 ? 'SPOT' : 'SPOTS'}`}
+                  ? (isPastWeek ? 'NO REWARD — DID NOT FINISH A LEVEL' : 'PLAY A LEVEL TO QUALIFY')
+                  : isPastWeek
+                    ? `FINAL RANK · #${serverRank}`
+                    : serverRank <= 3 && phase === 'active'
+                      ? 'EVENT IN PROGRESS · CLAIM AT WEEK END'
+                      : `#${serverRank} · CLIMB ${serverRank - 3} ${serverRank - 3 === 1 ? 'SPOT' : 'SPOTS'}`}
         </button>
       )}
     </div>

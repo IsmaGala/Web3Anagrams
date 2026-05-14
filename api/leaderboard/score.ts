@@ -12,7 +12,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'
-import { currentWeekId } from '../_lib/week.js'
+import { currentWeekId, eventPhase } from '../_lib/week.js'
 
 const MAX_SCORE = 100_000      // sanity cap; tune as the scoring model grows
 
@@ -37,6 +37,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > MAX_SCORE) {
     return res.status(400).json({ error: `score must be a number in [0, ${MAX_SCORE}]` })
   }
+
+  // Reject score submissions during the settled phase. The client UI prevents
+  // play during settled, so a request arriving here is either a stale in-flight
+  // call from a player who finished a level just before the cutoff (acceptable
+  // to drop quietly) or a deliberate hand-crafted POST trying to pollute the
+  // next week's leaderboard before the next ACTIVE window opens. Either way,
+  // 423 Locked tells the client "valid request, wrong phase".
+  if (eventPhase() === 'settled') {
+    return res.status(423).json({ error: 'Event is in claim window — score submissions are closed until the next event begins' })
+  }
+
   const intScore = Math.floor(score)
   const week     = currentWeekId()
 

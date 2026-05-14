@@ -18,10 +18,20 @@ interface WorldProgress {
   levels: Record<number, LevelProgress>  // levelIndex → progress
 }
 
-// Per-event state: which week was unlocked, and which week's reward has been claimed.
+// Per-event state, scoped to a single (worldId, weekId) competition.
+// Unlocked = the player paid to enter that week's event.
+// Claimed  = the player has taken their rank-based reward for that week.
+//
+// Tracking it per-week (rather than the single most-recent week) is what
+// lets entered events "stack" — a player who joined two weeks in a row but
+// only claimed week N still sees a pending-claim card for week N+1 after
+// the new event starts.
+export interface EventWeekRecord {
+  unlocked: boolean
+  claimed:  boolean
+}
 interface EventState {
-  unlockedWeek?: number   // week-id when last unlocked (must equal current week to play)
-  claimedWeek?:  number   // last week-id the reward was claimed for
+  weeks: Record<number, EventWeekRecord>   // weekId → record
 }
 
 interface ProgressState {
@@ -43,12 +53,21 @@ interface ProgressState {
   markPremiumUnlocked: (worldId: WorldId) => void
   isPremiumUnlocked:   (worldId: WorldId) => boolean
 
-  // Weekly events
-  unlockEventForWeek:    (worldId: WorldId) => void
+  // Weekly events — per-week tracking. The "this week" sugar helpers below
+  // are kept for backward compatibility with existing call sites; new code
+  // should reach for the explicit per-week variants.
+  unlockEventForWeek:    (worldId: WorldId) => void                    // current week
   isEventUnlockedThisWeek:(worldId: WorldId) => boolean
-  markEventRewardClaimed:(worldId: WorldId) => void
+  markEventRewardClaimed:(worldId: WorldId, weekId?: number) => void   // defaults to current
   isEventRewardClaimedThisWeek: (worldId: WorldId) => boolean
-  forceEventReset:       (worldId: WorldId) => void   // dev helper
+  forceEventReset:       (worldId: WorldId) => void                    // dev helper
+
+  // Per-week variants.
+  isEventUnlockedForWeek:(worldId: WorldId, weekId: number) => boolean
+  isEventClaimedForWeek: (worldId: WorldId, weekId: number) => boolean
+  /** Sorted desc (newest first) list of weekIds where the player joined
+   *  this event but hasn't claimed their reward yet. */
+  getPendingClaimWeeks:  (worldId: WorldId) => number[]
 
   // Daily lockout — daily can be attempted once per local calendar day.
   // A stored attempt with a stale dateKey is treated as "no attempt today".
@@ -88,8 +107,52 @@ function loadPremiumFromStorage(): Partial<Record<WorldId, boolean>> {
 function saveEvents(map: Partial<Record<WorldId, EventState>>) {
   try { localStorage.setItem(EVENT_KEY, JSON.stringify(map)) } catch {}
 }
+
+/** Migrate the pre-stacking shape `{ unlockedWeek?, claimedWeek? }` into the
+ *  per-week shape `{ weeks: { [weekId]: { unlocked, claimed } } }`. Both
+ *  fields, if present, become entries in the weeks map. If a record is
+ *  already in the new shape (has `.weeks`), we pass it through unchanged. */
+function migrateEventState(raw: unknown): Partial<Record<WorldId, EventState>> {
+  if (!raw || typeof raw !== 'object') return {}
+  const src = raw as Record<string, any>
+  const out: Partial<Record<WorldId, EventState>> = {}
+  for (const wid of Object.keys(src)) {
+    const v = src[wid]
+    if (!v || typeof v !== 'object') continue
+    // New shape — already migrated. Sanitize the weeks map.
+    if (v.weeks && typeof v.weeks === 'object') {
+      const weeks: Record<number, EventWeekRecord> = {}
+      for (const k of Object.keys(v.weeks)) {
+        const rec = v.weeks[k]
+        const weekId = parseInt(k, 10)
+        if (!Number.isFinite(weekId) || !rec) continue
+        weeks[weekId] = { unlocked: !!rec.unlocked, claimed: !!rec.claimed }
+      }
+      out[wid as WorldId] = { weeks }
+      continue
+    }
+    // Old shape — fold the flat fields into the weeks map.
+    const weeks: Record<number, EventWeekRecord> = {}
+    if (typeof v.unlockedWeek === 'number') {
+      weeks[v.unlockedWeek] = { unlocked: true, claimed: v.claimedWeek === v.unlockedWeek }
+    }
+    if (typeof v.claimedWeek === 'number' && v.claimedWeek !== v.unlockedWeek) {
+      // If a claim exists for a different week than the most-recent unlock,
+      // assume the player must have entered that week too — we never tracked
+      // claims for events they didn't enter.
+      weeks[v.claimedWeek] = { unlocked: true, claimed: true }
+    }
+    out[wid as WorldId] = { weeks }
+  }
+  return out
+}
+
 function loadEventsFromStorage(): Partial<Record<WorldId, EventState>> {
-  try { const raw = localStorage.getItem(EVENT_KEY); if (raw) return JSON.parse(raw) } catch {}
+  try {
+    const raw = localStorage.getItem(EVENT_KEY)
+    if (!raw) return {}
+    return migrateEventState(JSON.parse(raw))
+  } catch {}
   return {}
 }
 
@@ -176,23 +239,50 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   isPremiumUnlocked: (worldId) => !!get().unlockedPremium[worldId],
 
   // ── Weekly events ───────────────────────────────────────────────────────
-  // Unlocks are tied to the week-id (epoch / WEEK_MS). When the week rolls
-  // over, the stored week-id no longer matches currentWeekId() and the event
-  // appears locked again, requiring another 5-GALA purchase.
+  // Per-week records so entered events persist across week boundaries. A
+  // player who joined week N but didn't claim still sees a pending-claim
+  // card after the new week starts; the eventState.weeks[N] record survives.
+  //
+  // When a player enters a NEW week (one with no existing record), we wipe
+  // the per-level progress in `worlds[worldId]` because the leaderboard for
+  // that new week starts at zero. The previous week's level-by-level scores
+  // are gone from the client (they live only on the server's leaderboard
+  // rows from now on) — see WeeklyEvents.tsx for how past-week cards rely
+  // on the server's leaderboard data rather than local progress.
+
+  isEventUnlockedForWeek: (worldId, weekId) =>
+    !!get().eventState[worldId]?.weeks?.[weekId]?.unlocked,
+
+  isEventClaimedForWeek: (worldId, weekId) =>
+    !!get().eventState[worldId]?.weeks?.[weekId]?.claimed,
+
+  getPendingClaimWeeks: (worldId) => {
+    const weeks = get().eventState[worldId]?.weeks ?? {}
+    return Object.entries(weeks)
+      .filter(([, rec]) => rec.unlocked && !rec.claimed)
+      .map(([k]) => parseInt(k, 10))
+      .filter(n => Number.isFinite(n))
+      .sort((a, b) => b - a)
+  },
+
   unlockEventForWeek: (worldId) => {
     const week = currentWeekId()
-    // Wipe last week's per-event level progress when re-unlocking — this is a
-    // fresh attempt with a clean leaderboard.
-    const currentEvent = get().eventState[worldId]
-    const isNewWeek = currentEvent?.unlockedWeek !== week
-    const updatedEvent = {
+    const cur = get().eventState[worldId] ?? { weeks: {} }
+    const alreadyUnlocked = !!cur.weeks[week]?.unlocked
+    const updatedEvent: Partial<Record<WorldId, EventState>> = {
       ...get().eventState,
-      [worldId]: { ...currentEvent, unlockedWeek: week },
+      [worldId]: {
+        weeks: {
+          ...cur.weeks,
+          [week]: { unlocked: true, claimed: cur.weeks[week]?.claimed ?? false },
+        },
+      },
     }
     saveEvents(updatedEvent)
 
-    if (isNewWeek) {
-      // Reset the event world's level progress for the new week.
+    if (!alreadyUnlocked) {
+      // Fresh week → reset the per-level progress so this week's leaderboard
+      // run starts from zero. Past weeks' data lives on the server.
       const w = get().worlds
       const wipedWorlds = { ...w, [worldId]: { levels: {} } }
       save(wipedWorlds)
@@ -203,25 +293,32 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   },
 
   isEventUnlockedThisWeek: (worldId) =>
-    get().eventState[worldId]?.unlockedWeek === currentWeekId(),
+    get().isEventUnlockedForWeek(worldId, currentWeekId()),
 
-  markEventRewardClaimed: (worldId) => {
-    const week = currentWeekId()
-    const next = {
+  markEventRewardClaimed: (worldId, weekId) => {
+    const week = weekId ?? currentWeekId()
+    const cur = get().eventState[worldId] ?? { weeks: {} }
+    const prevRec = cur.weeks[week] ?? { unlocked: true, claimed: false }
+    const next: Partial<Record<WorldId, EventState>> = {
       ...get().eventState,
-      [worldId]: { ...get().eventState[worldId], claimedWeek: week },
+      [worldId]: {
+        weeks: {
+          ...cur.weeks,
+          [week]: { unlocked: prevRec.unlocked, claimed: true },
+        },
+      },
     }
     saveEvents(next)
     set({ eventState: next })
   },
 
   isEventRewardClaimedThisWeek: (worldId) =>
-    get().eventState[worldId]?.claimedWeek === currentWeekId(),
+    get().isEventClaimedForWeek(worldId, currentWeekId()),
 
   forceEventReset: (worldId) => {
     const w = get().worlds
     const wipedWorlds = { ...w, [worldId]: { levels: {} } }
-    const next = { ...get().eventState, [worldId]: {} }
+    const next = { ...get().eventState, [worldId]: { weeks: {} } }
     save(wipedWorlds); saveEvents(next)
     set({ worlds: wipedWorlds, eventState: next })
   },
