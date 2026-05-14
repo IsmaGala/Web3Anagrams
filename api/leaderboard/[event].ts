@@ -46,9 +46,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = sql()
 
   // Top N entries with dense rank.
+  //
+  // NOTE: RANK() returns a Postgres `bigint`, which @neondatabase/serverless
+  // deserializes as a JS *string* (to dodge int53 precision issues). Casting
+  // to INT here keeps the value comfortably within JS number range and lets
+  // the wire format come back as a real number, so strict-equality / arithmetic
+  // on the client work without surprise coercions.
   const top = await db`
     SELECT
-      RANK() OVER (ORDER BY score DESC, updated_at ASC) AS rank,
+      RANK() OVER (ORDER BY score DESC, updated_at ASC)::int AS rank,
       address,
       score
     FROM scores
@@ -57,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     LIMIT ${TOP_N}
   ` as Array<{ rank: number; address: string; score: number }>
 
-  // Caller's own row, if authenticated.
+  // Caller's own row, if authenticated. Same INT cast applies.
   let you: { rank: number; address: string; score: number } | null = null
   const authAddress = await requireAuth(req.headers.authorization)
   if (authAddress) {
@@ -66,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         SELECT
           address,
           score,
-          RANK() OVER (ORDER BY score DESC, updated_at ASC) AS rank
+          RANK() OVER (ORDER BY score DESC, updated_at ASC)::int AS rank
         FROM scores
         WHERE event_id = ${eventId} AND week_id = ${week}
       )

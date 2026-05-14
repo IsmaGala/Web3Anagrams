@@ -52,12 +52,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   `
 
   // Recompute the player's rank with their (possibly improved) score.
+  // Cast RANK() to INT so the value comes back as a JS number (the neon
+  // serverless driver returns bigint as a string by default). Mirrors the
+  // same cast in /api/leaderboard/[event].ts.
   const ranked = await db`
     WITH r AS (
       SELECT
         address,
         score,
-        RANK() OVER (ORDER BY score DESC, updated_at ASC) AS rank
+        RANK() OVER (ORDER BY score DESC, updated_at ASC)::int AS rank
       FROM scores
       WHERE event_id = ${eventId} AND week_id = ${week}
     )

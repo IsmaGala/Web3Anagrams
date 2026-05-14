@@ -324,7 +324,7 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
           can't pile up requests. */}
       <div className="flex items-center justify-between mb-2">
         <div className="font-fredoka text-sm" style={{ color: accent, letterSpacing:'1.5px' }}>
-          LEADERBOARD {board && <span style={{ color:'rgba(255,255,255,0.4)' }}>· WEEK {board.week}</span>}
+          LEADERBOARD
         </div>
         <button
           onClick={() => { playSfx('uiTap'); setRefreshTick(t => t + 1) }}
