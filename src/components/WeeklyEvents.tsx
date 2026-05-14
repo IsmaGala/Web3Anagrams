@@ -4,7 +4,7 @@ import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
-import { timeToNextWeek, formatWeekCountdown } from '../utils/gameUtils'
+import { timeToNextWeek, formatWeekCountdown, eventPhase } from '../utils/gameUtils'
 import { playSfx } from '../utils/sfx'
 import { api } from '../utils/apiClient'
 
@@ -302,10 +302,15 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
   }, [worldId, jwt, score, refreshTick])
 
   // Rank-driven reward — if the server returned a top-3 rank for the player,
-  // they're eligible to claim that tier; otherwise no reward this week.
+  // they're eligible to claim that tier… BUT only after the event's active
+  // window has closed (Sun 00:00 PST). Letting players claim mid-event would
+  // mean they could lock in a rank-1 reward and then keep playing to widen
+  // their lead, which defeats the "weekly competition" framing. See
+  // gameUtils.eventPhase for the time-window definition.
+  const phase      = eventPhase()
   const serverRank = board?.you?.rank ?? null
   const rewardTier = serverRank && serverRank <= 3 ? REWARDS.find(r => r.rank === serverRank) : null
-  const eligible   = !!rewardTier && !claimed
+  const eligible   = !!rewardTier && !claimed && phase === 'settled'
 
   function handleClaim() {
     if (!eligible || !rewardTier) return
@@ -523,7 +528,10 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
           {/* Disabled-state copy reads the player's exact situation rather
               than a generic catch-all. The "climb N spots" string surfaces
               the actual gap to top-3 so the player knows what they're
-              shooting for instead of just "keep climbing". */}
+              shooting for instead of just "keep climbing". A top-3 player
+              who is still mid-event gets a "waiting for week-end" message
+              so they know the reward will become claimable, not that
+              something is broken. */}
           {eligible && rewardTier
             ? `CLAIM RANK #${rewardTier.rank} · +${rewardTier.hints} HINTS`
             : !walletAddress
@@ -532,7 +540,9 @@ export function LeaderboardPanel({ worldId, accent }: { worldId: WorldId; accent
                 ? 'SIGN IN TO QUALIFY'
                 : serverRank === null
                   ? 'PLAY A LEVEL TO QUALIFY'
-                  : `#${serverRank} · CLIMB ${serverRank - 3} ${serverRank - 3 === 1 ? 'SPOT' : 'SPOTS'}`}
+                  : serverRank <= 3 && phase === 'active'
+                    ? 'EVENT IN PROGRESS · CLAIM AT WEEK END'
+                    : `#${serverRank} · CLIMB ${serverRank - 3} ${serverRank - 3 === 1 ? 'SPOT' : 'SPOTS'}`}
         </button>
       )}
     </div>

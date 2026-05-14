@@ -328,3 +328,57 @@ export function formatWeekCountdown(ms: number): string {
   const s = total % 60
   return `${d}d ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
 }
+
+// ── Weekly event PHASE (not the same as week ID) ─────────────────────────────
+// The week ID partitions leaderboard data into 7-day chunks anchored to the
+// Unix epoch. The *phase* is the human-readable lifecycle state of the current
+// event from the player's point of view:
+//
+//   ACTIVE   — players can play levels and submit scores.
+//              Mon 16:00 PST → Sun 00:00 PST  (≈ 5d 8h)
+//   SETTLED  — event window has closed. Players who entered can claim their
+//              rank-based reward, but new scores cannot be earned.
+//              Sun 00:00 PST → next Mon 16:00 PST  (≈ 40h)
+//
+// Times are in America/Los_Angeles (handles PST↔PDT automatically). We read
+// the local weekday + hour via Intl.DateTimeFormat rather than hand-rolling
+// an offset, because doing the latter requires re-implementing DST rules and
+// is a perennial source of subtle bugs.
+//
+// The phase is purely a UI gate today — server-side score submission is not
+// yet aware of phase, so a determined client could still POST a score during
+// settled phase. Tightening the server is a follow-up.
+
+export type EventPhase = 'active' | 'settled'
+
+/** Decompose a Date into America/Los_Angeles weekday + hour. Sunday = 0. */
+function pstDayHour(d: Date): { day: number; hour: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    weekday: 'short',
+    hour: 'numeric',
+    hour12: false,
+  }).formatToParts(d)
+  const weekday = parts.find(p => p.type === 'weekday')?.value ?? 'Sun'
+  const hourRaw = parts.find(p => p.type === 'hour')?.value ?? '0'
+  // Intl with hour12:false can occasionally emit '24' for midnight — normalize.
+  const hour = parseInt(hourRaw, 10) % 24
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }
+  return { day: dayMap[weekday] ?? 0, hour }
+}
+
+/** Current event phase based on America/Los_Angeles wall-clock. */
+export function eventPhase(now: Date = new Date()): EventPhase {
+  const { day, hour } = pstDayHour(now)
+  // Settled windows:
+  //   • Sunday — any time
+  //   • Monday before 16:00 — still recovering from the previous event
+  if (day === 0) return 'settled'
+  if (day === 1 && hour < 16) return 'settled'
+  return 'active'
+}
+
+/** Human-readable label for when the current phase will flip. */
+export function eventPhaseEndsAt(now: Date = new Date()): string {
+  return eventPhase(now) === 'active' ? 'Sun 00:00 PST' : 'Mon 16:00 PST'
+}
