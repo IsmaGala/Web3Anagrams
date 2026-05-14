@@ -12,7 +12,7 @@
 // Reference: docs/wallet/WALLET_AUTH.md §5
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { verifyMessage } from 'ethers'
+import { verifyMessage, keccak256, recoverAddress } from 'ethers'
 import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
 import { signSession } from '../_lib/jwt.js'
@@ -22,6 +22,30 @@ function isHexAddress(s: unknown): s is string {
 }
 function isHex(s: unknown): s is string {
   return typeof s === 'string' && /^0x[a-fA-F0-9]+$/.test(s)
+}
+
+/** Recover the signer's address from a nonce + signature using every
+ *  personal_sign variant we've seen in the wild. MetaMask uses standard
+ *  EIP-191 over the raw message; Gala Wallet hex-encodes the message bytes
+ *  first; older GalaChain chaincode tooling drops EIP-191 and just keccaks
+ *  the hex form. We accept whichever recovers an address that matches the
+ *  nonce-requester — they all require the same private key, so trying them
+ *  in series does not expose us to forgery. Reference: WALLET_AUTH.md §10 #2.
+ */
+function recoverAll(nonce: string, signature: string): string[] {
+  const out: string[] = []
+  const hex = '0x' + Buffer.from(nonce, 'utf8').toString('hex')
+
+  // 1. Standard EIP-191 — MetaMask, modern Gala Wallet.
+  try { out.push(verifyMessage(nonce, signature).toLowerCase()) } catch {}
+
+  // 2. EIP-191 over the hex-encoded message — Gala Wallet caveat #2.
+  try { out.push(verifyMessage(hex, signature).toLowerCase()) } catch {}
+
+  // 3. Raw keccak256 of "0x" + hex(msg) — legacy GalaChain chaincode style.
+  try { out.push(recoverAddress(keccak256(hex), signature).toLowerCase()) } catch {}
+
+  return out
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -53,14 +77,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Nonce expired — request a new one' })
   }
 
-  // 2-3. Recover signer & compare.
-  let recovered: string
-  try {
-    recovered = verifyMessage(nonce, signature).toLowerCase()
-  } catch (e: any) {
-    return res.status(400).json({ error: 'Signature could not be recovered: ' + (e?.message ?? 'unknown') })
+  // 2-3. Recover signer & compare — try all known personal_sign variants.
+  // (MetaMask, modern Gala Wallet, legacy chaincode hash.) Accept if any
+  // variant recovers the requesting address; otherwise reject.
+  const recovered = recoverAll(nonce, signature)
+  if (recovered.length === 0) {
+    return res.status(400).json({ error: 'Signature could not be recovered' })
   }
-  if (recovered !== key) {
+  if (!recovered.includes(key)) {
     return res.status(401).json({ error: 'Signature does not match the requesting address' })
   }
 
