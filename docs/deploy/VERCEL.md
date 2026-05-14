@@ -254,3 +254,120 @@ If anything misbehaves, check the function logs in Vercel → Project →
 - **`Signature does not match…`** — usually a wallet that returned
   `eth|...` and we forgot to strip the prefix. The client's
   `signMessage()` handles this — if you see it, file a bug.
+
+---
+
+# V3 — Cross-device profile sync
+
+After the v2 backend is live, v3 wires the JWT into a real save layer.
+Every piece of player state the client tracks locally (economy, world
+progress, premium unlocks, event state, daily attempt) gets mirrored to a
+new `player_state` table keyed by wallet address. Two new endpoints:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/profile`      | GET  | Return the latest payload for the JWT's address (or null) |
+| `/api/profile/sync` | POST | UPSERT a payload by JWT's address (max 200 KB) |
+
+The schema is intentionally JSONB-only so the client can ship new state
+buckets without DB migrations. Server validates address (from JWT), method,
+and payload size; everything else is client-owned.
+
+## 1. Apply the migration
+
+In Neon SQL Editor, paste `migrations/0002_player_state.sql` and run. Verify:
+
+```sql
+SELECT count(*) FROM player_state;   -- 0 on a fresh table
+```
+
+## 2. Env vars
+
+No new env vars. `DATABASE_URL` + `JWT_SECRET` from v2 are sufficient.
+
+## 3. Push and smoke-test
+
+```powershell
+git add .
+git commit -m "V3: cross-device profile sync"
+git push
+```
+
+After deploy goes green:
+
+```powershell
+$base = "https://web3-anagrams.vercel.app"
+
+# Without a JWT — both should return 401
+Invoke-RestMethod "$base/api/profile"
+Invoke-RestMethod -Uri "$base/api/profile/sync" -Method POST `
+  -ContentType "application/json" -Body '{}'
+```
+
+Both should error with HTTP 401 ("Missing or invalid Authorization bearer
+token"). That confirms the JWT middleware is in place. For an authenticated
+smoke-test, log in via the browser first and grab the JWT from
+`localStorage.wc_wallet_v1`, then:
+
+```powershell
+$jwt = "<paste-jwt-here>"
+Invoke-RestMethod "$base/api/profile" -Headers @{ Authorization = "Bearer $jwt" }
+```
+
+Expected: `{ address: "0x...", payload: null, updatedAt: null }` on first
+fetch. After playing one level and waiting ~3 seconds for the debounce, the
+same call returns the real payload.
+
+## 4. Verify in the browser
+
+1. Open the deployed splash, **CONNECT WALLET**, complete the
+   sign-in flow.
+2. Play a level — score goes up, GALA + hints update.
+3. **Wait ~3 seconds** (the push debounce) and check Vercel → Logs filtered
+   to `/api/profile/sync`. You should see a 200 invocation.
+4. **Open the same URL on your phone**, log in with the **same wallet**.
+   The splash should hydrate with the levels you completed on desktop,
+   your premium unlocks, your GALA balance, your daily attempt status.
+
+## 5. Conflict resolution
+
+If a player runs the game on two devices simultaneously, the merge rules
+are conservative and player-friendly:
+
+| Bucket | Rule |
+|---|---|
+| Per-level score      | `MAX(local, server)` |
+| Per-level completion | OR (either side completed → completed) |
+| Premium unlocks      | UNION |
+| Event unlock/claim   | `MAX(weekId)` per event |
+| Daily attempt        | latest `dateKey`; same-day ties prefer `'won'` |
+| GALA balance         | `MAX(local, server)` (friendly — see note below) |
+| Hint count           | `MAX(local, server)` |
+
+> **Economy max-merge is friendly but exploitable.** A determined cheater
+> could edit localStorage on one device to inflate GALA, then sync. While
+> GALA is mock this is acceptable; when GALA moves on-chain (v4), the
+> economy section drops out of the sync payload entirely.
+
+## 6. Files added in v3
+
+```
+migrations/0002_player_state.sql   — schema
+api/profile.ts                     — GET handler
+api/profile/sync.ts                — POST handler
+api/profile/index.ts               — stub (see note below)
+src/utils/profileSync.ts           — client merge/push/pull logic
+src/App.tsx                        — lifecycle hooks
+```
+
+### Note about `api/profile/index.ts`
+
+This file is a no-op stub I couldn't delete from my sandbox during
+development. It does NOT export a default handler, so Vercel ignores it.
+You can safely remove it from the repo:
+
+```powershell
+git rm api/profile/index.ts
+git commit -m "Remove stub api/profile/index.ts"
+git push
+```
