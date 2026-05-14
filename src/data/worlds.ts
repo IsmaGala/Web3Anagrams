@@ -3,7 +3,7 @@ import type { Level } from '../types'
 export type WorldId =
   | 'townstar' | 'mirandus' | 'galaswap' | 'eternalnight'
   | 'area51' | 'asimov' | 'nature'
-  | 'oceanevent'
+  | 'oceanevent' | 'blooddonor'
   | 'coming_soon'
 
 export interface World {
@@ -20,5 +20,11 @@ export interface World {
   premium?:    boolean         // sold for GALA in the Premium section
   event?:      boolean         // sold for GALA in the Weekly Events section (resets weekly)
   cost?:       number          // GALA price (used by both premium and event)
+  /** For event worlds: the ISO date (YYYY-MM-DD) of the Monday this event
+   *  becomes ACTIVE. Used to schedule which event runs on which week — the
+   *  Mon 16:00 PST of this date is the boundary where the event flips from
+   *  "upcoming" to "active". The next Mon 16:00 PST flips it from "active"
+   *  to "past". Non-event worlds ignore this field. */
+  startDate?:  string
   levels:      Level[]
 }

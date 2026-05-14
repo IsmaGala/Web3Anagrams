@@ -7,6 +7,7 @@ import { AREA51_LEVELS }       from './area51Levels'
 import { ASIMOV_LEVELS }       from './asimovLevels'
 import { NATURE_LEVELS }       from './natureLevels'
 import { OCEAN_EVENT_LEVELS }  from './oceanEventLevels'
+import { BLOOD_DONOR_LEVELS }  from './bloodDonorLevels'
 
 export const WORLDS: World[] = [
   {
@@ -111,7 +112,27 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
+    startDate:   '2026-05-11',     // week of May 11 — this week's event
     levels:      OCEAN_EVENT_LEVELS,
+  },
+  {
+    // World Blood Donor Day — annual observance on June 14. Scheduled here
+    // for the following Monday so it's immediately visible as the "upcoming"
+    // card while Deep Sea is still active. Move startDate to '2026-06-08'
+    // when you want it to align with the actual June 14 observance.
+    id:          'blooddonor',
+    name:        'Blood Donor Day',
+    subtitle:    'Next Week\'s Event',
+    icon:        '🩸',
+    description: '10 levels through the language of blood donation — veins, pulses, plasma, the people and the courage. Honors World Blood Donor Day (June 14). Unlocks for 5 GALA per week.',
+    color:       '#ef4444',
+    gradient:    'linear-gradient(135deg, #450a0a 0%, #7f1d1d 50%, #991b1b 100%)',
+    levelCount:  BLOOD_DONOR_LEVELS.length,
+    unlockAfter: 0,
+    event:       true,
+    cost:        5,
+    startDate:   '2026-05-18',     // week of May 18 — next week's event (testing slot)
+    levels:      BLOOD_DONOR_LEVELS,
   },
   {
     id:          'coming_soon',

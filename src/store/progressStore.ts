@@ -86,6 +86,7 @@ function emptyProgress(): Record<WorldId, WorldProgress> {
     asimov:       { levels: {} },
     nature:       { levels: {} },
     oceanevent:   { levels: {} },
+    blooddonor:   { levels: {} },
     coming_soon:  { levels: {} },
   }
 }

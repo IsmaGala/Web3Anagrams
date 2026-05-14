@@ -349,6 +349,22 @@ export function currentWeekId(now: Date | number = new Date()): number {
   return Math.floor((pstAsUtcMs(d) - EVENT_WEEK_ANCHOR_PST_MS) / WEEK_MS)
 }
 
+/** Compute the event weekId for a Monday "YYYY-MM-DD" date. The event for
+ *  that week is the one that activates at Mon 16:00 PST of the supplied
+ *  date. Passing a non-Monday date still works — it'll just return the
+ *  weekId of the week containing that date (most recent Mon 16:00 PST
+ *  on-or-before). Returns NaN if the date string is malformed. */
+export function startWeekIdFromDate(dateISO: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateISO)
+  if (!m) return NaN
+  const [, y, mo, d] = m
+  // Treat <date> 18:00 as PST wall-clock (treated-as-UTC for our anchor
+  // math). 18:00 is comfortably past the 16:00 boundary, so the floor()
+  // lands in the correct week regardless of any minute-level drift.
+  const fake = Date.UTC(parseInt(y, 10), parseInt(mo, 10) - 1, parseInt(d, 10), 18, 0, 0)
+  return Math.floor((fake - EVENT_WEEK_ANCHOR_PST_MS) / WEEK_MS)
+}
+
 /** ms until the next week boundary (next Mon 16:00 PST). DEPRECATED for
  *  the events page countdown — use `timeToNextPhaseChange` instead. Kept
  *  for any caller that genuinely wants "next week id flip" timing. */

@@ -4,7 +4,7 @@ import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
-import { formatWeekCountdown, eventPhase, currentWeekId, timeToNextPhaseChange } from '../utils/gameUtils'
+import { formatWeekCountdown, eventPhase, currentWeekId, timeToNextPhaseChange, startWeekIdFromDate } from '../utils/gameUtils'
 import { playSfx } from '../utils/sfx'
 import { api } from '../utils/apiClient'
 
@@ -25,7 +25,12 @@ const REWARDS: { rank: number; label: string; hints: number; icon: string }[] = 
 interface EventCardEntry {
   world:    World
   weekId:   number
-  isCurrent: boolean
+  /** 'active'   — this is THIS week's event (running now, or just finished
+   *              and waiting for the claim window).
+   *  'upcoming' — this is NEXT week's event. Preview only; no purchase,
+   *              no play, no leaderboard.
+   *  'past'     — a past week the player entered but hasn't claimed. */
+  kind:     'active' | 'upcoming' | 'past'
 }
 
 export default function WeeklyEvents() {
@@ -61,24 +66,44 @@ export default function WeeklyEvents() {
   const phase = eventPhase()
   const thisWeek = currentWeekId()
 
-  // Build the list of cards to render. For each event world:
-  //   • Include the current week if we're in ACTIVE phase (anyone can buy in)
-  //     OR the player already entered this week (settled-phase "claim now"
-  //     card for participants).
-  //   • Include every PAST week where the player joined but hasn't claimed —
-  //     these "stack" across weeks per the product spec.
-  // Non-entered events during settled phase get filtered out (they leave the
-  // page once the event finishes, matching "you lose access").
+  // Build the list of cards to render. Each event world is scheduled to be
+  // ACTIVE on exactly one week, controlled by its `startDate`. From the
+  // events page's point of view, on any given day we may see:
+  //
+  //   • The world whose startDate maps to THIS week (active or settling)
+  //   • The world whose startDate maps to NEXT week (upcoming preview)
+  //   • Any number of past weeks the player entered but didn't claim
+  //
+  // Worlds whose scheduled week is in the past with no pending claim
+  // disappear entirely (matches the "you lose access" rule for events
+  // that finish without participation).
   const eventWorlds = WORLDS.filter(w => w.event)
   const entries: EventCardEntry[] = []
   for (const world of eventWorlds) {
+    const startWid = world.startDate ? startWeekIdFromDate(world.startDate) : thisWeek
+    const isThisWeeksEvent = startWid === thisWeek
+    const isNextWeeksEvent = startWid === thisWeek + 1
     const unlockedThisWeek = isEventUnlockedForWeek(world.id, thisWeek)
-    if (phase === 'active' || unlockedThisWeek) {
-      entries.push({ world, weekId: thisWeek, isCurrent: true })
+
+    // Active card — this week's event. Visible if we're in active phase
+    // (anyone can still buy in) OR the player already entered (settled
+    // phase "claim now" affordance for participants).
+    if (isThisWeeksEvent && (phase === 'active' || unlockedThisWeek)) {
+      entries.push({ world, weekId: thisWeek, kind: 'active' })
     }
+    // Upcoming preview — shown regardless of phase. Settled phase is
+    // actually prime real estate for "look what's coming next" since the
+    // current event is winding down. At the Mon 16:00 PST boundary, this
+    // world's `isNextWeeksEvent` flips to `isThisWeeksEvent` on the next
+    // 1-second tick, so the card transitions from preview to active
+    // without any handcrafted state-machine.
+    if (isNextWeeksEvent) {
+      entries.push({ world, weekId: startWid, kind: 'upcoming' })
+    }
+    // Past stacked claims, regardless of scheduling.
     const pendingPast = getPendingClaimWeeks(world.id).filter(w => w < thisWeek)
     for (const pw of pendingPast) {
-      entries.push({ world, weekId: pw, isCurrent: false })
+      entries.push({ world, weekId: pw, kind: 'past' })
     }
   }
 
@@ -146,20 +171,18 @@ export default function WeeklyEvents() {
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-5">
-        {entries.map(({ world, weekId, isCurrent }) => {
+        {entries.map(({ world, weekId, kind }) => {
           const cost      = world.cost ?? 0
           const canAfford = galaBalance >= cost
-          const cardKey   = `${world.id}:${weekId}`
+          const cardKey   = `${world.id}:${weekId}:${kind}`
           const isOpen    = showLeaderboard === cardKey
-          // The "entered" flag is only meaningful for the current-week card
-          // (past-week cards exist only because the player was entered).
-          const enteredCurrent = isCurrent && isEventUnlockedForWeek(world.id, weekId)
-          // Phase-driven action:
-          //   • current + active + entered     → ENTER EVENT button
-          //   • current + active + not entered → UNLOCK · X GALA button
-          //   • current + settled (entered)    → EVENT ENDED · CLAIM badge
-          //   • past                           → EVENT ENDED · CLAIM badge
-          const isFinished = !isCurrent || phase === 'settled'
+          const isActive   = kind === 'active'
+          const isUpcoming = kind === 'upcoming'
+          // The "entered" flag is only meaningful for an active-this-week card.
+          const enteredCurrent = isActive && isEventUnlockedForWeek(world.id, weekId)
+          // Active card is "finished" once we're in settled phase — the play
+          // affordance disappears and the leaderboard claim becomes the focus.
+          const isFinished = isActive && phase === 'settled'
 
           return (
             <div key={cardKey} className="btn-3d w-full text-left"
@@ -169,8 +192,9 @@ export default function WeeklyEvents() {
                 borderBottom: `4px solid ${world.color}88`,
                 boxShadow: `0 8px 0 ${world.color}44, 0 0 28px ${world.color}33`,
                 borderRadius:'20px', padding:'20px',
-                // Past-week cards are subtly dimmer so the active card stands out.
-                opacity: isCurrent ? 1 : 0.92,
+                // Past and upcoming cards are subtly dimmer than the active
+                // card so the player's eye is drawn to what they can play now.
+                opacity: isActive ? 1 : 0.88,
               }}>
 
               <div className="flex items-center gap-4 mb-3">
@@ -181,7 +205,13 @@ export default function WeeklyEvents() {
                   <div className="font-fredoka text-xl text-white">{world.name}</div>
                   <div className="font-nunito font-bold text-sm" style={{ color:'rgba(255,255,255,0.55)' }}>{world.subtitle}</div>
                 </div>
-                {isFinished ? (
+                {isUpcoming ? (
+                  <span className="font-fredoka text-xs px-3 py-1 rounded-full"
+                    style={{ background:'rgba(0,0,0,0.35)', color:'#fcd34d',
+                      border:`2px solid ${world.color}66`, letterSpacing:'1px' }}>
+                    COMING NEXT
+                  </span>
+                ) : isFinished || kind === 'past' ? (
                   <span className="font-fredoka text-xs px-3 py-1 rounded-full"
                     style={{ background:'rgba(0,0,0,0.35)', color:'#fde68a',
                       border:`2px solid ${world.color}66`, letterSpacing:'1px' }}>
@@ -201,17 +231,31 @@ export default function WeeklyEvents() {
                 )}
               </div>
 
-              {isCurrent && (
+              {/* Description shown for active + upcoming (preview info), hidden
+                  for past cards where it's just visual noise. */}
+              {(isActive || isUpcoming) && (
                 <p className="font-nunito font-bold text-xs mb-4 leading-snug"
                   style={{ color:'rgba(255,255,255,0.65)' }}>
                   {world.description}
                 </p>
               )}
 
-              {/* Action row — depends on phase + entry status. */}
-              {isFinished ? (
-                // Finished events: no play affordance, just a CTA pointing the
-                // player at the leaderboard panel where they can claim.
+              {/* Action row — depends on kind, phase, and entry status. */}
+              {isUpcoming ? (
+                // Upcoming events: preview only. No purchase, no play, no
+                // leaderboard. The phase-aware countdown at the top of the
+                // page is doing the timing communication; here we just say
+                // "starts Mon 4pm PST" so the player knows when to come back.
+                <div className="w-full py-3 mb-1 rounded-xl text-center"
+                  style={{
+                    background:'rgba(0,0,0,0.35)',
+                    border:`3px dashed ${world.color}55`,
+                    color:`${world.color}cc`, fontFamily:'Fredoka One,cursive',
+                    fontSize:'0.9rem', letterSpacing:'1px',
+                  }}>
+                  STARTS MON 4:00 PM PST · {cost} GALA
+                </div>
+              ) : isFinished || kind === 'past' ? (
                 <div className="w-full py-3 mb-2 rounded-xl text-center"
                   style={{
                     background:'rgba(0,0,0,0.35)',
@@ -252,24 +296,28 @@ export default function WeeklyEvents() {
                 </button>
               )}
 
-              <button onClick={() => { playSfx('uiTap'); setShowLeaderboard(isOpen ? null : cardKey) }}
-                className="btn-3d w-full py-2"
-                style={{
-                  background:'rgba(0,0,0,0.3)',
-                  border:'2px solid rgba(255,255,255,0.15)',
-                  borderBottom:'2px solid rgba(0,0,0,0.3)',
-                  borderRadius:'12px',
-                  color:'#cffafe', fontFamily:'Fredoka One,cursive', fontSize:'0.85rem',
-                  letterSpacing:'1px',
-                }}>
-                {isOpen ? '✕ HIDE LEADERBOARD' : '🏆 OPEN LEADERBOARD'}
-              </button>
+              {/* Leaderboard toggle — hidden for upcoming cards (no data to
+                  show yet). Past and active cards keep the toggle. */}
+              {!isUpcoming && (
+                <button onClick={() => { playSfx('uiTap'); setShowLeaderboard(isOpen ? null : cardKey) }}
+                  className="btn-3d w-full py-2"
+                  style={{
+                    background:'rgba(0,0,0,0.3)',
+                    border:'2px solid rgba(255,255,255,0.15)',
+                    borderBottom:'2px solid rgba(0,0,0,0.3)',
+                    borderRadius:'12px',
+                    color:'#cffafe', fontFamily:'Fredoka One,cursive', fontSize:'0.85rem',
+                    letterSpacing:'1px',
+                  }}>
+                  {isOpen ? '✕ HIDE LEADERBOARD' : '🏆 OPEN LEADERBOARD'}
+                </button>
+              )}
 
-              {isOpen && (
+              {isOpen && !isUpcoming && (
                 <LeaderboardPanel
                   worldId={world.id}
                   accent={world.color}
-                  weekId={isCurrent ? undefined : weekId}
+                  weekId={isActive ? undefined : weekId}
                 />
               )}
             </div>
