@@ -192,6 +192,25 @@ export default function Splash() {
           </div>
         </button>
 
+        {/* Premium — sits above Daily per the splash hierarchy: identity-bound
+            content the player owns goes before the recurring daily ritual. */}
+        <button onClick={tap(goToPremium)} className="btn-3d w-full mb-3"
+          style={{ background:'linear-gradient(160deg, #0e7490, #155e75)',
+            border:'4px solid #22d3ee', borderBottom:'4px solid #042f2e',
+            boxShadow:'0 8px 0 #042f2e, 0 0 30px rgba(34,211,238,0.4)',
+            borderRadius:'20px', padding:'16px 22px' }}>
+          <div className="flex items-center gap-4">
+            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>🛸</span>
+            <div className="flex-1 text-left">
+              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>PREMIUM</div>
+              <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(207,250,254,0.7)' }}>
+                {premiumCaption}
+              </div>
+            </div>
+            <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
+          </div>
+        </button>
+
         {/* Daily — three visual modes */}
         {dailyState === 'available' && (
           <button onClick={tap(() => goToGame('daily'))} className="btn-3d w-full mb-3"
@@ -273,23 +292,6 @@ export default function Splash() {
             </div>
           </button>
         )}
-
-        <button onClick={tap(goToPremium)} className="btn-3d w-full mb-3"
-          style={{ background:'linear-gradient(160deg, #0e7490, #155e75)',
-            border:'4px solid #22d3ee', borderBottom:'4px solid #042f2e',
-            boxShadow:'0 8px 0 #042f2e, 0 0 30px rgba(34,211,238,0.4)',
-            borderRadius:'20px', padding:'16px 22px' }}>
-          <div className="flex items-center gap-4">
-            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>🛸</span>
-            <div className="flex-1 text-left">
-              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>PREMIUM</div>
-              <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(207,250,254,0.7)' }}>
-                {premiumCaption}
-              </div>
-            </div>
-            <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
-          </div>
-        </button>
 
         <button onClick={tap(goToEvents)} className="btn-3d w-full mb-5"
           style={{ background:'linear-gradient(160deg, #075985, #0c4a6e)',
