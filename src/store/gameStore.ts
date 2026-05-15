@@ -1068,11 +1068,21 @@ export const selectCurrentLevel = (s: GameStore) =>
 
 /** Letters as the player sees them on the wheel. In server mode this is
  *  the server's per-round shuffled set; in legacy mode it's the level's
- *  intrinsic letters. */
+ *  intrinsic letters.
+ *
+ *  IMPORTANT: this selector must return a REFERENTIALLY STABLE value across
+ *  calls when the underlying data hasn't changed. Zustand subscribes via
+ *  useSyncExternalStore which uses Object.is to detect changes — returning a
+ *  fresh `[]` literal on every call (which `?? []` would do) caused an
+ *  infinite re-render loop (React error #185) in the brief window between
+ *  level-entry and the apiStartLevel response landing. We use a module-level
+ *  frozen empty array as the stable fallback. */
+const EMPTY_LETTERS: string[] = Object.freeze([]) as unknown as string[]
+
 export const selectActiveLetters = (s: GameStore): string[] => {
   if (s.round) return s.round.manifest.letters
   const lvl = selectCurrentLevel(s)
-  return lvl?.letters ?? []
+  return lvl?.letters ?? EMPTY_LETTERS
 }
 
 /** Total number of primary slots in the active level. */
