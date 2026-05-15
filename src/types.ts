@@ -9,6 +9,63 @@ export interface Level {
   defs: Record<string, string>
 }
 
+// ── Server-authoritative level data (VITE_SERVER_AUTHORITATIVE) ──────────────
+//
+// When the server-authoritative flag is on, the client receives a
+// LevelManifest from POST /api/play/level/start instead of importing a Level
+// from src/data. The manifest carries only what the client needs to render
+// the empty grid + wheel — slot lengths, shuffled letters, a display title —
+// and nothing that would let a cheater learn the answers ahead of time.
+//
+// Per-slot fill / hint state lives in `SlotState`. The server identifies each
+// slot by (len, ordinal) — its length and its 0-based position among slots of
+// the same length, sorted alphabetically by the canonical word. The client
+// uses the same identifier in submit-word / hint responses so the renderer
+// knows which row to update.
+
+export interface LevelManifest {
+  levelId:        string
+  worldId:        string
+  levelIndex:     number
+  difficulty:     number
+  letters:        string[]   // shuffled per-round
+  slotCount:      number
+  slotLengths:    number[]   // sorted ascending
+  bonusSlotCount: number
+  displayTitle:   string     // never reveals the theme word
+}
+
+export interface SlotRef {
+  len:     number
+  ordinal: number
+}
+
+export interface HintReveal {
+  position: number    // 0-based letter index within the slot
+  letter:   string
+}
+
+export interface SlotState extends SlotRef {
+  /** When the slot is filled, the server-canonical word + def for it.
+   *  When unfilled, undefined. */
+  filled?: { word: string; def: string }
+  /** Server-revealed letters at specific positions. Empty until the
+   *  player spends a hint. */
+  hinted:  HintReveal[]
+}
+
+/** Aggregate of the current round's server state. Populated by initLevel
+ *  in server mode; null in legacy mode. */
+export interface RoundState {
+  roundId:        string
+  manifest:       LevelManifest
+  slots:          SlotState[]
+  /** Bonus words found this round. Bonus slots aren't pre-disclosed (the
+   *  manifest only shows a bonusSlotCount), so we track them as a flat list
+   *  rather than as positional slots. */
+  bonusFound:     Array<{ word: string; def: string }>
+}
+
 // ── Game State ────────────────────────────────────────────────────────────────
 
 export type GameMode = 'single' | 'daily'
@@ -25,6 +82,12 @@ export interface GameState {
   levels:     Level[]
   allLevels:  Level[]   // master copy, never mutated
   currentLevelIndex: number
+
+  // Server-authoritative round state (only populated when VITE_SERVER_AUTHORITATIVE
+  // is on — null otherwise). When non-null, the renderer prefers `round.manifest`
+  // / `round.slots` over `levels[currentLevelIndex]` (which won't contain the
+  // answer key anyway in this mode).
+  round:      RoundState | null
 
   // Round state
   foundWords:  Set<string>

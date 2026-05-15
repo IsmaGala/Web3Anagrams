@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react'
-import { useGameStore, selectCurrentLevel } from '../store/gameStore'
+import { useGameStore, selectActiveLetters } from '../store/gameStore'
 import { useCosmeticsStore } from '../store/cosmeticsStore'
 import { getWheelSkin, resolveRing, resolveConnector } from '../skins'
 import { letterPosition } from '../utils/gameUtils'
@@ -9,7 +9,9 @@ const CANVAS_SIZE = 260
 export default function Wheel() {
   const canvasRef      = useRef<HTMLCanvasElement>(null)
   const containerRef   = useRef<HTMLDivElement>(null)
-  const level          = useGameStore(selectCurrentLevel)
+  // Letters come from the active source — server-shuffled manifest when in
+  // server-authoritative mode, otherwise the legacy Level.letters.
+  const letters        = useGameStore(selectActiveLetters)
   const selected       = useGameStore(s => s.selected)
   const gameMode       = useGameStore(s => s.gameMode)
   const startSelect    = useGameStore(s => s.startSelect)
@@ -26,7 +28,7 @@ export default function Wheel() {
   const ring    = resolveRing(skin, isDaily)
   const conn    = resolveConnector(skin, isDaily)
 
-  const letters = level?.letters ?? []
+  // (letters provided above via selectActiveLetters)
 
   // Draw connector lines. Re-runs when the skin changes so a swap shows up
   // immediately on an already-in-progress drag, not just after the next

@@ -1,0 +1,252 @@
+import type { Level } from '../types.js'
+
+// Flags and Countries — fourth weekly event, the "release month" content.
+// Themes follow the vocabulary of national identity: flag elements →
+// national symbols → governance → geography. Difficulty crescendos
+// 3.0 → 12.0 across a 5 → 9-letter arc, matching the Deep Sea / Blood
+// Donor Day / Area 51.5 event shape so it slots cleanly into the
+// rotation. Every word has been hand-validated against its letter pool
+// (each letter usable up to its multiplicity in the level).
+//
+// Tone note: the world is global by design, but defs lean on US examples
+// where the symbol is famously American (STARS, EAGLE, FREEDOM) — fits
+// the Patriot skin players win at rank #1 without making the world feel
+// US-exclusive. Other entries (SPAIN, NATION, REPUBLIC, CONTINENT)
+// stay deliberately international so the world reads as "Flags and
+// Countries", not "USA only".
+
+export const FLAGS_LEVELS: Level[] = [
+  {
+    theme: 'STARS', difficulty: 3.0,
+    letters: ['S','T','A','R','S'],
+    words: ['STARS','STAR','TSAR','TARS','RATS','ARTS','ART','RAT','SAT','TAR'], bonus: ['TSARS'],
+    defs: {
+      STARS: 'Five-pointed shapes on flags worldwide — 50 on the U.S. flag, one per state',
+      STAR: 'A celestial body of plasma; a leading performer; a flag emblem',
+      TSAR: 'A Russian emperor before 1917',
+      TARS: 'Black sticky residues from coal or wood; British slang for sailors',
+      RATS: 'Plural of rat; an exclamation of mild frustration',
+      ARTS: 'Plural of art; creative or skilled pursuits',
+      ART: 'Creative expression; skill in any field',
+      RAT: 'A rodent; an informer (slang)',
+      SAT: 'Past tense of sit',
+      TAR: 'A thick viscous black liquid; a sailor (informal)',
+      TSARS: 'Plural of tsar — the Russian dynasty up to 1917',
+    }
+  },
+  {
+    theme: 'EAGLE', difficulty: 4.0,
+    letters: ['E','A','G','L','E'],
+    words: ['EAGLE','GLEE','ALEE','GALE','LEA','LEG','EEL','GEE','ALE','AGE'], bonus: ['GAL'],
+    defs: {
+      EAGLE: 'A large bird of prey — national symbol of the U.S., Mexico, Germany, Egypt and many more',
+      GLEE: 'Great delight; an unaccompanied song for several voices',
+      ALEE: 'On the sheltered (leeward) side of a ship',
+      GALE: 'A very strong wind',
+      LEA: 'An open area of grassy or arable land',
+      LEG: 'A limb on which a person or animal walks',
+      EEL: 'A long, snake-like fish',
+      GEE: 'An exclamation of surprise; the letter G',
+      ALE: 'A type of beer brewed from malted barley',
+      AGE: 'The length of time someone has lived',
+      GAL: 'A girl or young woman (informal)',
+    }
+  },
+  {
+    theme: 'STATE', difficulty: 4.7,
+    letters: ['S','T','A','T','E'],
+    words: ['STATE','TASTE','TEATS','SEAT','EATS','SETA','TATS','ATE','EAT','SAT','TAT','TEA','SET'], bonus: ['TESTA'],
+    defs: {
+      STATE: 'A sovereign political entity; one of the 50 U.S. states; a condition or mode',
+      TASTE: 'The flavor of something; refined judgment',
+      TEATS: 'Plural of teat — a nipple of a mammal',
+      SEAT: 'A place to sit; a constituency held by an elected official',
+      EATS: 'Consumes food; plural noun for food (informal)',
+      SETA: 'A stiff biological bristle (singular of setae)',
+      TATS: 'Tattoos (informal); does lacework on a shuttle',
+      ATE: 'Past tense of eat',
+      EAT: 'To consume food',
+      SAT: 'Past tense of sit',
+      TAT: 'A piece of cheap or tasteless decor; to make lace',
+      TEA: 'A drink brewed from leaves; an afternoon meal',
+      SET: 'A group of related items; to place',
+      TESTA: 'The protective outer coat of a plant seed (bonus)',
+    }
+  },
+  {
+    theme: 'SPAIN', difficulty: 5.2,
+    letters: ['S','P','A','I','N'],
+    words: ['SPAIN','PAINS','SNAP','PAIN','PANS','NIPS','SPIN','SPAN','NAP','PAN','NIP','PIN','SIN'], bonus: ['NIPA'],
+    defs: {
+      SPAIN: 'Iberian Peninsula country — flag of red, yellow, red horizontal bands with crowned coat of arms',
+      PAINS: 'Plural of pain; physical or emotional sufferings; takes pains to do something carefully',
+      SNAP: 'A sudden sharp sound; to break suddenly; an easy task',
+      PAIN: 'Physical or emotional suffering',
+      PANS: 'Plural of pan; criticizes harshly',
+      NIPS: 'Small pinches or bites; small drinks',
+      SPIN: 'To rotate; a particular slant put on information',
+      SPAN: 'The full extent from one end to another; to extend across',
+      NAP: 'A short sleep; the soft surface of a fabric',
+      PAN: 'A flat cooking vessel; to criticize harshly',
+      NIP: 'A small pinch; a sharp cold sensation',
+      PIN: 'A short pointed piece of metal for fastening',
+      SIN: 'A transgression against moral or religious law',
+      NIPA: 'A palm of tropical Asia whose leaves thatch roofs (bonus)',
+    }
+  },
+  {
+    theme: 'NATION', difficulty: 6.0,
+    letters: ['N','A','T','I','O','N'],
+    words: ['NATION','ANION','INTO','IOTA','ANON','ANTI','ION','TAN','TON','NIT','TIN','ANT','OAT','ANI'], bonus: ['NAOI'],
+    defs: {
+      NATION: 'A large body of people united by descent, history, culture and language — typically inhabiting a sovereign state',
+      ANION: 'An ion with a negative charge',
+      INTO: 'Expressing movement to the inside of',
+      IOTA: 'An extremely small amount; the Greek letter ι',
+      ANON: 'Soon; shortly; in a little while (archaic)',
+      ANTI: 'Opposed to; against',
+      ION: 'An atom or molecule with an electric charge',
+      TAN: 'A yellowish-brown color; to darken skin from sun exposure',
+      TON: 'A unit of weight (2,000 lb in the U.S.)',
+      NIT: 'The egg of a louse; a trivial complaint',
+      TIN: 'A silvery-white metallic element; a sealed container',
+      ANT: 'A small social insect',
+      OAT: 'A cereal grain',
+      ANI: 'A black tropical American cuckoo bird',
+      NAOI: 'The inner chambers of ancient Greek temples (bonus)',
+    }
+  },
+  {
+    theme: 'ANTHEM', difficulty: 7.0,
+    letters: ['A','N','T','H','E','M'],
+    words: ['ANTHEM','MEANT','AMEN','MEAN','MATE','TEAM','THAN','NAME','TAME','HATE','HEAT','MATH','MANE','HAM','HAT','HEM'], bonus: ['HAEM'],
+    defs: {
+      ANTHEM: 'A solemn patriotic song officially adopted by a country',
+      MEANT: 'Past tense of mean — intended',
+      AMEN: 'An affirmation said at the end of a prayer — "so be it"',
+      MEAN: 'To intend; unkind; the arithmetic average',
+      MATE: 'A friend; a sexual partner; to pair up',
+      TEAM: 'A group of people working together; to join forces',
+      THAN: 'Used to introduce the second element in a comparison',
+      NAME: 'A word by which a person, place or thing is known',
+      TAME: 'Not wild; lacking excitement; to subdue',
+      HATE: 'Intense dislike; to detest',
+      HEAT: 'High temperature; to make warm',
+      MATH: 'The study of numbers, shapes and patterns',
+      MANE: 'The long hair on the neck of certain mammals',
+      HAM: 'Cured meat from a pig\'s leg; an overactor',
+      HAT: 'A covering for the head',
+      HEM: 'The edge of a piece of cloth folded and sewn',
+      HAEM: 'Iron-containing pigment in red blood cells (variant of heme, bonus)',
+    }
+  },
+  {
+    theme: 'CAPITAL', difficulty: 8.0,
+    letters: ['C','A','P','I','T','A','L'],
+    words: ['CAPITAL','CAPITA','PLAIT','TICAL','LAIC','ALIT','PACT','PITA','PAIL','TAIL','PACA','APT','CAP','CAT','LAP','PAT','PIT','TAP'], bonus: ['ACTA'],
+    defs: {
+      CAPITAL: 'A country\'s seat of government — Washington D.C., Madrid, Tokyo. Also wealth; an uppercase letter',
+      CAPITA: 'Singular forms used in "per capita" — for each person',
+      PLAIT: 'A braid of hair or fabric',
+      TICAL: 'A former silver coin of Thailand and Cambodia',
+      LAIC: 'Of the laity — not ordained as clergy',
+      ALIT: 'Past tense of alight — descended and came to rest',
+      PACT: 'A formal agreement between countries or parties',
+      PITA: 'A round flat bread of Middle Eastern origin',
+      PAIL: 'A bucket',
+      TAIL: 'The rear appendage of an animal',
+      PACA: 'A large rodent of Central and South America',
+      APT: 'Suitable; quick to learn',
+      CAP: 'A soft head covering; an upper limit',
+      CAT: 'A small carnivorous mammal',
+      LAP: 'The flat area between waist and knees when sitting; one circuit',
+      PAT: 'A light touch; precisely on cue',
+      PIT: 'A hole in the ground; the stone of a fruit',
+      TAP: 'A device for releasing flow; a light striking',
+      ACTA: 'The official record of a meeting or proceeding (bonus)',
+    }
+  },
+  {
+    theme: 'FREEDOM', difficulty: 9.5,
+    letters: ['F','R','E','E','D','O','M'],
+    words: ['FREEDOM','DEFORM','FORMED','ERODE','FREED','DEFER','DEMO','DEER','REED','DOER','DOME','MODE','MORE','FORE','FORM','FROM','FREE','DERM','DOE','MOD'], bonus: ['ERE'],
+    defs: {
+      FREEDOM: 'The power to act, speak or think without restraint — the central premise of many national charters',
+      DEFORM: 'To distort the shape of something',
+      FORMED: 'Past tense of form — given a shape',
+      ERODE: 'To gradually wear away',
+      FREED: 'Past tense of free — released from restraint',
+      DEFER: 'To put off until later; to yield to another\'s judgment',
+      DEMO: 'A demonstration; a recording made to demonstrate',
+      DEER: 'A hoofed grazing mammal',
+      REED: 'A tall water-loving grass; a thin strip in a musical instrument',
+      DOER: 'A person who acts rather than waits',
+      DOME: 'A rounded roof; the top of a head (informal)',
+      MODE: 'A way in which something occurs; the most common value',
+      MORE: 'A greater amount',
+      FORE: 'At the front; a warning shouted by golfers',
+      FORM: 'The shape of an object; a printed document',
+      FROM: 'Indicating the point of origin',
+      FREE: 'Not under control of another; without cost',
+      DERM: 'The skin (variant of derma)',
+      DOE: 'A female deer or rabbit',
+      MOD: 'A subculture of 1960s Britain; a modification',
+      ERE: 'Before — archaic/poetic (bonus)',
+    }
+  },
+  {
+    theme: 'REPUBLIC', difficulty: 10.5,
+    letters: ['R','E','P','U','B','L','I','C'],
+    words: ['REPUBLIC','PUBLIC','PERIL','BLUER','RUBLE','BURP','CURB','LURE','PILE','PURE','PUCE','RICE','RULE','RIPE','CLUB','CRIB','BLIP','LICE','BRIE'], bonus: ['BURL'],
+    defs: {
+      REPUBLIC: 'A state in which supreme power is held by the people and their elected representatives',
+      PUBLIC: 'Relating to the people as a whole; open to general view',
+      PERIL: 'Serious and immediate danger',
+      BLUER: 'More blue in color',
+      RUBLE: 'The basic monetary unit of Russia and Belarus',
+      BURP: 'To expel gas from the stomach through the mouth',
+      CURB: 'A check or restraint; the edge of a sidewalk',
+      LURE: 'To tempt or entice; bait used to attract',
+      PILE: 'A heap of objects; the soft surface of a carpet',
+      PURE: 'Not mixed with anything else',
+      PUCE: 'A dark red-brown color',
+      RICE: 'A staple cereal grain',
+      RULE: 'A regulation; to govern; a measuring stick',
+      RIPE: 'Fully developed and ready to be eaten or used',
+      CLUB: 'A society or association; a heavy stick',
+      CRIB: 'A baby\'s bed; a manger',
+      BLIP: 'A short high-pitched sound; a small unexpected deviation',
+      LICE: 'Plural of louse',
+      BRIE: 'A soft creamy French cheese',
+      BURL: 'A rounded knotty growth on a tree (bonus)',
+    }
+  },
+  {
+    theme: 'CONTINENT', difficulty: 12.0,
+    letters: ['C','O','N','T','I','N','E','N','T'],
+    words: ['CONTINENT','CONTENT','NOTICE','INTONE','TONIC','NICE','NINE','NEON','NONE','TINT','TENT','TOTE','ICON','ONCE','CONE','TONE','NOTE','INTO','TINE','CENT'], bonus: ['ETIC'],
+    defs: {
+      CONTINENT: 'A continuous expanse of land — Africa, Antarctica, Asia, Australia, Europe, North America, South America',
+      CONTENT: 'In a state of satisfaction; the things contained',
+      NOTICE: 'A formal announcement; the act of observing',
+      INTONE: 'To recite something in a singing or chanting voice',
+      TONIC: 'A medicinal substance taken to give a feeling of vigor; the first note of a scale',
+      NICE: 'Pleasant; agreeable',
+      NINE: 'The number after eight',
+      NEON: 'A noble gas used in luminous signage',
+      NONE: 'Not any',
+      TINT: 'A shade or variety of a color',
+      TENT: 'A portable shelter of cloth supported by poles',
+      TOTE: 'To carry; a large open bag',
+      ICON: 'A representative symbol; a religious painting',
+      ONCE: 'On one occasion; formerly',
+      CONE: 'A pointed solid figure; an ice-cream holder',
+      TONE: 'A musical sound of definite pitch; quality of voice',
+      NOTE: 'A brief written record; a single musical sound',
+      INTO: 'Expressing movement to the inside',
+      TINE: 'A prong of a fork or antler',
+      CENT: 'A hundredth of a dollar',
+      ETIC: 'Studying a culture from an outsider\'s perspective (linguistics, bonus)',
+    }
+  },
+]

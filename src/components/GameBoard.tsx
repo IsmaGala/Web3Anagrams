@@ -1,4 +1,4 @@
-import { useGameStore, selectCurrentLevel, selectFoundCount, selectProgress, selectCurrentWordState } from '../store/gameStore'
+import { useGameStore, selectCurrentLevel, selectFoundCount, selectProgress, selectCurrentWordState, selectActiveSlotCount } from '../store/gameStore'
 import Wheel from './Wheel'
 import WordGrid from './WordGrid'
 import ShopModal from './ShopModal'
@@ -18,6 +18,8 @@ export default function GameBoard() {
   const dailyFailed     = useGameStore(s => s.dailyFailed)
   const requestQuitDaily = useGameStore(s => s.requestQuitDaily)
   const level       = useGameStore(selectCurrentLevel)
+  const round       = useGameStore(s => s.round)
+  const slotCount   = useGameStore(selectActiveSlotCount)
   const foundCount  = useGameStore(selectFoundCount)
   const progress    = useGameStore(selectProgress)
   const score       = useGameStore(s => s.score)
@@ -79,7 +81,7 @@ export default function GameBoard() {
           <div className="px-4 py-1.5 rounded-full font-fredoka text-sm"
             style={{ background:'rgba(255,255,255,0.08)', border:'2px solid rgba(255,255,255,0.15)',
               color: isDaily ? '#fbbf24' : '#c4b5fd' }}>
-            {isDaily ? '🏆 DAILY' : `LEVEL ${currentLevelIndex + 1}/${levels.length} · ${level?.theme}`}
+            {isDaily ? '🏆 DAILY' : `LEVEL ${currentLevelIndex + 1}/${levels.length} · ${round ? round.manifest.displayTitle : (level?.theme ?? '')}`}
           </div>
         </div>
 
@@ -125,7 +127,7 @@ export default function GameBoard() {
           <div className="font-fredoka text-sm px-3 py-1 rounded-xl"
             style={{ background:'rgba(255,255,255,0.08)', color: isDaily ? '#fbbf24' : '#a78bfa',
               border:'2px solid rgba(255,255,255,0.1)' }}>
-            {foundCount}/{level?.words.length ?? 0}
+            {foundCount}/{slotCount}
           </div>
           {!isDaily && (
             <button onClick={useHint} className="btn-3d flex items-center gap-1.5 px-3 py-1.5"

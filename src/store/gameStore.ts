@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { GameState, GameMode, Level, MessageType } from '../types'
+import type { GameState, GameMode, Level, MessageType, RoundState, SlotState, ScoreBreakdown } from '../types'
 import type { WorldId } from '../data/worlds'
 import {
   arrangeLevels, pickDailyLevel, getSessionSeed,
@@ -14,6 +14,49 @@ import { useProgressStore } from './progressStore'
 import { useCosmeticsStore } from './cosmeticsStore'
 import type { WheelSkinId } from '../skins'
 import { WORLDS } from '../data/worldData'
+import {
+  isServerAuthoritative, startLevel as apiStartLevel,
+  submitWord as apiSubmitWord, requestHint as apiRequestHint,
+} from '../utils/playClient'
+
+// ── Server-authoritative slot helpers ────────────────────────────────────────
+// The server identifies slots by (len, ordinal). To turn a SlotState array
+// into something the WordGrid can render row-by-row, we group by length and
+// sort within each group by ordinal — same ordering the server uses.
+
+function buildEmptySlots(slotLengths: number[]): SlotState[] {
+  const byLen: Record<number, number> = {}
+  return slotLengths.map(len => {
+    const ord = (byLen[len] = (byLen[len] ?? 0))
+    byLen[len] = ord + 1
+    return { len, ordinal: ord, hinted: [] }
+  })
+}
+
+function applyFilledSlot(
+  slots:    SlotState[],
+  slotRef:  { len: number; ordinal: number },
+  word:     string,
+  def:      string,
+): SlotState[] {
+  return slots.map(s =>
+    s.len === slotRef.len && s.ordinal === slotRef.ordinal
+      ? { ...s, filled: { word, def } }
+      : s,
+  )
+}
+
+function applyHintReveal(
+  slots:   SlotState[],
+  slotRef: { len: number; ordinal: number },
+  reveal:  { position: number; letter: string },
+): SlotState[] {
+  return slots.map(s =>
+    s.len === slotRef.len && s.ordinal === slotRef.ordinal
+      ? { ...s, hinted: [...s.hinted, reveal] }
+      : s,
+  )
+}
 
 function saveProgress(worldId: string, levelIndex: number, score: number) {
   try {
@@ -245,6 +288,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   sfxMuted:          isSfxMuted(),
   pendingWorldRewardId: null,
 
+  round:             null,
+
   setScreen:  (screen) => set({ screen } as any),
   setWorldId: (id) => set({ selectedWorldId: id, _worldId: id }),
 
@@ -264,17 +309,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   initLevel: () => {
-    const { levels, currentLevelIndex, gameMode } = get()
+    const { levels, currentLevelIndex, gameMode, _worldId } = get()
     if (!levels.length) return
-    const lvl     = levels[currentLevelIndex % levels.length]
     const isDaily = gameMode === 'daily'
-    const msg     = isDaily ? '⏱ 5 minutes — no hints!' : `Find ${lvl.words.length} words!`
+
+    // Common reset (applies in both modes). The mode-specific bits — the
+    // message text and any async round bootstrap — follow.
     set({
       foundWords:      new Set(),
       hintedSlots:     {},
       selected:        [],
       dragging:        false,
-      // Reset the per-round trackers so the breakdown only reflects this run.
       levelMisses:     0,
       levelHintsUsed:  0,
       levelStartTime:  Date.now(),
@@ -282,12 +327,57 @@ export const useGameStore = create<GameStore>((set, get) => ({
       score:           0,
       currentWord:     '',
       wordDef:         '',
-      message:         msg,
-      messageType:     isDaily ? 'error' : 'info',
       dailySecondsLeft: DAILY_DURATION,
       dailyComplete:   false,
       dailyFailed:     false,
+      round:           null,
     })
+
+    // ── Server-authoritative path ─────────────────────────────────────────
+    // Kick off a fire-and-forget round-start request. The UI shows a brief
+    // "Connecting…" message while we wait; on response we populate the
+    // round and trigger the standard "Find N words!" message.
+    if (isServerAuthoritative()) {
+      set({ message: 'Connecting…', messageType: 'info' })
+      apiStartLevel({ worldId: _worldId, levelIndex: currentLevelIndex, mode: gameMode })
+        .then(({ roundId, manifest, balances }) => {
+          // Reset levelStartTime to NOW that we actually started — the server
+          // has its own start timestamp but the UI feels less laggy if local
+          // elapsed-time starts when the manifest arrives, not when the
+          // request fired. The server-side breakdown overrides this anyway
+          // on completion.
+          const round: RoundState = {
+            roundId,
+            manifest,
+            slots:      buildEmptySlots(manifest.slotLengths),
+            bonusFound: [],
+          }
+          const msg = isDaily ? '⏱ 5 minutes — no hints!' : `Find ${manifest.slotCount} words!`
+          set({
+            round,
+            levelStartTime: Date.now(),
+            message:        msg,
+            messageType:    isDaily ? 'error' : 'info',
+            gemsBalance:    balances.gems,
+            hints:          balances.hints,
+          })
+          setTimeout(() => {
+            if (get().message === msg) set({ message: '', messageType: '' })
+          }, 2000)
+        })
+        .catch(err => {
+          // Network/auth failures shouldn't softlock the level. Surface a
+          // visible error and let the player back out via the splash button.
+          console.warn('apiStartLevel failed:', err)
+          set({ message: 'Connection error — please retry', messageType: 'error' })
+        })
+      return
+    }
+
+    // ── Legacy path ───────────────────────────────────────────────────────
+    const lvl = levels[currentLevelIndex % levels.length]
+    const msg = isDaily ? '⏱ 5 minutes — no hints!' : `Find ${lvl.words.length} words!`
+    set({ message: msg, messageType: isDaily ? 'error' : 'info' })
     setTimeout(() => {
       if (get().message === msg) set({ message: '', messageType: '' })
     }, 2000)
@@ -513,7 +603,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   _updateCurrentWord: (sel) => {
-    const { levels, currentLevelIndex } = get()
+    const { levels, currentLevelIndex, round } = get()
+
+    // Server-authoritative mode: the client doesn't know the answer set, so
+    // we can only show the word being typed — no valid/invalid color hint.
+    // (A future tweak could optionally ask the server for a "prefix-of-any-
+    // valid-word" answer, but the round-trip cost outweighs the UX gain.)
+    if (round) {
+      const word = sel.map(i => round.manifest.letters[i]).join('')
+      set({ currentWord: word, _currentWordState: '' } as any)
+      return
+    }
+
     const lvl = levels[currentLevelIndex % levels.length]
     if (!lvl) return
     const word      = sel.map(i => lvl.letters[i]).join('')
@@ -525,7 +626,106 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── Word Submission ───────────────────────────────────────────────────────
 
   submitWord: () => {
-    const { levels, currentLevelIndex, selected, foundWords, score, gameMode, _worldId } = get()
+    const { levels, currentLevelIndex, selected, foundWords, score, gameMode, _worldId, round } = get()
+
+    // ── Server-authoritative path ─────────────────────────────────────────
+    // Build the word from the manifest letters (the wheel renders those in
+    // server mode), POST to /api/play/level/submit-word, and apply the
+    // response. The server decides every outcome — including completion.
+    if (round) {
+      const word = selected.map(i => round.manifest.letters[i]).join('').toUpperCase()
+      set({ selected: [], currentWord: '', _currentWordState: '' } as any)
+      if (word.length < 2) return
+
+      apiSubmitWord({ roundId: round.roundId, word })
+        .then(resp => {
+          // Re-read state after the round-trip — the player may have done
+          // something else in between (e.g. spent a hint).
+          const r = get().round
+          if (!r) return   // round was torn down mid-flight, ignore
+
+          if (resp.result === 'duplicate') {
+            playSfx('wordRepeat')
+            get()._setMessage('Already found!', 'error')
+            return
+          }
+          if (resp.result === 'rejected') {
+            // The server tracks misses authoritatively; we mirror its count
+            // so the UI breakdown preview matches.
+            set({ levelMisses: resp.misses })
+            playSfx('wordInvalid')
+            get()._setMessage('Not in the chain', 'error')
+            return
+          }
+          if (resp.result === 'accepted' && resp.kind === 'bonus') {
+            const nextFound = new Set(get().foundWords); nextFound.add(word)
+            const nextBonus = [...r.bonusFound, { word, def: resp.def }]
+            set({
+              foundWords: nextFound,
+              score:      resp.totalScore,
+              wordDef:    resp.def ? `${word}: ${resp.def}` : '',
+              round:      { ...r, bonusFound: nextBonus },
+            })
+            playSfx('wordBonus')
+            get()._setMessage('💎 BONUS TOKEN!', 'great')
+            return
+          }
+          // Primary word accepted
+          const nextFound = new Set(get().foundWords); nextFound.add(word)
+          const nextSlots = applyFilledSlot(r.slots, resp.slot, word, resp.def)
+          set({
+            foundWords: nextFound,
+            score:      resp.totalScore,
+            wordDef:    resp.def ? `${word}: ${resp.def}` : '',
+            round:      { ...r, slots: nextSlots },
+          })
+          playSfx('wordValid')
+          get()._setMessage(wordFeedback(word), 'great')
+
+          if (resp.completed && resp.breakdown) {
+            // Server-authoritative breakdown. We trust `final`; the local
+            // tracker fields (levelMisses, levelHintsUsed) are just for the
+            // breakdown UI and may have drifted by 1 between requests —
+            // override them with the server's view.
+            const b = resp.breakdown as ScoreBreakdown
+            set({
+              lastBreakdown:  b,
+              score:          b.final,
+              levelMisses:    b.misses,
+              levelHintsUsed: b.hintsUsed,
+            })
+            saveProgress(_worldId, currentLevelIndex, b.final)
+            submitEventScoreIfApplicable(_worldId, b.final)
+
+            // World-completion bounty (same eligibility logic as the legacy
+            // path) — see the long comment in the legacy branch below.
+            const wid = _worldId as WorldId
+            const world = WORLDS.find(w => w.id === wid)
+            const reward = world?.completionReward ?? 0
+            if (gameMode !== 'daily'
+                && reward > 0
+                && !useProgressStore.getState().isWorldCompletionRewardClaimed(wid)) {
+              const worldProgress = useProgressStore.getState().worlds[wid]?.levels ?? {}
+              const allLoadedDone = levels.length > 0 && levels.every((_, i) => worldProgress[i]?.completed)
+              if (allLoadedDone) set({ pendingWorldRewardId: _worldId })
+            }
+            setTimeout(() => {
+              if (gameMode === 'daily') get().triggerDailyWin()
+              else {
+                playSfx('levelComplete')
+                set({ _levelComplete: true } as any)
+              }
+            }, 600)
+          }
+        })
+        .catch(err => {
+          console.warn('apiSubmitWord failed:', err)
+          get()._setMessage('Connection error', 'error')
+        })
+      return
+    }
+
+    // ── Legacy path ───────────────────────────────────────────────────────
     const lvl = levels[currentLevelIndex % levels.length]
     if (!lvl) return
 
@@ -623,8 +823,50 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── Hints ─────────────────────────────────────────────────────────────────
 
   useHint: () => {
-    const { gameMode, hints, levels, currentLevelIndex, foundWords, hintedSlots } = get()
+    const { gameMode, hints, levels, currentLevelIndex, foundWords, hintedSlots, round } = get()
     if (gameMode === 'daily') return
+
+    // ── Server-authoritative path ─────────────────────────────────────────
+    // The server picks the slot + letter and charges the hint atomically.
+    // We optimistically gate on the LOCAL hint count for instant UI feedback,
+    // but the server is the real spender — a 402 response opens the shop
+    // regardless of what the local count claimed.
+    if (round) {
+      if (hints <= 0) { set({ showShop: true }); return }
+      apiRequestHint({ roundId: round.roundId })
+        .then(resp => {
+          const r = get().round
+          if (!r) return
+          const nextSlots = applyHintReveal(r.slots, resp.slot, {
+            position: resp.position, letter: resp.letter,
+          })
+          set({
+            round:          { ...r, slots: nextSlots },
+            hints:          resp.hintsRemaining,
+            levelHintsUsed: get().levelHintsUsed + 1,
+          })
+          playSfx('hint')
+          get()._setMessage('Hint deployed!', 'info')
+        })
+        .catch(err => {
+          // The server returns 402 with { reason: 'no-hints' } when the
+          // player is broke — apiClient.ts throws that as an Error whose
+          // message is the body's `error` field. Match on the substring so
+          // we open the shop instead of just showing a toast.
+          const msg = (err && (err as Error).message) || ''
+          if (msg.includes('no-hints')) { set({ showShop: true }); return }
+          if (msg.includes('no-hintable-slot')) {
+            playSfx('wordInvalid')
+            get()._setMessage('No hints available!', 'error')
+            return
+          }
+          console.warn('apiRequestHint failed:', err)
+          get()._setMessage('Connection error', 'error')
+        })
+      return
+    }
+
+    // ── Legacy path ───────────────────────────────────────────────────────
     const lvl = levels[currentLevelIndex % levels.length]
     if (!lvl) return
 
@@ -762,19 +1004,51 @@ useGameStore.subscribe((state) => {
 })
 
 // ── Selectors ──────────────────────────────────────────────────────────────────
+//
+// Two parallel sets of selectors:
+//   * Legacy (selectCurrentLevel, selectFoundCount, selectProgress) — read
+//     from `levels[currentLevelIndex]`. Returns the full Level when in
+//     legacy mode; in server mode `selectCurrentLevel` still returns the
+//     bundle-side entry, but `words` may be empty / stripped once the
+//     bundle-strip milestone lands.
+//   * Server-aware (selectActiveLetters, selectActiveSlotCount, etc.) —
+//     return the right value regardless of mode.
+//
+// New consumers should prefer the server-aware variants. Existing consumers
+// migrate over the course of the bundle-strip milestone.
 
 export const selectCurrentLevel = (s: GameStore) =>
   s.levels[s.currentLevelIndex % (s.levels.length || 1)]
 
-export const selectFoundCount = (s: GameStore) => {
+/** Letters as the player sees them on the wheel. In server mode this is
+ *  the server's per-round shuffled set; in legacy mode it's the level's
+ *  intrinsic letters. */
+export const selectActiveLetters = (s: GameStore): string[] => {
+  if (s.round) return s.round.manifest.letters
+  const lvl = selectCurrentLevel(s)
+  return lvl?.letters ?? []
+}
+
+/** Total number of primary slots in the active level. */
+export const selectActiveSlotCount = (s: GameStore): number => {
+  if (s.round) return s.round.manifest.slotCount
+  const lvl = selectCurrentLevel(s)
+  return lvl?.words.length ?? 0
+}
+
+/** How many primary slots have been filled. */
+export const selectActiveFoundCount = (s: GameStore): number => {
+  if (s.round) return s.round.slots.filter(slot => !!slot.filled).length
   const lvl = selectCurrentLevel(s)
   return lvl ? lvl.words.filter(w => s.foundWords.has(w)).length : 0
 }
 
+export const selectFoundCount = selectActiveFoundCount
+
 export const selectProgress = (s: GameStore) => {
-  const lvl = selectCurrentLevel(s)
-  if (!lvl || !lvl.words.length) return 0
-  return selectFoundCount(s) / lvl.words.length
+  const total = selectActiveSlotCount(s)
+  if (!total) return 0
+  return selectActiveFoundCount(s) / total
 }
 
 export const selectCurrentWordState = (s: any): 'valid' | 'invalid' | '' =>

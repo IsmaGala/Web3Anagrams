@@ -1,20 +1,20 @@
-import { useGameStore, selectCurrentLevel } from '../store/gameStore'
+import { useGameStore, selectActiveFoundCount, selectActiveSlotCount } from '../store/gameStore'
 import { randomFlavor, DAILY_DURATION, DAILY_HINT_REWARD, formatTime } from '../utils/gameUtils'
 import { useRef } from 'react'
 
 export function DailyWinOverlay() {
   const show        = useGameStore(s => s.dailyComplete)
   const goToSplash  = useGameStore(s => s.goToSplash)
-  const foundWords  = useGameStore(s => s.foundWords)
-  const level       = useGameStore(selectCurrentLevel)
   const secondsLeft = useGameStore(s => s.dailySecondsLeft)
   const breakdown   = useGameStore(s => s.lastBreakdown)
+  // Found/total counts via mode-aware selectors so this works in both the
+  // legacy and server-authoritative paths.
+  const found       = useGameStore(selectActiveFoundCount)
+  const total       = useGameStore(selectActiveSlotCount)
 
   if (!show) return null
 
   const timeUsed = DAILY_DURATION - secondsLeft
-  const found    = level ? level.words.filter(w => foundWords.has(w)).length : 0
-  const total    = level?.words.length ?? 0
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center px-6"
@@ -122,14 +122,11 @@ export function DailyQuitConfirmOverlay() {
 export function DailyLoseOverlay() {
   const show       = useGameStore(s => s.dailyFailed)
   const goToSplash = useGameStore(s => s.goToSplash)
-  const foundWords = useGameStore(s => s.foundWords)
-  const level      = useGameStore(selectCurrentLevel)
+  const found      = useGameStore(selectActiveFoundCount)
+  const total      = useGameStore(selectActiveSlotCount)
   const flavorRef  = useRef(randomFlavor())
 
   if (!show) return null
-
-  const found = level ? level.words.filter(w => foundWords.has(w)).length : 0
-  const total = level?.words.length ?? 0
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center px-6"

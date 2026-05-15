@@ -1,0 +1,5 @@
+{
+  "_comment": "Disposable scratch tsconfig left behind by a typecheck. Safe to delete; nothing depends on it.",
+  "compilerOptions": { "noEmit": true },
+  "include": []
+}
