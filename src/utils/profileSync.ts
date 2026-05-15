@@ -31,6 +31,8 @@ import { api } from './apiClient'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
+import { useCosmeticsStore } from '../store/cosmeticsStore'
+import { WHEEL_SKINS, type WheelSkinId } from '../skins'
 import type { WorldId } from '../data/worlds'
 
 // ── Payload shape ───────────────────────────────────────────────────────────
@@ -65,6 +67,17 @@ export interface PlayerStatePayload {
    *  to re-claim the reward. Optional in the payload shape for backward
    *  compatibility with server blobs written before this field existed. */
   completion?: { claimed: Partial<Record<WorldId, boolean>> }
+  /** Cosmetic state — wheel skin unlocks and the currently-equipped skin.
+   *  Ownership is the source of truth; equipped is a UX preference. Both
+   *  cross-device so a player who unlocks Patriot on phone sees it
+   *  equipped on tablet. Optional for backward compatibility with payloads
+   *  written before this field existed. */
+  cosmetics?: { ownedSkins: string[]; wheelSkin: string }
+  /** One-time welcome bonus state. `firstWalletBonusClaimed: true` means
+   *  the player has already been credited the +Gems / +hints grant on
+   *  some device, so no device will grant it again. Optional for
+   *  backward compatibility with pre-rollout payloads. */
+  welcome?: { firstWalletBonusClaimed: boolean }
 }
 
 /** Read the gems balance from a payload, tolerating the legacy field name.
@@ -84,8 +97,9 @@ interface ServerResponse {
 // ── Build a payload from the current client state ───────────────────────────
 
 export function buildPayload(): PlayerStatePayload {
-  const game     = useGameStore.getState()
-  const progress = useProgressStore.getState()
+  const game      = useGameStore.getState()
+  const progress  = useProgressStore.getState()
+  const cosmetics = useCosmeticsStore.getState()
   return {
     v: 1,
     economy: {
@@ -106,6 +120,14 @@ export function buildPayload(): PlayerStatePayload {
     },
     completion: {
       claimed: progress.worldCompletionClaimed as any,
+    },
+    cosmetics: {
+      // Spread the Set into a plain array for JSON-serializability.
+      ownedSkins: [...cosmetics.ownedSkins],
+      wheelSkin:  cosmetics.wheelSkin,
+    },
+    welcome: {
+      firstWalletBonusClaimed: progress.firstWalletBonusClaimed,
     },
   }
 }
@@ -186,6 +208,32 @@ function mergeEventState(
   return out
 }
 
+/** Merge cosmetics state. Ownership is unioned (a player who unlocked a
+ *  skin on either device keeps it on both). For the equipped skin we
+ *  prefer the LOCAL side — pulls only happen on login and the client
+ *  has likely just made a deliberate choice that should override an
+ *  older server record. Falls back to remote if local is missing, then
+ *  to 'default' if neither side has a valid value. */
+function mergeCosmetics(
+  local:  PlayerStatePayload['cosmetics'],
+  server: PlayerStatePayload['cosmetics'],
+): { ownedSkins: string[]; wheelSkin: string } {
+  const localOwned  = local?.ownedSkins  ?? []
+  const serverOwned = server?.ownedSkins ?? []
+  // Union + sanitize: 'default' is always present; unknown ids dropped.
+  const merged = new Set<string>(['default'])
+  for (const id of [...localOwned, ...serverOwned]) {
+    if (typeof id === 'string' && id in WHEEL_SKINS) merged.add(id)
+  }
+  // Preferred equipped: local first, then server, then default. We also
+  // gate on whether the equipped skin is actually in the owned set —
+  // otherwise a stale equipped value would render against a skin the
+  // player no longer owns.
+  const candidate = local?.wheelSkin ?? server?.wheelSkin ?? 'default'
+  const equipped  = merged.has(candidate) ? candidate : 'default'
+  return { ownedSkins: [...merged], wheelSkin: equipped }
+}
+
 function mergeDaily(a: DailyAttemptRecord | null, b: DailyAttemptRecord | null): DailyAttemptRecord | null {
   if (!a) return b
   if (!b) return a
@@ -226,6 +274,15 @@ export function mergePayloads(local: PlayerStatePayload, server: PlayerStatePayl
         server.completion?.claimed ?? {},
       ),
     },
+    cosmetics: mergeCosmetics(local.cosmetics, server.cosmetics),
+    welcome: {
+      // OR — once either device records the bonus as claimed, no future
+      // device will re-grant it. Tolerant of missing welcome blocks in
+      // pre-rollout payloads.
+      firstWalletBonusClaimed:
+        !!(local.welcome?.firstWalletBonusClaimed
+          || server.welcome?.firstWalletBonusClaimed),
+    },
   }
 }
 
@@ -240,12 +297,14 @@ export function applyPayload(p: PlayerStatePayload): void {
   // its internal state directly. The setter will trigger zustand subscribers,
   // which our localStorage layers in progressStore already listen to.
   const completionClaimed = p.completion?.claimed ?? {}
+  const welcomeClaimed    = !!p.welcome?.firstWalletBonusClaimed
   useProgressStore.setState({
-    worlds:                 p.progress.worlds as any,
-    unlockedPremium:        p.premium.unlocked as any,
-    eventState:             p.events.state as any,
-    dailyAttempt:           p.daily.attempt,
-    worldCompletionClaimed: completionClaimed as any,
+    worlds:                  p.progress.worlds as any,
+    unlockedPremium:         p.premium.unlocked as any,
+    eventState:              p.events.state as any,
+    dailyAttempt:            p.daily.attempt,
+    worldCompletionClaimed:  completionClaimed as any,
+    firstWalletBonusClaimed: welcomeClaimed,
   } as any)
   // Persist locally — these are the SAME keys progressStore.save uses, so
   // a refresh hydrates from localStorage if we ever go offline.
@@ -257,7 +316,21 @@ export function applyPayload(p: PlayerStatePayload): void {
     else                 localStorage.removeItem('wc_daily_attempt_v1')
     localStorage.setItem('wc_economy_v1',                     JSON.stringify(p.economy))
     localStorage.setItem('wc_world_completion_claimed_v1',    JSON.stringify(completionClaimed))
+    localStorage.setItem('wc_welcome_bonus_v1',               JSON.stringify(welcomeClaimed))
   } catch {}
+  // Apply cosmetics last so the wheel re-renders with the synced skin.
+  // The cosmetics store handles its own localStorage persistence inside
+  // setOwnedSkins / setWheelSkin, so we don't double-write here.
+  if (p.cosmetics) {
+    const owned = (p.cosmetics.ownedSkins ?? []).filter(
+      (id): id is WheelSkinId => typeof id === 'string' && id in WHEEL_SKINS,
+    )
+    useCosmeticsStore.getState().setOwnedSkins(owned)
+    const equipped = p.cosmetics.wheelSkin
+    if (typeof equipped === 'string' && equipped in WHEEL_SKINS) {
+      useCosmeticsStore.getState().setWheelSkin(equipped as WheelSkinId)
+    }
+  }
 }
 
 // ── Network ─────────────────────────────────────────────────────────────────

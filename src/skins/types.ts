@@ -44,6 +44,11 @@ export interface WheelSkin {
   label: string
   /** Short description for shop-style UI later. */
   description: string
+  /** Optional Gem price for direct purchase from the Wardrobe. Skins with
+   *  no price are earn-only (rank-1 event reward or always-owned default).
+   *  Set this on event-themed skins so players who missed the event can
+   *  still buy them; leave undefined for ultra-rare or default skins. */
+  price?: number
   /** Outer-ring palette for the standard (campaign) game mode. */
   ring: WheelRingPalette
   /** Connector-line palette for the standard game mode. */

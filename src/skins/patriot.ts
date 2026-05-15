@@ -26,6 +26,7 @@ export const patriotSkin: WheelSkin = {
   id: 'patriot',
   label: 'Patriot',
   description: 'Old-Glory navy tiles with a red-and-white star pop.',
+  price: 3000,
   ring: {
     // Red ring with a navy haze bleeding outward.
     border: 'rgba(220,38,38,0.35)',

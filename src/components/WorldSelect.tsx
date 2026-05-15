@@ -9,11 +9,20 @@ export default function WorldSelect() {
   const setScreen         = useGameStore(s => (s as any).setScreen)
   const setWorldId        = useGameStore(s => (s as any).setWorldId)
   const goToSplash        = useGameStore(s => s.goToSplash)
+  const goToPremium       = useGameStore(s => s.goToPremium)
   const isWorldUnlocked   = useProgressStore(s => s.isWorldUnlocked)
   const getCompletedCount = useProgressStore(s => s.getCompletedCount)
+  const isPremiumUnlocked = useProgressStore(s => s.isPremiumUnlocked)
   // Used to flip the completion-reward badge between "available" and
   // "claimed" once the player accepts their bounty.
   const isRewardClaimed   = useProgressStore(s => s.isWorldCompletionRewardClaimed)
+
+  // Premium summary for the inline CTA at the bottom of the world list.
+  // Computed inline (not memoized) — WORLDS is a static module-level
+  // constant and the filter is tiny.
+  const premiumWorlds = WORLDS.filter(w => w.premium)
+  const ownedPremium  = premiumWorlds.filter(w => isPremiumUnlocked(w.id)).length
+  const lockedPremium = premiumWorlds.length - ownedPremium
 
   function handleWorldClick(world: World) {
     if (world.comingSoon || !isWorldUnlocked(world.id)) return
@@ -142,6 +151,41 @@ export default function WorldSelect() {
             </button>
           )
         })}
+
+        {/* PREMIUM WORLDS — folded into Single Player as a dedicated
+            section. The cyan accent and 🛸 icon match the standalone
+            Premium screen so players recognize it as the same content.
+            Tap navigates to PremiumWorlds.tsx, which still owns the
+            polished purchase flow + confirmation modal. Caption mirrors
+            what Splash used to show ("X of N UNLOCKED · M NEW") so the
+            information density of the old Premium button is preserved
+            in a single compact CTA. */}
+        {premiumWorlds.length > 0 && (
+          <button onClick={() => { playSfx('uiTap'); goToPremium() }}
+            className="btn-3d w-full text-left mt-2"
+            style={{
+              background:'linear-gradient(160deg,#0e7490,#155e75)',
+              border:'4px solid #22d3ee',
+              borderBottom:'4px solid #042f2e',
+              boxShadow:'0 6px 0 #042f2e, 0 0 24px rgba(34,211,238,0.3)',
+              borderRadius:'20px', padding:'16px 18px',
+            }}>
+            <div className="flex items-center gap-4">
+              <span className="text-3xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>🛸</span>
+              <div className="flex-1">
+                <div className="font-fredoka text-lg text-white" style={{ letterSpacing:'1px' }}>
+                  PREMIUM WORLDS
+                </div>
+                <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(207,250,254,0.75)' }}>
+                  {lockedPremium === 0
+                    ? `ALL ${premiumWorlds.length} WORLDS UNLOCKED`
+                    : `${ownedPremium} OF ${premiumWorlds.length} UNLOCKED · ${lockedPremium} NEW`}
+                </div>
+              </div>
+              <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
+            </div>
+          </button>
+        )}
       </div>
     </div>
   )

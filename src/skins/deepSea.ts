@@ -19,6 +19,7 @@ export const deepSeaSkin: WheelSkin = {
   id: 'deep-sea',
   label: 'Deep Sea',
   description: 'Abyssal navy tiles, bioluminescent aqua lock-on.',
+  price: 3000,
   ring: {
     // Soft kelp-green border with a cold cyan halo bleeding outward.
     border: 'rgba(94,234,212,0.30)',

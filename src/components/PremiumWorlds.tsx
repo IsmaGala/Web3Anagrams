@@ -14,7 +14,6 @@ import { useScreenBackdrop } from '../utils/screenBackdrop'
 // level select grid.
 
 export default function PremiumWorlds() {
-  const goToSplash      = useGameStore(s => s.goToSplash)
   const setScreen       = useGameStore(s => (s as any).setScreen)
   const setWorldId      = useGameStore(s => (s as any).setWorldId)
   const purchaseWorld   = useGameStore(s => s.purchaseWorld)
@@ -47,14 +46,18 @@ export default function PremiumWorlds() {
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
       style={{ background: useScreenBackdrop('linear-gradient(180deg,#042f2e 0%,#0d2438 60%,#0d0220 100%)') }}>
 
-      {/* Back */}
+      {/* Back — returns to WorldSelect (the Single Player world list)
+          rather than Splash. The premium screen is now reached *from*
+          WorldSelect via the inline "PREMIUM WORLDS →" CTA, so the
+          back button should walk one step back in that flow rather
+          than dump the player two screens out. */}
       <div className="self-start mb-5">
-        <button onClick={() => { playSfx('uiTap'); goToSplash() }} className="btn-3d flex items-center gap-2 px-5 py-3"
+        <button onClick={() => { playSfx('uiTap'); setScreen('worldSelect') }} className="btn-3d flex items-center gap-2 px-5 py-3"
           style={{ background:'linear-gradient(160deg,#0e7490,#155e75)',
             border:'3px solid #22d3ee', borderBottom:'3px solid #042f2e',
             boxShadow:'0 5px 0 #042f2e', borderRadius:'14px',
             color:'#cffafe', fontFamily:'Fredoka One,cursive', fontSize:'1rem' }}>
-          ‹ MENU
+          ‹ WORLDS
         </button>
       </div>
 

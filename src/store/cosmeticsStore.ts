@@ -90,6 +90,11 @@ interface CosmeticsState {
    *  was the one that flipped the player from un-owned to owned — the
    *  caller can use that to fire a "new skin unlocked" toast/celebration. */
   grantSkin: (id: WheelSkinId) => boolean
+  /** Replace the entire owned set. Used by the profile-sync layer on
+   *  pull-and-apply, where the merge has already produced the union of
+   *  local + remote ownership. 'default' is always re-added so we never
+   *  end up with an empty owned set even if a server payload omits it. */
+  setOwnedSkins: (ids: WheelSkinId[]) => void
   /** Membership helper for picker UIs. */
   ownsSkin: (id: WheelSkinId) => boolean
   /** Cycle through registered skins — handy for a one-button toggle. */
@@ -128,6 +133,15 @@ export const useCosmeticsStore = create<CosmeticsState>((set, get) => ({
     set({ ownedSkins: next })
     persist(get())
     return true
+  },
+
+  setOwnedSkins: (ids) => {
+    const next = new Set<WheelSkinId>(['default'])
+    for (const id of ids) {
+      if (id in WHEEL_SKINS) next.add(id)
+    }
+    set({ ownedSkins: next })
+    persist(get())
   },
 
   ownsSkin: (id) => get().ownedSkins.has(id),

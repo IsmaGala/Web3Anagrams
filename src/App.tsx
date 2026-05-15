@@ -11,6 +11,7 @@ import GameBoard from './components/GameBoard'
 import PremiumWorlds from './components/PremiumWorlds'
 import WeeklyEvents from './components/WeeklyEvents'
 import GemStore from './components/GemStore'
+import Wardrobe from './components/Wardrobe'
 import DebugMenu from './components/DebugMenu'
 import OnboardingOverlay, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingOverlay'
 import WorldRewardOverlay from './components/WorldRewardOverlay'
@@ -57,6 +58,23 @@ export default function App() {
     didPullForJwt.current = jwt
     Promise.resolve(pullAndApply()).finally(() => {
       useGameStore.getState().scanForUnclaimedWorldRewards()
+      // First-wallet welcome bonus. Runs AFTER pullAndApply so the synced
+      // `firstWalletBonusClaimed` flag is authoritative — a player who
+      // already claimed on another device won't re-claim here. Anyone who
+      // genuinely hasn't claimed (fresh wallet, first connection ever)
+      // gets +15 Gems and +5 hints, the flag flips, and a celebratory
+      // toast surfaces. The flag mutation triggers App.tsx's profileSync
+      // push subscription, so the server records the claim within ~2s.
+      const progress = useProgressStore.getState()
+      if (!progress.firstWalletBonusClaimed) {
+        const game = useGameStore.getState()
+        useGameStore.setState({
+          gemsBalance: game.gemsBalance + 15,
+          hints:       game.hints + 5,
+        } as any)
+        progress.claimFirstWalletBonus()
+        game.showToast('🎁 Welcome! +15 Gems · +5 hints')
+      }
     })
   }, [jwt])
 
@@ -77,19 +95,25 @@ export default function App() {
     // flicker back to the default backdrop if anything ever remounts.
   }, [appSkin])
 
-  // Subscribe to both stores; any change after login schedules a debounced
-  // push to /api/profile/sync. The debounce coalesces a flurry of changes
-  // (level complete → gain score, hints, money) into one round-trip.
+  // Subscribe to every store whose state should round-trip through the
+  // server. Any change after login schedules a debounced push to
+  // /api/profile/sync. The debounce coalesces a flurry of changes
+  // (level complete → gain score, hints, money, possibly grant skin)
+  // into one round-trip.
   useEffect(() => {
     if (!jwt) return
     const unsub1 = useGameStore.subscribe(() => schedulePush())
     const unsub2 = useProgressStore.subscribe(() => schedulePush())
+    // Cosmetics: when the player buys / wins / equips a skin, the
+    // unlock should follow them across devices. Same debounce as the
+    // other stores.
+    const unsub3 = useCosmeticsStore.subscribe(() => schedulePush())
     // Best-effort flush on tab unload so a pending push doesn't get lost
     // when the player closes the browser mid-debounce.
     const onUnload = () => { flushPush() }
     window.addEventListener('beforeunload', onUnload)
     return () => {
-      unsub1(); unsub2()
+      unsub1(); unsub2(); unsub3()
       window.removeEventListener('beforeunload', onUnload)
     }
   }, [jwt])
@@ -103,6 +127,7 @@ export default function App() {
       {screen === 'premium'     && <PremiumWorlds />}
       {screen === 'events'      && <WeeklyEvents />}
       {screen === 'store'       && <GemStore />}
+      {screen === 'wardrobe'    && <Wardrobe />}
       <DebugMenu />
       {/* Globally mounted so a queued reward (live win or retroactive
           scan hit) surfaces on whatever screen the player happens to be on. */}

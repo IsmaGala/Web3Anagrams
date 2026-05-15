@@ -12,6 +12,7 @@ export const cyberneticSkin: WheelSkin = {
   id: 'cybernetic',
   label: 'Cybernetic',
   description: 'Neon circuit tiles. Cyan idle, magenta lock-on.',
+  price: 3000,
   ring: {
     // Electric cyan ring with a colder outer halo.
     border: 'rgba(34,211,238,0.35)',

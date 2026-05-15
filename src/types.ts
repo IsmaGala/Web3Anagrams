@@ -12,7 +12,7 @@ export interface Level {
 // ── Game State ────────────────────────────────────────────────────────────────
 
 export type GameMode = 'single' | 'daily'
-export type Screen   = 'splash' | 'worldSelect' | 'levelSelect' | 'game' | 'premium' | 'events' | 'store'
+export type Screen   = 'splash' | 'worldSelect' | 'levelSelect' | 'game' | 'premium' | 'events' | 'store' | 'wardrobe'
 
 export type MessageType = 'great' | 'error' | 'info' | ''
 

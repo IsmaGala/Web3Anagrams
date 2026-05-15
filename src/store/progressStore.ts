@@ -12,6 +12,12 @@ const DAILY_KEY       = 'wc_daily_attempt_v1'
 // completion Gem bounty for. Per-world boolean — once true, the reward is
 // never re-granted, even if progress is reset and re-completed.
 const COMPLETION_KEY  = 'wc_world_completion_claimed_v1'
+// One-time welcome bonus granted the first time a player connects ANY
+// wallet to this profile. Tracked here (synced through profileSync)
+// rather than in localStorage alone so the bonus can't be double-claimed
+// by clearing local storage and reconnecting — once the server records
+// the claim, no device will grant it again.
+const WELCOME_KEY     = 'wc_welcome_bonus_v1'
 
 interface LevelProgress {
   completed: boolean
@@ -48,6 +54,10 @@ interface ProgressState {
    *  level-progress map so that a deliberate progress reset does not also
    *  let the player re-farm the completion reward. */
   worldCompletionClaimed:  Partial<Record<WorldId, boolean>>
+  /** One-shot welcome bonus claimed on the player's first ever wallet
+   *  connection. Synced through profileSync so a player can't reset by
+   *  clearing local storage on one device and connecting again. */
+  firstWalletBonusClaimed: boolean
 
   // Actions — regular progress
   markLevelComplete:   (worldId: WorldId, levelIndex: number, score: number) => void
@@ -92,6 +102,12 @@ interface ProgressState {
   // Gems and surfacing the toast.
   isWorldCompletionRewardClaimed: (worldId: WorldId) => boolean
   claimWorldCompletionReward:     (worldId: WorldId) => number
+
+  // First-wallet-connect welcome bonus. The caller (App.tsx, post-pull)
+  // is responsible for crediting Gems + hints and surfacing the toast
+  // — this action just flips the persisted flag so subsequent
+  // connections don't re-grant.
+  claimFirstWalletBonus: () => void
 }
 
 function emptyProgress(): Record<WorldId, WorldProgress> {
@@ -196,12 +212,24 @@ function loadCompletionFromStorage(): Partial<Record<WorldId, boolean>> {
   return {}
 }
 
+function saveWelcome(claimed: boolean) {
+  try { localStorage.setItem(WELCOME_KEY, JSON.stringify(claimed)) } catch {}
+}
+function loadWelcomeFromStorage(): boolean {
+  try {
+    const raw = localStorage.getItem(WELCOME_KEY)
+    if (raw === null) return false
+    return JSON.parse(raw) === true
+  } catch { return false }
+}
+
 export const useProgressStore = create<ProgressState>((set, get) => ({
-  worlds:                 loadFromStorage(),
-  unlockedPremium:        loadPremiumFromStorage(),
-  eventState:             loadEventsFromStorage(),
-  dailyAttempt:           loadDailyFromStorage(),
-  worldCompletionClaimed: loadCompletionFromStorage(),
+  worlds:                  loadFromStorage(),
+  unlockedPremium:         loadPremiumFromStorage(),
+  eventState:              loadEventsFromStorage(),
+  dailyAttempt:            loadDailyFromStorage(),
+  worldCompletionClaimed:  loadCompletionFromStorage(),
+  firstWalletBonusClaimed: loadWelcomeFromStorage(),
 
   markLevelComplete: (worldId, levelIndex, score) => {
     const { worlds } = get()
@@ -253,6 +281,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     eventState: loadEventsFromStorage(),
     dailyAttempt: loadDailyFromStorage(),
     worldCompletionClaimed: loadCompletionFromStorage(),
+    firstWalletBonusClaimed: loadWelcomeFromStorage(),
   }),
 
   reset: () => {
@@ -411,5 +440,17 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     saveCompletion(next)
     set({ worldCompletionClaimed: next })
     return reward
+  },
+
+  // ── First-wallet welcome bonus ──────────────────────────────────────────
+  // Idempotent flag flip. The caller (App.tsx's post-pull effect) is
+  // responsible for crediting the actual Gems + hints and surfacing the
+  // toast — keeping that economy mutation in the call site means the
+  // amount lives next to the rest of the welcome UX, and this store
+  // stays focused on the persisted "did we already grant?" question.
+  claimFirstWalletBonus: () => {
+    if (get().firstWalletBonusClaimed) return
+    saveWelcome(true)
+    set({ firstWalletBonusClaimed: true })
   },
 }))

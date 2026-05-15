@@ -179,6 +179,27 @@ body.daily-mode .letter-slot.filled {
   color: #1c1917;
 }
 
+/* ── WHEEL LETTER PREVIEW (Wardrobe screen) ──────────────────────────────
+   `.wheel-letter.preview` reuses every visual rule below (background,
+   border, glow) so each skin's palette renders identically here — but
+   wipes the absolute-positioning + center-translate that the wheel
+   geometry depends on, swapping in a flat inline-flex layout sized for
+   thumbnail rows. The per-skin overrides further down still apply
+   because they target `.wheel-letter` (not the position rules). */
+.wheel-letter.preview {
+  position: static;
+  display: inline-flex;
+  margin: 0 2px;
+  width: 38px; height: 38px;
+  font-size: 1rem;
+  /* Cancel the wheel's translate(-50%,-50%) so the tile sits inline. */
+  transform: none;
+}
+.wheel-letter.preview.selected {
+  /* Compact selected lift — no horizontal translate to cancel. */
+  transform: scale(1.08) translateY(-2px);
+}
+
 /* ── WHEEL LETTERS ───────────────────────────────────────────────────────── */
 .wheel-letter {
   position: absolute;

@@ -22,6 +22,7 @@ export const bloodSkin: WheelSkin = {
   id: 'blood',
   label: 'Blood',
   description: 'Coagulated crimson tiles, arterial lock-on.',
+  price: 3000,
   ring: {
     // Fresh-blood red trace with a darker venous halo.
     border: 'rgba(220,38,38,0.35)',

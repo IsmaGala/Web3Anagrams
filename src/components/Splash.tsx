@@ -23,9 +23,9 @@ function tap<T extends any[]>(fn: (...args: T) => void) {
 
 export default function Splash() {
   const goToGame       = useGameStore(s => s.goToGame)
-  const goToPremium    = useGameStore(s => s.goToPremium)
   const goToEvents     = useGameStore(s => s.goToEvents)
   const goToStore      = useGameStore(s => s.goToStore)
+  const goToWardrobe   = useGameStore(s => s.goToWardrobe)
   const payToRetryDaily= useGameStore(s => s.payToRetryDaily)
   const gemsBalance    = useGameStore(s => s.gemsBalance)
   const hints          = useGameStore(s => s.hints)
@@ -56,24 +56,9 @@ export default function Splash() {
     return () => clearInterval(id)
   }, [])
 
-  // Subscribe to unlockedPremium so the PREMIUM caption updates immediately
-  // after a purchase without needing a re-mount.
-  const unlockedPremium = useProgressStore(s => s.unlockedPremium)
-
-  // Dynamic captions for the Premium and Weekly Events buttons. Both are
-  // memoized against the inputs that actually change — premium status for
-  // one, event scheduling + phase for the other — so we don't recompute
-  // on every unrelated re-render.
-
-  const premiumCaption = useMemo(() => {
-    const premiumWorlds = WORLDS.filter(w => w.premium)
-    const total  = premiumWorlds.length
-    const owned  = premiumWorlds.filter(w => unlockedPremium[w.id]).length
-    const locked = total - owned
-    if (total === 0)   return 'UNLOCK NEW WORLDS WITH GEMS'
-    if (locked === 0)  return `ALL ${total} WORLDS UNLOCKED`
-    return `${owned} OF ${total} UNLOCKED · ${locked} NEW`
-  }, [unlockedPremium])
+  // Dynamic caption for the Weekly Events button. Memoized against the
+  // inputs that actually change — event scheduling + phase — so we don't
+  // recompute on every unrelated re-render.
 
   // The events caption depends on phase + the currently-scheduled active or
   // upcoming event world. We recompute on every countdown tick (via the
@@ -208,108 +193,98 @@ export default function Splash() {
           </div>
         </button>
 
-        {/* Premium — sits above Daily per the splash hierarchy: identity-bound
-            content the player owns goes before the recurring daily ritual. */}
-        <button onClick={tap(goToPremium)} className="btn-3d w-full mb-3"
-          style={{ background:'linear-gradient(160deg, #0e7490, #155e75)',
-            border:'4px solid #22d3ee', borderBottom:'4px solid #042f2e',
-            boxShadow:'0 8px 0 #042f2e, 0 0 30px rgba(34,211,238,0.4)',
-            borderRadius:'20px', padding:'16px 22px' }}>
-          <div className="flex items-center gap-4">
-            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>🛸</span>
-            <div className="flex-1 text-left">
-              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>PREMIUM</div>
-              <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(207,250,254,0.7)' }}>
-                {premiumCaption}
-              </div>
-            </div>
-            <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
-          </div>
-        </button>
-
-        {/* Daily — three visual modes */}
-        {dailyState === 'available' && (
-          <button onClick={tap(() => goToGame('daily'))} className="btn-3d w-full mb-3"
-            style={{ background:'linear-gradient(160deg, #d97706, #b45309)',
-              border:'4px solid #fbbf24', borderBottom:'4px solid #78350f',
-              boxShadow:'0 8px 0 #451a03, 0 0 30px rgba(217,119,6,0.4)',
-              borderRadius:'20px', padding:'16px 22px' }}>
-            <div className="flex items-center gap-4">
-              <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>🏆</span>
-              <div className="flex-1 text-left">
-                <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>DAILY</div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-bold" style={{ color:'rgba(255,255,255,0.6)' }}>RESETS</span>
-                  <span className="font-fredoka text-sm" style={{ color:'#fde68a' }}>{countdown}</span>
-                  {streak > 0 && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
-                      style={{ background:'rgba(0,0,0,0.25)', color:'#fde68a' }}>
-                      🔥{streak}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
-            </div>
-          </button>
-        )}
-
-        {dailyState === 'won' && (
-          <div className="btn-3d w-full mb-3"
-            style={{ background:'linear-gradient(160deg, rgba(217,119,6,0.35), rgba(180,83,9,0.25))',
-              border:'4px solid rgba(251,191,36,0.4)', borderBottom:'4px solid rgba(120,53,15,0.4)',
-              boxShadow:'0 6px 0 rgba(0,0,0,0.4)',
-              borderRadius:'20px', padding:'16px 22px', cursor:'default' }}>
-            <div className="flex items-center gap-4">
-              <span className="text-4xl">✓</span>
-              <div className="flex-1 text-left">
-                <div className="font-fredoka text-xl" style={{ color:'#fde68a', letterSpacing:'1px' }}>DAILY DONE</div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-bold" style={{ color:'rgba(255,255,255,0.55)' }}>NEXT IN</span>
-                  <span className="font-fredoka text-sm" style={{ color:'#fde68a' }}>{countdown}</span>
-                  {streak > 0 && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
-                      style={{ background:'rgba(0,0,0,0.25)', color:'#fde68a' }}>
-                      🔥{streak}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {dailyState === 'lost' && (
-          <button onClick={tap(payToRetryDaily)} disabled={!canAffordRetry} className="btn-3d w-full mb-3"
-            style={{
-              background: canAffordRetry
+        {/* Daily — compressed to a single-row pill. Three states share the
+            same compact pill geometry; only icon, colors, copy, and
+            click behavior vary by state. About 40% the vertical weight
+            of the old full-block treatment, freeing space for the rest
+            of the menu. Premium worlds moved into WorldSelect, so this
+            sits directly above the main button stack as the recurring
+            "play right now" affordance. */}
+        {(() => {
+          // Derive per-state visual + behavioral config in one place so the
+          // JSX below stays clean. Putting this in a render-time IIFE
+          // avoids polluting the component scope with three nearly-
+          // identical helper consts.
+          const states = {
+            available: {
+              icon: '🏆',
+              label: 'DAILY',
+              accent: '#fde68a',
+              border: '#fbbf24',
+              bg: 'linear-gradient(160deg, #d97706, #b45309)',
+              glow: 'rgba(217,119,6,0.4)',
+              onClick: () => goToGame('daily'),
+              disabled: false,
+              caption: countdown,
+              showChevron: true,
+            },
+            won: {
+              icon: '✓',
+              label: 'DAILY DONE',
+              accent: '#fde68a',
+              border: 'rgba(251,191,36,0.4)',
+              bg: 'linear-gradient(160deg, rgba(217,119,6,0.30), rgba(180,83,9,0.20))',
+              glow: 'transparent',
+              onClick: () => {},
+              disabled: true,
+              caption: countdown,
+              showChevron: false,
+            },
+            lost: {
+              icon: '💀',
+              label: canAffordRetry ? 'RETRY' : 'DAILY FAILED',
+              accent: canAffordRetry ? '#fecaca' : 'rgba(255,255,255,0.5)',
+              border: canAffordRetry ? '#f87171' : 'rgba(255,255,255,0.15)',
+              bg: canAffordRetry
                 ? 'linear-gradient(160deg, #7f1d1d, #991b1b)'
                 : 'linear-gradient(160deg, #3f3f46, #18181b)',
-              border:`4px solid ${canAffordRetry ? '#f87171' : 'rgba(255,255,255,0.15)'}`,
-              borderBottom:`4px solid ${canAffordRetry ? '#450a0a' : 'rgba(0,0,0,0.4)'}`,
-              boxShadow:`0 8px 0 ${canAffordRetry ? '#450a0a' : 'rgba(0,0,0,0.4)'}, 0 0 28px ${canAffordRetry ? 'rgba(248,113,113,0.3)' : 'transparent'}`,
-              borderRadius:'20px', padding:'16px 22px',
-              cursor: canAffordRetry ? 'pointer' : 'not-allowed',
-            }}>
-            <div className="flex items-center gap-4">
-              <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>💀</span>
-              <div className="flex-1 text-left">
-                <div className="font-fredoka text-xl" style={{ color: canAffordRetry ? '#fecaca' : 'rgba(255,255,255,0.5)', letterSpacing:'1px' }}>
-                  DAILY FAILED
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs font-bold" style={{ color: canAffordRetry ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)' }}>
-                    {canAffordRetry
-                      ? `RETRY · ◈ ${DAILY_RETRY_COST}`
-                      : `NEED ${DAILY_RETRY_COST} GEMS · RESETS`}
-                  </span>
-                  <span className="font-fredoka text-sm" style={{ color:'#fda4af' }}>{countdown}</span>
-                </div>
-              </div>
-              <span className="text-2xl" style={{ color: canAffordRetry ? '#fecaca' : 'rgba(255,255,255,0.3)' }}>›</span>
-            </div>
-          </button>
-        )}
+              glow: canAffordRetry ? 'rgba(248,113,113,0.3)' : 'transparent',
+              onClick: () => { if (canAffordRetry) payToRetryDaily() },
+              disabled: !canAffordRetry,
+              caption: canAffordRetry ? `◈ ${DAILY_RETRY_COST} · ${countdown}` : countdown,
+              showChevron: canAffordRetry,
+            },
+          } as const
+          const s = states[dailyState]
+          return (
+            <button onClick={tap(s.onClick)} disabled={s.disabled}
+              className="btn-3d w-full mb-3 flex items-center gap-2 px-4 py-2"
+              style={{
+                background: s.bg,
+                border: `2.5px solid ${s.border}`,
+                borderBottom: `2.5px solid ${s.border}66`,
+                boxShadow: `0 4px 0 rgba(0,0,0,0.35), 0 0 18px ${s.glow}`,
+                borderRadius: '14px',
+                cursor: s.disabled ? 'default' : 'pointer',
+              }}>
+              <span className="text-xl" aria-hidden>{s.icon}</span>
+              <span className="font-fredoka" style={{
+                color: s.accent, fontSize: '0.95rem', letterSpacing: '1.5px',
+              }}>
+                {s.label}
+              </span>
+              <span className="font-fredoka ml-auto" style={{
+                color: s.accent, fontSize: '0.8rem', opacity: 0.9,
+              }}>
+                {s.caption}
+              </span>
+              {streak > 0 && dailyState !== 'lost' && (
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: 'rgba(0,0,0,0.30)', color: '#fde68a',
+                    fontSize: '0.7rem', fontWeight: 800,
+                  }}>
+                  🔥{streak}
+                </span>
+              )}
+              {s.showChevron && (
+                <span style={{
+                  color: s.accent, fontSize: '1.05rem', opacity: 0.7,
+                }}>›</span>
+              )}
+            </button>
+          )
+        })()}
 
         <button onClick={tap(goToEvents)} className="btn-3d w-full mb-3"
           style={{ background:'linear-gradient(160deg, #075985, #0c4a6e)',
@@ -322,6 +297,29 @@ export default function Splash() {
               <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>WEEKLY EVENTS</div>
               <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(186,230,253,0.7)' }}>
                 {eventCaption}
+              </div>
+            </div>
+            <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
+          </div>
+        </button>
+
+        {/* Wardrobe — cosmetic wheel skins. Slotted between Events
+            (the source of free skin unlocks) and Gem Store (the place to
+            buy more Gems), so the flow reads: play → win or buy skin →
+            top up Gems. Cyan accent so it visually pairs with the Patriot
+            release-month theme without competing with the violet
+            premium buttons above. */}
+        <button onClick={tap(goToWardrobe)} className="btn-3d w-full mb-3"
+          style={{ background:'linear-gradient(160deg, #0e7490, #155e75)',
+            border:'4px solid #22d3ee', borderBottom:'4px solid #0c4a6e',
+            boxShadow:'0 8px 0 #083344, 0 0 30px rgba(34,211,238,0.35)',
+            borderRadius:'20px', padding:'16px 22px' }}>
+          <div className="flex items-center gap-4">
+            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>👕</span>
+            <div className="flex-1 text-left">
+              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>WARDROBE</div>
+              <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(165,243,252,0.7)' }}>
+                EQUIP WHEEL SKINS
               </div>
             </div>
             <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>

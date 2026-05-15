@@ -11,6 +11,8 @@ import {
 } from '../utils/gameUtils'
 import { playSfx, isSfxMuted, setSfxMuted, unlockSfx } from '../utils/sfx'
 import { useProgressStore } from './progressStore'
+import { useCosmeticsStore } from './cosmeticsStore'
+import type { WheelSkinId } from '../skins'
 import { WORLDS } from '../data/worldData'
 
 function saveProgress(worldId: string, levelIndex: number, score: number) {
@@ -141,10 +143,16 @@ interface GameStore extends GameState {
   goToPremium:     () => void
   goToEvents:      () => void
   goToStore:       () => void
+  goToWardrobe:    () => void
   // Premium
   purchaseWorld:   (worldId: string, cost: number) => boolean
   // Weekly events
   purchaseEvent:   (worldId: string, cost: number) => boolean
+  // Cosmetics (Wardrobe screen)
+  /** Atomically check affordability, debit Gems, and grant the skin via
+   *  the cosmetics store. Returns true if the player just unlocked it,
+   *  false if they already owned it or couldn't afford it. */
+  purchaseSkin:    (skinId: string, cost: number) => boolean
   // Daily retry
   payToRetryDaily: () => boolean
 
@@ -348,6 +356,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Navigate to the gem store (buy Gems with GALA or GUSDC tokens).
   goToStore: () => set({ screen: 'store' }),
+
+  // Navigate to the Wardrobe screen (cosmetic skins — equip / buy with Gems).
+  goToWardrobe: () => set({ screen: 'wardrobe' }),
+
+  // Purchase a wheel skin with Gems. The Wardrobe screen is the caller —
+  // it knows the skin's `price` (from skins/<name>.ts) and calls this
+  // after the player confirms. We do the affordability check and the
+  // grant atomically here so a doubled-up tap can't double-grant.
+  //
+  // No-op (and returns false) when the player already owns the skin,
+  // can't afford it, or passes a price ≤ 0. Toast surfaces in the
+  // Wardrobe; we keep this action focused on the state mutation.
+  purchaseSkin: (skinId, cost) => {
+    if (!skinId || cost <= 0) return false
+    const bal = get().gemsBalance
+    if (bal < cost) return false
+    const cosmetics = useCosmeticsStore.getState()
+    if (cosmetics.ownsSkin(skinId as WheelSkinId)) return false
+    // Order matters: debit Gems FIRST so a race with another action
+    // can't double-spend. The grant is idempotent inside the
+    // cosmetics store.
+    set({ gemsBalance: bal - cost })
+    cosmetics.grantSkin(skinId as WheelSkinId)
+    cosmetics.setWheelSkin(skinId as WheelSkinId)
+    return true
+  },
 
   // Spend Gems to unlock the current week's event. The unlock resets every
   // Monday (Mon-16:00-PST-anchored week). Returns true if purchase succeeded.
