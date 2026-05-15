@@ -672,6 +672,36 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ selected: [], currentWord: '', _currentWordState: '' } as any)
       if (word.length < 2) return
 
+      // ── Optimistic feedback ────────────────────────────────────────────
+      // The submit-word round-trip is ~50–150ms once the function is warm.
+      // To make the wheel feel instant we play the success/duplicate sound
+      // and show the feedback message NOW, based on local-only signals:
+      //   • If `word` is already in foundWords → predict 'duplicate'
+      //   • Else if `word.length` matches an unfilled slot → predict 'success'
+      //   • Otherwise stay silent (server will fire the correct feedback)
+      //
+      // The authoritative score / slot fill / def still come from the
+      // server response — we deliberately don't optimistically fill the
+      // slot to avoid the visual "letter jumps between rows of the same
+      // length" glitch when the server's alphabetical ordinal disagrees
+      // with our first-unfilled guess. Score isn't bumped optimistically
+      // either, so a rejection doesn't cause a visible score bounce.
+      //
+      // The `optimistic` tracker lets the .then() handler skip duplicate
+      // sound/message playback when we already fired them speculatively.
+      const alreadyFound    = get().foundWords.has(word)
+      const hasMatchingSlot = round.slots.some(s => !s.filled && s.len === word.length)
+      let optimistic: 'success' | 'duplicate' | 'silent' = 'silent'
+      if (alreadyFound) {
+        playSfx('wordRepeat')
+        get()._setMessage('Already found!', 'error')
+        optimistic = 'duplicate'
+      } else if (hasMatchingSlot) {
+        playSfx('wordValid')
+        get()._setMessage(wordFeedback(word), 'great')
+        optimistic = 'success'
+      }
+
       apiSubmitWord({ roundId: round.roundId, word })
         .then(resp => {
           // Re-read state after the round-trip — the player may have done
@@ -680,13 +710,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
           if (!r) return   // round was torn down mid-flight, ignore
 
           if (resp.result === 'duplicate') {
-            playSfx('wordRepeat')
-            get()._setMessage('Already found!', 'error')
+            // Speculative feedback already fired if we predicted dup.
+            if (optimistic !== 'duplicate') {
+              playSfx('wordRepeat')
+              get()._setMessage('Already found!', 'error')
+            }
             return
           }
           if (resp.result === 'rejected') {
             // The server tracks misses authoritatively; we mirror its count
-            // so the UI breakdown preview matches.
+            // so the UI breakdown preview matches. If we played the
+            // wordValid sound optimistically, the rejection sound here
+            // overlays it — minor audio glitch, but the player needs to
+            // hear that the word was rejected.
             set({ levelMisses: resp.misses })
             playSfx('wordInvalid')
             get()._setMessage('Not in the chain', 'error')
@@ -701,6 +737,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
               wordDef:    resp.def ? `${word}: ${resp.def}` : '',
               round:      { ...r, bonusFound: nextBonus },
             })
+            // Bonus has a distinct sound + message. If optimism predicted
+            // success (wordValid), we play wordBonus on top so the player
+            // still hears the "this is a bonus, not a primary" cue.
             playSfx('wordBonus')
             get()._setMessage('💎 BONUS TOKEN!', 'great')
             return
@@ -714,8 +753,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
             wordDef:    resp.def ? `${word}: ${resp.def}` : '',
             round:      { ...r, slots: nextSlots },
           })
-          playSfx('wordValid')
-          get()._setMessage(wordFeedback(word), 'great')
+          // Speculative feedback already fired if we predicted success.
+          // Skip the redundant play; the slot fill animation is enough
+          // visual confirmation that the word landed.
+          if (optimistic !== 'success') {
+            playSfx('wordValid')
+            get()._setMessage(wordFeedback(word), 'great')
+          }
 
           if (resp.completed && resp.breakdown) {
             // Server-authoritative breakdown. We trust `final`; the local
