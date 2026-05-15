@@ -26,5 +26,12 @@ export interface World {
    *  "upcoming" to "active". The next Mon 16:00 PST flips it from "active"
    *  to "past". Non-event worlds ignore this field. */
   startDate?:  string
+  /** One-time Gem bounty granted when the player completes every level in
+   *  this world for the first time. Intended for free single-player worlds
+   *  as the main on-ramp to the Gem economy — premium/event worlds typically
+   *  leave this undefined since the player already paid Gems to enter. The
+   *  reward is claimed exactly once per (player, world) via
+   *  progressStore.worldCompletionClaimed. */
+  completionReward?: number
   levels:      Level[]
 }

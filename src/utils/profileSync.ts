@@ -60,6 +60,11 @@ export interface PlayerStatePayload {
   premium: { unlocked: Partial<Record<WorldId, boolean>> }
   events:  { state: Partial<Record<WorldId, EventStateEntry>> }
   daily:   { attempt: DailyAttemptRecord | null }
+  /** Per-world flag set the first time the player collects the world's
+   *  one-time completion Gem bounty. Synced so a fresh device can't be used
+   *  to re-claim the reward. Optional in the payload shape for backward
+   *  compatibility with server blobs written before this field existed. */
+  completion?: { claimed: Partial<Record<WorldId, boolean>> }
 }
 
 /** Read the gems balance from a payload, tolerating the legacy field name.
@@ -98,6 +103,9 @@ export function buildPayload(): PlayerStatePayload {
     },
     daily: {
       attempt: progress.dailyAttempt,
+    },
+    completion: {
+      claimed: progress.worldCompletionClaimed as any,
     },
   }
 }
@@ -209,6 +217,15 @@ export function mergePayloads(local: PlayerStatePayload, server: PlayerStatePayl
     daily: {
       attempt: mergeDaily(local.daily.attempt, server.daily.attempt),
     },
+    completion: {
+      // UNION of claim flags — once either side has paid the bounty, no
+      // device will pay it again. Tolerant of missing `completion` blocks
+      // in pre-rollout server payloads.
+      claimed: mergeBoolMap(
+        local.completion?.claimed ?? {},
+        server.completion?.claimed ?? {},
+      ),
+    },
   }
 }
 
@@ -222,21 +239,24 @@ export function applyPayload(p: PlayerStatePayload): void {
   // progressStore doesn't expose a "set everything" action; we reach into
   // its internal state directly. The setter will trigger zustand subscribers,
   // which our localStorage layers in progressStore already listen to.
+  const completionClaimed = p.completion?.claimed ?? {}
   useProgressStore.setState({
-    worlds:          p.progress.worlds as any,
-    unlockedPremium: p.premium.unlocked as any,
-    eventState:      p.events.state as any,
-    dailyAttempt:    p.daily.attempt,
+    worlds:                 p.progress.worlds as any,
+    unlockedPremium:        p.premium.unlocked as any,
+    eventState:             p.events.state as any,
+    dailyAttempt:           p.daily.attempt,
+    worldCompletionClaimed: completionClaimed as any,
   } as any)
   // Persist locally — these are the SAME keys progressStore.save uses, so
   // a refresh hydrates from localStorage if we ever go offline.
   try {
-    localStorage.setItem('wc_progress_v1',          JSON.stringify(p.progress.worlds))
-    localStorage.setItem('wc_premium_unlocks_v1',   JSON.stringify(p.premium.unlocked))
-    localStorage.setItem('wc_event_state_v1',       JSON.stringify(p.events.state))
+    localStorage.setItem('wc_progress_v1',                    JSON.stringify(p.progress.worlds))
+    localStorage.setItem('wc_premium_unlocks_v1',             JSON.stringify(p.premium.unlocked))
+    localStorage.setItem('wc_event_state_v1',                 JSON.stringify(p.events.state))
     if (p.daily.attempt) localStorage.setItem('wc_daily_attempt_v1', JSON.stringify(p.daily.attempt))
     else                 localStorage.removeItem('wc_daily_attempt_v1')
-    localStorage.setItem('wc_economy_v1',           JSON.stringify(p.economy))
+    localStorage.setItem('wc_economy_v1',                     JSON.stringify(p.economy))
+    localStorage.setItem('wc_world_completion_claimed_v1',    JSON.stringify(completionClaimed))
   } catch {}
 }
 

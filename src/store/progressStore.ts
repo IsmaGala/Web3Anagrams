@@ -4,10 +4,14 @@ import type { WorldId } from '../data/worlds'
 import type { DailyAttempt } from '../types'
 import { currentWeekId, todaysDateKey } from '../utils/gameUtils'
 
-const STORAGE_KEY  = 'wc_progress_v1'
-const PREMIUM_KEY  = 'wc_premium_unlocks_v1'
-const EVENT_KEY    = 'wc_event_state_v1'
-const DAILY_KEY    = 'wc_daily_attempt_v1'
+const STORAGE_KEY     = 'wc_progress_v1'
+const PREMIUM_KEY     = 'wc_premium_unlocks_v1'
+const EVENT_KEY       = 'wc_event_state_v1'
+const DAILY_KEY       = 'wc_daily_attempt_v1'
+// Tracks which worlds the player has already claimed the one-time
+// completion Gem bounty for. Per-world boolean — once true, the reward is
+// never re-granted, even if progress is reset and re-completed.
+const COMPLETION_KEY  = 'wc_world_completion_claimed_v1'
 
 interface LevelProgress {
   completed: boolean
@@ -35,10 +39,15 @@ interface EventState {
 }
 
 interface ProgressState {
-  worlds:          Record<WorldId, WorldProgress>
-  unlockedPremium: Partial<Record<WorldId, boolean>>
-  eventState:      Partial<Record<WorldId, EventState>>
-  dailyAttempt:    DailyAttempt | null     // today's daily-challenge result, if any
+  worlds:                  Record<WorldId, WorldProgress>
+  unlockedPremium:         Partial<Record<WorldId, boolean>>
+  eventState:              Partial<Record<WorldId, EventState>>
+  dailyAttempt:            DailyAttempt | null     // today's daily-challenge result, if any
+  /** Per-world flag: has the player already collected the one-time Gem
+   *  bounty granted on full world completion? Persisted separately from the
+   *  level-progress map so that a deliberate progress reset does not also
+   *  let the player re-farm the completion reward. */
+  worldCompletionClaimed:  Partial<Record<WorldId, boolean>>
 
   // Actions — regular progress
   markLevelComplete:   (worldId: WorldId, levelIndex: number, score: number) => void
@@ -74,6 +83,15 @@ interface ProgressState {
   getTodaysDailyAttempt: () => DailyAttempt | null
   setDailyAttempt:       (status: 'won' | 'lost') => void
   clearDailyAttempt:     () => void
+
+  // World-completion reward bookkeeping. `claimWorldCompletionReward`
+  // atomically checks-and-marks: it returns 0 if the world has no reward
+  // configured or the reward has already been collected; otherwise it
+  // returns the reward amount and flips the per-world flag in one shot.
+  // Caller (gameStore.submitWord) is responsible for actually crediting the
+  // Gems and surfacing the toast.
+  isWorldCompletionRewardClaimed: (worldId: WorldId) => boolean
+  claimWorldCompletionReward:     (worldId: WorldId) => number
 }
 
 function emptyProgress(): Record<WorldId, WorldProgress> {
@@ -168,11 +186,20 @@ function loadDailyFromStorage(): DailyAttempt | null {
   return null
 }
 
+function saveCompletion(map: Partial<Record<WorldId, boolean>>) {
+  try { localStorage.setItem(COMPLETION_KEY, JSON.stringify(map)) } catch {}
+}
+function loadCompletionFromStorage(): Partial<Record<WorldId, boolean>> {
+  try { const raw = localStorage.getItem(COMPLETION_KEY); if (raw) return JSON.parse(raw) } catch {}
+  return {}
+}
+
 export const useProgressStore = create<ProgressState>((set, get) => ({
-  worlds:          loadFromStorage(),
-  unlockedPremium: loadPremiumFromStorage(),
-  eventState:      loadEventsFromStorage(),
-  dailyAttempt:    loadDailyFromStorage(),
+  worlds:                 loadFromStorage(),
+  unlockedPremium:        loadPremiumFromStorage(),
+  eventState:             loadEventsFromStorage(),
+  dailyAttempt:           loadDailyFromStorage(),
+  worldCompletionClaimed: loadCompletionFromStorage(),
 
   markLevelComplete: (worldId, levelIndex, score) => {
     const { worlds } = get()
@@ -223,18 +250,25 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     unlockedPremium: loadPremiumFromStorage(),
     eventState: loadEventsFromStorage(),
     dailyAttempt: loadDailyFromStorage(),
+    worldCompletionClaimed: loadCompletionFromStorage(),
   }),
 
   reset: () => {
     const empty = emptyProgress()
-    save(empty); savePremium({}); saveEvents({}); saveDaily(null)
+    save(empty); savePremium({}); saveEvents({}); saveDaily(null); saveCompletion({})
     // Reset the first-run onboarding flag so a deliberate full wipe shows
     // the walkthrough again — debug-menu callers expect a truly fresh
     // state, and a brand-new player on a passed-around device benefits.
     // We do NOT reset on wallet disconnect (the same human is usually
     // reconnecting; re-showing the walkthrough would be annoying).
     try { localStorage.removeItem('wc_onboarding_seen_v1') } catch {}
-    set({ worlds: empty, unlockedPremium: {}, eventState: {}, dailyAttempt: null })
+    set({
+      worlds: empty,
+      unlockedPremium: {},
+      eventState: {},
+      dailyAttempt: null,
+      worldCompletionClaimed: {},
+    })
   },
 
   // ── Premium ─────────────────────────────────────────────────────────────
@@ -348,5 +382,27 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
   clearDailyAttempt: () => {
     saveDaily(null)
     set({ dailyAttempt: null })
+  },
+
+  // ── World completion reward ─────────────────────────────────────────────
+  isWorldCompletionRewardClaimed: (worldId) =>
+    !!get().worldCompletionClaimed[worldId],
+
+  claimWorldCompletionReward: (worldId) => {
+    const map = get().worldCompletionClaimed
+    if (map[worldId]) return 0   // already claimed — never pay twice
+    const world = WORLDS.find(w => w.id === worldId)
+    const reward = world?.completionReward ?? 0
+    if (reward <= 0) return 0    // world has no configured bounty
+    // Confirm the world is actually fully complete. The caller normally
+    // checks too, but folding the guard in here keeps the contract simple
+    // for future callers ("just call claim; if it returns >0 you owe the
+    // player that many Gems").
+    const completed = Object.values(get().worlds[worldId]?.levels ?? {}).filter(l => l.completed).length
+    if (completed < (world?.levelCount ?? Infinity)) return 0
+    const next = { ...map, [worldId]: true }
+    saveCompletion(next)
+    set({ worldCompletionClaimed: next })
+    return reward
   },
 }))

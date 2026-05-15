@@ -218,7 +218,7 @@ export default function DebugMenu() {
 
       <div style={header}>ECONOMY · GEMS</div>
       <div className="flex flex-wrap gap-1 mb-1">
-        <button style={btnDanger} onClick={wipeEconomy} title="Reset Gems + hints to fresh-player defaults (10000 / 3) and clear wc_economy_v1">
+        <button style={btnDanger} onClick={wipeEconomy} title="Reset Gems + hints to fresh-player defaults (0 / 3) and clear wc_economy_v1">
           wipe economy
         </button>
       </div>

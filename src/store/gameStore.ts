@@ -65,7 +65,11 @@ function playableLevel(lvl: Level): boolean {
 
 const DAILY_HINT_REWARD = 5     // hints granted on daily win (no Gem reward — hints are the only Gem sink, so we don't bleed supply)
 const INITIAL_HINTS     = 3
-const INITIAL_GEMS      = 10000
+// New players start with no Gems — they earn them by completing free worlds
+// (see WORLDS[].completionReward) and by winning the daily, or buy them in
+// the Gem Store. Existing players keep whatever balance is in localStorage;
+// only fresh installs (or a debug-menu wipe) see this default.
+const INITIAL_GEMS      = 0
 
 // ── Local economy persistence ────────────────────────────────────────────────
 // Gems are the in-game currency the player spends on hints, premium worlds,
@@ -436,6 +440,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // player is signed in. Fire-and-forget — server failure should never
         // block the local progression UI.
         submitEventScoreIfApplicable(_worldId, breakdown.final)
+        // One-time world-completion Gem bounty. The progressStore call is
+        // a check-and-mark atom: it returns the reward amount the first
+        // time the player clears the world and 0 thereafter. Only free
+        // single-player worlds currently carry a reward (see worldData.ts
+        // → completionReward).
+        const bounty = useProgressStore.getState().claimWorldCompletionReward(_worldId as any)
+        if (bounty > 0) {
+          set({ gemsBalance: get().gemsBalance + bounty })
+          // Slight delay so the per-level completion sound/overlay lands
+          // first, then the world-completion celebration toast follows
+          // instead of stepping on it.
+          setTimeout(() => {
+            playSfx('purchase')
+            get().showToast(`🏆 World complete! +${bounty} Gems`)
+          }, 900)
+        }
         setTimeout(() => {
           if (gameMode === 'daily') get().triggerDailyWin()
           else {

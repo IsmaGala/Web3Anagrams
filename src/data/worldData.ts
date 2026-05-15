@@ -20,6 +20,9 @@ export const WORLDS: World[] = [
     gradient:    'linear-gradient(135deg, #14532d 0%, #166534 50%, #15803d 100%)',
     levelCount:  TOWNSTAR_LEVELS.length,
     unlockAfter: 0,
+    // First free world doubles as the on-ramp to the Gem economy. Lower
+    // payout than the other three because it's also the easiest to clear.
+    completionReward: 150,
     levels:      TOWNSTAR_LEVELS,
   },
   {
@@ -32,6 +35,7 @@ export const WORLDS: World[] = [
     gradient:    'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%)',
     levelCount:  MIRANDUS_LEVELS.length,
     unlockAfter: 5,
+    completionReward: 200,
     levels:      MIRANDUS_LEVELS,
   },
   {
@@ -44,6 +48,7 @@ export const WORLDS: World[] = [
     gradient:    'linear-gradient(135deg, #0c4a6e 0%, #075985 50%, #0369a1 100%)',
     levelCount:  GALASWAP_LEVELS.length,
     unlockAfter: 5,
+    completionReward: 200,
     levels:      GALASWAP_LEVELS,
   },
   {
@@ -56,6 +61,7 @@ export const WORLDS: World[] = [
     gradient:    'linear-gradient(135deg, #0d0220 0%, #2d1b69 50%, #4c1d95 100%)',
     levelCount:  ETERNALNIGHT_LEVELS.length,
     unlockAfter: 5,
+    completionReward: 200,
     levels:      ETERNALNIGHT_LEVELS,
   },
   {
