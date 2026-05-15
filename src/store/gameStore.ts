@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { GameState, GameMode, Level, MessageType } from '../types'
+import type { WorldId } from '../data/worlds'
 import {
   arrangeLevels, pickDailyLevel, getSessionSeed,
   wordScore, wordFeedback, validateLevel,
@@ -406,7 +407,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Atomic check-and-mark — returns 0 if the reward was somehow already
     // claimed (e.g. duplicate tap, cross-device race), guarding against
     // double-credit.
-    const bounty = useProgressStore.getState().claimWorldCompletionReward(id as any)
+    const bounty = useProgressStore.getState().claimWorldCompletionReward(id as WorldId)
     if (bounty > 0) {
       set({ gemsBalance: get().gemsBalance + bounty })
       playSfx('purchase')
@@ -540,12 +541,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // checking those instead of `world.levelCount` covers the case where
         // some raw levels were filtered out by `playableLevel` validation
         // and the player can't physically reach the raw count.
-        const world = WORLDS.find(w => w.id === _worldId)
+        // Narrow the loosely-typed `_worldId: string` from the store back
+        // to the literal-union `WorldId` so the indexes below are well-typed.
+        // The store keeps it as `string` to dodge a circular import on the
+        // type definition; the cast here is the single bridge point.
+        const wid = _worldId as WorldId
+        const world = WORLDS.find(w => w.id === wid)
         const reward = world?.completionReward ?? 0
         if (gameMode !== 'daily'
             && reward > 0
-            && !useProgressStore.getState().isWorldCompletionRewardClaimed(_worldId as any)) {
-          const worldProgress = useProgressStore.getState().worlds[_worldId as any]?.levels ?? {}
+            && !useProgressStore.getState().isWorldCompletionRewardClaimed(wid)) {
+          const worldProgress = useProgressStore.getState().worlds[wid]?.levels ?? {}
           const allLoadedDone = levels.length > 0 && levels.every((_, i) => worldProgress[i]?.completed)
           if (allLoadedDone) {
             set({ pendingWorldRewardId: _worldId })
