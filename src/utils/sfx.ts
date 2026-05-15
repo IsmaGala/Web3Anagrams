@@ -1,13 +1,15 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// SFX engine — tech-aligned digital bleeps & blips via ZzFX.
+// -----------------------------------------------------------------------------
+// SFX engine: tech-aligned digital bleeps via ZzFX, plus a sample player for
+// the Kenney UI Audio pack in public/audio/.
 //
-// ZzFX ("Zuper Zmall Zound Zynth") by Frank Force — MIT licensed.
+// ZzFX ("Zuper Zmall Zound Zynth") by Frank Force, MIT licensed.
 // https://github.com/KilledByAPixel/ZzFX
 //
-// We vendor the synth function inline (≈1KB) so this stays a zero-dependency
-// addition, and expose a small named-voice API that the rest of the game
-// can call without thinking about parameter arrays.
-// ─────────────────────────────────────────────────────────────────────────────
+// We vendor the synth function inline (~1KB) so this stays zero-dependency,
+// and expose a small named-voice API that the rest of the game can call
+// without thinking about parameter arrays. A subset of voices opt into real
+// audio samples; the rest stay procedural.
+// -----------------------------------------------------------------------------
 
 const SAMPLE_RATE = 44100
 const MASTER_VOL  = 0.35       // global ceiling on top of per-voice volume
@@ -15,10 +17,9 @@ const MASTER_VOL  = 0.35       // global ceiling on top of per-voice volume
 let ctx: AudioContext | null = null
 let muted = false
 
-// ── AudioContext lifecycle ──────────────────────────────────────────────────
-// Browsers require a user gesture before AudioContext can produce sound. We
-// lazy-init on the first playSfx() call and resume() every time we're asked
-// to play — cheap if already running.
+// AudioContext lifecycle: browsers require a user gesture before AudioContext
+// can produce sound. We lazy-init on the first playSfx() call and resume()
+// every time we play (cheap if already running).
 function getCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null
   if (!ctx) {
@@ -27,15 +28,13 @@ function getCtx(): AudioContext | null {
     try { ctx = new AC() } catch { return null }
   }
   if (ctx && ctx.state === 'suspended') {
-    // .resume() returns a promise but we don't need to await it for fire-and-forget play
     ctx.resume().catch(() => {})
   }
   return ctx
 }
 
-// ── ZzFX core (vendored, MIT) ───────────────────────────────────────────────
-// Returns a mono PCM buffer of float samples for the given parameter set.
-// Parameter order matches the upstream ZzFX 1.x signature exactly.
+// ZzFX core (vendored, MIT). Returns a mono PCM buffer of float samples for
+// the given parameter set. Parameter order matches upstream ZzFX 1.x exactly.
 function zzfxBuild(
   volume = 1, randomness = .05, frequency = 220,
   attack = 0, sustain = 0, release = .1,
@@ -127,54 +126,141 @@ function zzfxPlay(params: number[]) {
   src.start()
 }
 
-// ── Named voices ────────────────────────────────────────────────────────────
-// ZzFX parameter order, abbreviated for the most-used knobs:
+// Named voices. ZzFX parameter order, abbreviated for the most-used knobs:
 //   [volume, randomness, frequency, attack, sustain, release,
 //    shape (0 sine, 1 tri, 2 saw, 3 tan, 4 noise), shapeCurve,
 //    slide, deltaSlide, pitchJump, pitchJumpTime,
 //    repeatTime, noise, modulation, bitCrush, delay, sustainVolume,
 //    decay, tremolo]
-//
-// All voices below are hand-tuned for a digital/crypto/chain aesthetic:
-// short attack, bright triangle / square / saw shapes, clean envelopes.
+// All voices are hand-tuned for a digital/crypto/chain aesthetic.
 type Voice =
   | 'letterTick' | 'wordValid' | 'wordBonus' | 'wordInvalid' | 'wordRepeat'
   | 'hint' | 'levelComplete' | 'dailyWin' | 'dailyLose'
   | 'purchase' | 'uiTap' | 'timerWarn'
 
 const VOICES: Record<Voice, number[]> = {
-  // Selecting a letter on the wheel — soft, fast, high
   letterTick:    [0.25, 0, 1200, 0.001, 0.01, 0.03, 1, 0.5, 0, 0,   0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-  // Word minted: rising triangle blip
-  wordValid:     [0.55, 0.05, 520, 0.005, 0.04, 0.10, 1, 1.3,  6, 0,  0, 0, 0, 0, 0, 0, 0, 1, 0.05, 0],
-  // Bonus token: pitch-jumped arpeggio sparkle
+  // Soft sine blip with a gentle upward slide (3 vs the old steep 6) so the
+  // "correct" cue still rises but doesn't sweep into a chirp. Volume dropped
+  // 0.55 -> 0.30 and shape switched from triangle to sine to lose the buzz.
+  wordValid:     [0.30, 0.03, 520, 0.005, 0.03, 0.08, 0, 1,    3, 0,  0, 0, 0, 0, 0, 0, 0, 1, 0.04, 0],
   wordBonus:     [0.65, 0.05, 660, 0.005, 0.05, 0.18, 1, 1,    0, 0, 660, 0.04, 0, 0, 0, 0, 0, 1, 0.08, 0],
-  // Not in chain: soft sine "boop" with a gentle downward slide. Was a
-  // sawtooth buzz before — too harsh on repeat hits, so dropped to sine,
-  // ~half volume, and a shallow -1.5 slide instead of the steep -4.
-  wordInvalid:   [0.22, 0.02, 280, 0.002, 0.02, 0.07, 0, 1,   -1.5, 0,  0, 0, 0, 0, 0, 0, 0, 1, 0.03, 0],
-  // Already found: softer, mid-low triangle
+  // Gentler "boop": volume 0.22 -> 0.14, slide softened -1.5 -> -1.0, slightly
+  // lower base freq for a warmer no-feedback feel. Still clearly a descending
+  // negative cue without nagging on repeat hits.
+  wordInvalid:   [0.14, 0.02, 260, 0.003, 0.02, 0.06, 0, 1,   -1.0, 0,  0, 0, 0, 0, 0, 0, 0, 1, 0.03, 0],
   wordRepeat:    [0.35, 0.05, 300, 0.002, 0.02, 0.06, 1, 1,    0, 0,  0, 0, 0, 0, 0, 0, 0, 1, 0.04, 0],
-  // Hint deployed: bright chime with subtle modulation
   hint:          [0.50, 0.02, 880, 0.005, 0.06, 0.15, 1, 1.2,  0, 0, 220, 0.06, 0, 0, 2, 0, 0, 1, 0.06, 0],
-  // Single-player level done: ascending fanfare via pitch jumps
   levelComplete: [0.6, 0.05, 523, 0.005, 0.08, 0.20, 1, 1,    0, 0, 196, 0.08, 0, 0, 0, 0, 0, 1, 0.10, 0],
-  // Daily challenge cleared: bigger, longer, with delay
   dailyWin:      [0.7, 0.05, 440, 0.01, 0.12, 0.30, 1, 1.1,   0, 0, 220, 0.10, 0, 0, 0, 0, 0.15, 1, 0.15, 0],
-  // Daily failed: descending dark tone
   dailyLose:     [0.55, 0.05, 280, 0.01, 0.10, 0.30, 2, 1.4, -8, 0,  0, 0, 0, 0, 0, 0, 0, 1, 0.12, 0],
-  // Shop purchase: softer "ka-ching" — warmer freq, less bitcrush, lower
-  // volume. Was sharp/loud before; now feels rewarding without being shrill.
   purchase:      [0.32, 0.04, 1100, 0.008, 0.03, 0.14, 1, 1.6, 0, 0,    0, 0, 0, 0, 0, 0.15, 0, 1, 0.04, 0],
-  // Menu confirm tap — warm triangle blip with a small upward pitch jump
-  // (+200 Hz at 25 ms) so it feels like a "click → confirmed" gesture
-  // rather than just a click. Soft enough to play on every menu press.
   uiTap:         [0.26, 0, 660, 0.001, 0.02, 0.06, 1, 1,    0, 0,  200, 0.025, 0, 0, 0, 0, 0, 1, 0.02, 0],
-  // Optional: short warning beep when daily timer hits critical
   timerWarn:     [0.4, 0, 660, 0.001, 0.02, 0.08, 1, 1,      0, 0,    0, 0, 0, 0, 0, 0, 0, 1, 0.02, 0],
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+// Sample player (Kenney UI Audio pack). A handful of UI-flavored voices route
+// to real samples from public/audio/ (Kenney "UI Audio" pack, CC0). Everything
+// else stays procedural ZzFX.
+//
+// Loading is lazy: the first playSfx() for a sampled voice kicks off a fetch
+// + decodeAudioData, and the resulting AudioBuffer is cached for instant
+// replays. The very first tap of a brand-new voice may be silent for a
+// fraction of a second while the decode runs.
+
+const SAMPLE_BASE = '/audio'
+
+interface SampleSpec {
+  file: string
+  // Per-voice gain multiplier. Samples land hotter than ZzFX output, so
+  // values here are usually well below 1.0 to match the synth voices.
+  vol?: number
+}
+
+// Voice -> sample file. Only voices listed here use samples; the rest fall
+// through to ZzFX. Tweak files/vol to taste; the Kenney pack ships dozens of
+// click/rollover/switch variants in public/audio/.
+const SAMPLES: Partial<Record<Voice, SampleSpec>> = {
+  uiTap:      { file: 'click4.ogg',    vol: 0.7 },
+  letterTick: { file: 'rollover6.ogg', vol: 0.55 },
+  purchase:   { file: 'switch33.ogg',   vol: 0.7 },
+}
+
+// Cache stores either the decoded AudioBuffer or an in-flight Promise so
+// concurrent plays during the first fetch don't trigger duplicate requests.
+const bufferCache = new Map<string, AudioBuffer | Promise<AudioBuffer>>()
+
+function loadSample(file: string): Promise<AudioBuffer> | null {
+  const c = getCtx()
+  if (!c) return null
+  const cached = bufferCache.get(file)
+  if (cached) return cached instanceof AudioBuffer ? Promise.resolve(cached) : cached
+  const p = fetch(SAMPLE_BASE + '/' + file)
+    .then(r => {
+      if (!r.ok) throw new Error('sfx fetch ' + r.status + ' for ' + file)
+      return r.arrayBuffer()
+    })
+    .then(ab => c.decodeAudioData(ab))
+    .then(buf => { bufferCache.set(file, buf); return buf })
+    .catch(err => { bufferCache.delete(file); throw err })
+  bufferCache.set(file, p)
+  return p
+}
+
+function playBuffer(c: AudioContext, buf: AudioBuffer, vol: number): void {
+  const src  = c.createBufferSource()
+  const gain = c.createGain()
+  gain.gain.value = MASTER_VOL * vol
+  src.buffer = buf
+  src.connect(gain).connect(c.destination)
+  src.start()
+}
+
+function playSampleVoice(spec: SampleSpec): void {
+  const c = getCtx()
+  if (!c) return
+  const cached = bufferCache.get(spec.file)
+  if (cached instanceof AudioBuffer) {
+    playBuffer(c, cached, spec.vol ?? 1)
+    return
+  }
+  const p = loadSample(spec.file)
+  if (!p) return
+  p.then(buf => playBuffer(c, buf, spec.vol ?? 1)).catch(() => { /* swallow */ })
+}
+
+// Hint sequence: three short ascending sine blips. The previous single-shot
+// hint voice was bright but felt loud and a little aggressive on repeat hits.
+// This sparkle pattern stays recognizable as the hint cue (no other voice
+// does a 3-note rise) while sitting much softer in the mix.
+//
+// Each blip is a near-pure sine (shape 0) at low volume, ~60ms apart, with
+// a tiny pitch climb (660 -> 880 -> 1100 Hz, roughly E5 / A5 / C#6) so the
+// listener perceives a quick rising chime rather than three repeats.
+const HINT_NOTES: Array<{ freq: number; vol: number; delayMs: number }> = [
+  { freq: 660,  vol: 0.18, delayMs: 0   },
+  { freq: 880,  vol: 0.16, delayMs: 60  },
+  { freq: 1100, vol: 0.14, delayMs: 120 },
+]
+
+function playHintSequence(): void {
+  for (const n of HINT_NOTES) {
+    const fire = () => zzfxPlay([
+      n.vol, 0.01, n.freq,
+      0.003, 0.015, 0.05,
+      0, 1,
+      0, 0,
+      0, 0,
+      0, 0, 0,
+      0, 0, 1,
+      0.02, 0,
+    ])
+    if (n.delayMs === 0) fire()
+    else setTimeout(fire, n.delayMs)
+  }
+}
+
+// Public API
 
 const MUTE_KEY = 'wc_sfx_muted'
 
@@ -183,14 +269,22 @@ try {
   if (typeof localStorage !== 'undefined') {
     muted = localStorage.getItem(MUTE_KEY) === '1'
   }
-} catch { /* private mode / SSR — ignore */ }
+} catch { /* private mode / SSR */ }
 
 export function playSfx(voice: Voice): void {
   if (muted) return
   try {
-    zzfxPlay(VOICES[voice])
+    if (voice === 'hint') {
+      playHintSequence()
+      return
+    }
+    const sample = SAMPLES[voice]
+    if (sample) {
+      playSampleVoice(sample)
+    } else {
+      zzfxPlay(VOICES[voice])
+    }
   } catch (e) {
-    // Audio failures are non-fatal; never let SFX crash gameplay.
     if (typeof console !== 'undefined') console.warn('sfx failed:', voice, e)
   }
 }
