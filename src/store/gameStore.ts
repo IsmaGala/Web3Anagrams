@@ -1079,7 +1079,9 @@ export const selectActiveLetters = (s: GameStore): string[] => {
 export const selectActiveSlotCount = (s: GameStore): number => {
   if (s.round) return s.round.manifest.slotCount
   const lvl = selectCurrentLevel(s)
-  return lvl?.words.length ?? 0
+  // `lvl` is the placeholder `{}` in server-mode builds, so `lvl.words` is
+  // undefined — double-chain the optional to avoid `undefined.length`.
+  return lvl?.words?.length ?? 0
 }
 
 /** How many primary slots have been filled. */
