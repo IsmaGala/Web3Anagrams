@@ -308,20 +308,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  goToSplash: () => set({
-    screen:            'splash',
-    currentLevelIndex: 0,
-    dailyComplete:     false,
-    dailyFailed:       false,
-    dailySecondsLeft:  DAILY_DURATION,
-    showQuitConfirm:   false,
-  }),
+  goToSplash: () => {
+    set({
+      screen:            'splash',
+      currentLevelIndex: 0,
+      dailyComplete:     false,
+      dailyFailed:       false,
+      dailySecondsLeft:  DAILY_DURATION,
+      showQuitConfirm:   false,
+    })
+    // Whenever we leave the game screen, re-scan. If a level completion
+    // legitimately filled the last slot in a world but the queue inside
+    // submitWord failed to fire (or pendingWorldRewardId was somehow
+    // cleared by an unrelated state update), this safety net catches it
+    // and pops the modal on the splash.
+    get().scanForUnclaimedWorldRewards()
+  },
 
-  goToLevelSelect: () => set({
-    screen:        'levelSelect',
-    dailyComplete: false,
-    dailyFailed:   false,
-  }),
+  goToLevelSelect: () => {
+    set({
+      screen:        'levelSelect',
+      dailyComplete: false,
+      dailyFailed:   false,
+    })
+    // Same safety-net rescan as goToSplash — by the time we land back
+    // on the level select grid, any newly-completed world will surface
+    // its bounty popup even if the immediate in-submitWord queue missed.
+    get().scanForUnclaimedWorldRewards()
+  },
 
   // Navigate to the premium (paid worlds) storefront.
   goToPremium: () => set({ screen: 'premium' }),
@@ -365,8 +379,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     for (const world of WORLDS) {
       if (!world.completionReward || world.completionReward <= 0) continue
       if (progress.isWorldCompletionRewardClaimed(world.id)) continue
+      // Two-stage eligibility, OR'd so the more lenient signal also fires:
+      //   • completedCount >= raw levelCount (matches the original intent
+      //     when no levels get filtered out by playableLevel).
+      //   • every level the world ships has a progress entry marked
+      //     completed (covers the case where the raw count is unreachable
+      //     because some level failed validation — using `world.levels`
+      //     here, not the player's loaded `levels`, so the scan works on
+      //     any screen regardless of what's currently loaded in state).
       const completed = progress.getCompletedCount(world.id)
-      if (completed >= world.levelCount) {
+      const worldLevels = progress.worlds[world.id]?.levels ?? {}
+      const everyLevelDone = world.levels.length > 0
+        && world.levels.every((_, i) => worldLevels[i]?.completed)
+      if (completed >= world.levelCount || everyLevelDone) {
         set({ pendingWorldRewardId: world.id })
         return
       }
@@ -504,11 +529,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // overlay's CLAIM button calls acceptWorldReward, which is what
         // actually atomically claims + credits the Gems. Queuing only — we
         // do NOT modify worldCompletionClaimed yet.
+        //
+        // Eligibility: only single-player mode (daily plays a one-off level
+        // from any world; we don't want a daily win to falsely complete the
+        // _worldId carried over from the player's last single-player session)
+        // AND every level that's actually been LOADED for this world is
+        // marked complete. Loaded levels are what the player can reach —
+        // checking those instead of `world.levelCount` covers the case where
+        // some raw levels were filtered out by `playableLevel` validation
+        // and the player can't physically reach the raw count.
         const world = WORLDS.find(w => w.id === _worldId)
         const reward = world?.completionReward ?? 0
-        if (reward > 0 && !useProgressStore.getState().isWorldCompletionRewardClaimed(_worldId as any)) {
-          const completedNow = useProgressStore.getState().getCompletedCount(_worldId as any)
-          if (completedNow >= (world?.levelCount ?? Infinity)) {
+        if (gameMode !== 'daily'
+            && reward > 0
+            && !useProgressStore.getState().isWorldCompletionRewardClaimed(_worldId as any)) {
+          const worldProgress = useProgressStore.getState().worlds[_worldId as any]?.levels ?? {}
+          const allLoadedDone = levels.length > 0 && levels.every((_, i) => worldProgress[i]?.completed)
+          if (allLoadedDone) {
             set({ pendingWorldRewardId: _worldId })
           }
         }

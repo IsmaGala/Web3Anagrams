@@ -394,12 +394,17 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     const world = WORLDS.find(w => w.id === worldId)
     const reward = world?.completionReward ?? 0
     if (reward <= 0) return 0    // world has no configured bounty
-    // Confirm the world is actually fully complete. The caller normally
-    // checks too, but folding the guard in here keeps the contract simple
-    // for future callers ("just call claim; if it returns >0 you owe the
-    // player that many Gems").
-    const completed = Object.values(get().worlds[worldId]?.levels ?? {}).filter(l => l.completed).length
-    if (completed < (world?.levelCount ?? Infinity)) return 0
+    // Confirm the world is actually fully complete. Two-stage eligibility
+    // mirroring scanForUnclaimedWorldRewards: pass if either the raw
+    // completed count clears world.levelCount OR every level in
+    // world.levels has a completed flag. The OR is what unblocks worlds
+    // whose raw count is unreachable because some level failed
+    // playableLevel validation.
+    const levelsMap = get().worlds[worldId]?.levels ?? {}
+    const completed = Object.values(levelsMap).filter(l => l.completed).length
+    const everyLevelDone = !!world && world.levels.length > 0
+      && world.levels.every((_, i) => levelsMap[i]?.completed)
+    if (completed < (world?.levelCount ?? Infinity) && !everyLevelDone) return 0
     const next = { ...map, [worldId]: true }
     saveCompletion(next)
     set({ worldCompletionClaimed: next })
