@@ -3,7 +3,7 @@ import type { GameState, GameMode, Level, MessageType } from '../types'
 import {
   arrangeLevels, pickDailyLevel, getSessionSeed,
   wordScore, wordFeedback, validateLevel,
-  DAILY_DURATION, updateStreak,
+  DAILY_DURATION, DAILY_HINT_REWARD, updateStreak,
   MIN_WORDS_PER_LEVEL,
   computeScoreBreakdown,
   pickDailyWordMix,
@@ -64,7 +64,9 @@ function playableLevel(lvl: Level): boolean {
   return true
 }
 
-const DAILY_HINT_REWARD = 5     // hints granted on daily win (no Gem reward — hints are the only Gem sink, so we don't bleed supply)
+// DAILY_HINT_REWARD now lives in utils/gameUtils.ts so the on-screen
+// reward badge in DailyWinOverlay and the actual hint credit here can't
+// drift apart. Edit it there and both surfaces update.
 const INITIAL_HINTS     = 3
 // New players start with no Gems — they earn them by completing free worlds
 // (see WORLDS[].completionReward) and by winning the daily, or buy them in
@@ -257,7 +259,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!levels.length) return
     const lvl     = levels[currentLevelIndex % levels.length]
     const isDaily = gameMode === 'daily'
-    const msg     = isDaily ? '⏱ 8 minutes — no hints!' : `Find ${lvl.words.length} words!`
+    const msg     = isDaily ? '⏱ 5 minutes — no hints!' : `Find ${lvl.words.length} words!`
     set({
       foundWords:      new Set(),
       hintedSlots:     {},
@@ -296,9 +298,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       const picked = pickDailyLevel(allLevels)
       // Daily-specific curation: trim the full word list down to a mixed
-      // 13-word set (long/mid/short) so the daily feels distinct from a
-      // regular level — same rules for everyone since the underlying word
-      // list is deterministic.
+      // long/mid/short set (DAILY_WORDS_TARGET = 8) so the daily feels
+      // distinct from a regular level — same rules for everyone since the
+      // underlying word list is deterministic.
       const dailyLevel = { ...picked, words: pickDailyWordMix(picked.words, picked.theme) }
       updateStreak()
       set({ gameMode: mode, screen: 'game', levels: [dailyLevel], currentLevelIndex: 0, score: 0 })

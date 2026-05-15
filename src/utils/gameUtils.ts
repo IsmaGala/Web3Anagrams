@@ -208,8 +208,12 @@ export function getStreak(): number {
 
 // ── Daily timer ───────────────────────────────────────────────────────────────
 
-export const DAILY_DURATION    = 8 * 60   // seconds (8 minutes)
-export const DAILY_WORDS_TARGET = 13      // total words to find in a daily run
+export const DAILY_DURATION     = 5 * 60   // seconds (5 minutes)
+export const DAILY_WORDS_TARGET = 8        // total words to find in a daily run
+/** Hints granted on a daily win. Exported (not just stored in gameStore)
+ *  so the DailyWinOverlay reward badge reads the same number, keeping the
+ *  on-screen value and the actual credit guaranteed in sync. */
+export const DAILY_HINT_REWARD  = 10
 
 // Curate the daily word list so the player gets a mix of long / mid / short
 // rather than a single tier. We stratify the validated word pool into three
@@ -217,7 +221,14 @@ export const DAILY_WORDS_TARGET = 13      // total words to find in a daily run
 // word (typically the longest). When the pool has fewer than `target`
 // words we just return the whole thing.
 //
-// Distribution for target=13:  4 long  ·  5 mid  ·  4 short  =  13
+// Distribution math is the SAME ratio formula at any target:
+//   long  = ceil(target * 0.30)
+//   short = ceil(target * 0.30)
+//   mid   = target - long - short
+//
+// Concrete distributions:
+//   target=13 → 4 long · 5 mid · 4 short
+//   target=8  → 3 long · 2 mid · 3 short
 //
 // "Long" / "short" mean positional buckets after sorting by length desc and
 // alphabetical tiebreaker — not absolute character counts — so this works

@@ -1,5 +1,5 @@
 import { useGameStore, selectCurrentLevel } from '../store/gameStore'
-import { randomFlavor, DAILY_DURATION, formatTime } from '../utils/gameUtils'
+import { randomFlavor, DAILY_DURATION, DAILY_HINT_REWARD, formatTime } from '../utils/gameUtils'
 import { useRef } from 'react'
 
 export function DailyWinOverlay() {
@@ -42,12 +42,13 @@ export function DailyWinOverlay() {
           </div>
         )}
 
-        {/* Reward — 5 hints */}
+        {/* Reward badge — reads DAILY_HINT_REWARD so the displayed count
+            stays locked to whatever the store actually credits. */}
         <div className="flex items-center justify-center gap-3 py-3 px-5 rounded-2xl mb-4 mx-auto w-fit"
           style={{ background:'linear-gradient(160deg,rgba(217,119,6,0.3),rgba(180,83,9,0.2))',
             border:'3px solid rgba(251,191,36,0.4)', boxShadow:'0 4px 0 rgba(0,0,0,0.4)' }}>
           <span className="text-2xl">💡</span>
-          <span className="font-fredoka text-3xl" style={{ color:'#fbbf24' }}>+5 HINTS</span>
+          <span className="font-fredoka text-3xl" style={{ color:'#fbbf24' }}>+{DAILY_HINT_REWARD} HINTS</span>
         </div>
 
         <button onClick={goToSplash} className="btn-3d w-full py-3"
