@@ -4,6 +4,7 @@ import { MIRANDUS_LEVELS }     from './mirandusLevels'
 import { GALASWAP_LEVELS }     from './galaswapLevels'
 import { ETERNALNIGHT_LEVELS } from './eternalnightLevels'
 import { AREA51_LEVELS }       from './area51Levels'
+import { AREA515_LEVELS }      from './area515Levels'
 import { ASIMOV_LEVELS }       from './asimovLevels'
 import { NATURE_LEVELS }       from './natureLevels'
 import { OCEAN_EVENT_LEVELS }  from './oceanEventLevels'
@@ -69,13 +70,13 @@ export const WORLDS: World[] = [
     name:        'Area 51',
     subtitle:    'UFO Lore & Black Ops',
     icon:        '🛸',
-    description: 'A premium dossier of UFO lore — Roswell, hangars, abductions, motherships. Unlock with Gems to access a 20-level deep-state crescendo.',
+    description: 'A premium dossier of UFO lore — Roswell, hangars, abductions, motherships. Unlock with Gems to access a 10-level deep-state crescendo.',
     color:       '#22d3ee',
     gradient:    'linear-gradient(135deg, #042f2e 0%, #0e7490 50%, #155e75 100%)',
     levelCount:  AREA51_LEVELS.length,
     unlockAfter: 0,
     premium:     true,
-    cost:        2000,
+    cost:        1200,
     levels:      AREA51_LEVELS,
   },
   {
@@ -119,6 +120,7 @@ export const WORLDS: World[] = [
     event:       true,
     cost:        5,
     startDate:   '2026-05-11',     // week of May 11 — this week's event
+    eventReward: { firstPlaceSkin: 'deep-sea' },
     levels:      OCEAN_EVENT_LEVELS,
   },
   {
@@ -138,7 +140,30 @@ export const WORLDS: World[] = [
     event:       true,
     cost:        5,
     startDate:   '2026-05-18',     // week of May 18 — next week's event (testing slot)
+    eventReward: { firstPlaceSkin: 'blood' },
     levels:      BLOOD_DONOR_LEVELS,
+  },
+  {
+    // Area 51.5 — the declassified-secondary-files event. Built from the
+    // 10 themes that were trimmed when Area 51 was reduced from 20 → 10
+    // levels (see area515Levels.ts header). Slotted for the week AFTER
+    // Blood Donor Day so the event rotation reads Deep Sea → Blood Donor
+    // Day → Area 51.5 in calendar order. Cyan accent mirrors Area 51's
+    // color so players read it as "the sequel" at a glance.
+    id:          'area515',
+    name:        'Area 51.5',
+    subtitle:    'Declassified Files',
+    icon:        '🛸',
+    description: '10 levels of secondary UFO files spun off from the Area 51 dossier — bunkers, beacons, telepaths, monoliths. The lore that didn\'t make the headline cut. Unlocks for 5 Gems per week.',
+    color:       '#22d3ee',
+    gradient:    'linear-gradient(135deg, #155e75 0%, #0e7490 50%, #042f2e 100%)',
+    levelCount:  AREA515_LEVELS.length,
+    unlockAfter: 0,
+    event:       true,
+    cost:        5,
+    startDate:   '2026-05-25',     // week of May 25 — the slot after Blood Donor Day
+    eventReward: { firstPlaceSkin: 'cybernetic' },
+    levels:      AREA515_LEVELS,
   },
   {
     id:          'coming_soon',

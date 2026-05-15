@@ -3,6 +3,7 @@ import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { World } from '../data/worlds'
 import { playSfx } from '../utils/sfx'
+import { useScreenBackdrop } from '../utils/screenBackdrop'
 
 export default function WorldSelect() {
   const setScreen         = useGameStore(s => (s as any).setScreen)
@@ -23,7 +24,7 @@ export default function WorldSelect() {
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-6 pb-8 px-4"
-      style={{ background:'linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)' }}>
+      style={{ background: useScreenBackdrop('linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)') }}>
 
       {/* Back */}
       <div className="self-start mb-6">

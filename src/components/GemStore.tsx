@@ -4,6 +4,7 @@ import { useWalletStore } from '../store/walletStore'
 import { signMessage } from '../utils/wallet'
 import { api } from '../utils/apiClient'
 import { playSfx } from '../utils/sfx'
+import { useScreenBackdrop } from '../utils/screenBackdrop'
 
 // Gem Store — the on-chain GALA / GUSDC entry point.
 //
@@ -112,7 +113,7 @@ export default function GemStore() {
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
-      style={{ background:'linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)' }}>
+      style={{ background: useScreenBackdrop('linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)') }}>
 
       {/* Back */}
       <div className="self-start mb-5">

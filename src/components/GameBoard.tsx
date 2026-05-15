@@ -8,6 +8,7 @@ import LevelCompleteOverlay from './LevelCompleteOverlay'
 import SfxToggle from './SfxToggle'
 import Toast from './Toast'
 import { playSfx } from '../utils/sfx'
+import { useScreenBackdrop } from '../utils/screenBackdrop'
 
 export default function GameBoard() {
   const gameMode    = useGameStore(s => s.gameMode)
@@ -47,11 +48,16 @@ export default function GameBoard() {
     }
   }
 
+  // Default-skin gradient kept verbatim so the original look is preserved;
+  // any other skin renders transparent and lets the body's per-skin
+  // backdrop (driven by data-app-skin) show through.
+  const backdrop = useScreenBackdrop(isDaily
+    ? 'linear-gradient(180deg,#431407 0%,#1c0a00 100%)'
+    : 'linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)')
+
   return (
     <div className={`min-h-screen flex flex-col items-center pb-6 ${isDaily ? 'daily-mode' : ''}`}
-      style={{ background: isDaily
-        ? 'linear-gradient(180deg,#431407 0%,#1c0a00 100%)'
-        : 'linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)' }}>
+      style={{ background: backdrop }}>
 
       {/* ── TOP BAR ── */}
       <div className="w-full max-w-sm flex items-center gap-2 px-4 pt-4 pb-3">

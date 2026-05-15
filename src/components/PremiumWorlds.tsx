@@ -4,6 +4,7 @@ import { useProgressStore } from '../store/progressStore'
 import { WORLDS } from '../data/worldData'
 import type { World } from '../data/worlds'
 import { playSfx } from '../utils/sfx'
+import { useScreenBackdrop } from '../utils/screenBackdrop'
 
 // Premium worlds storefront. Each entry shows a card with name/subtitle/
 // description/level count/cost. Locked worlds show an "UNLOCK FOR X GEMS"
@@ -44,7 +45,7 @@ export default function PremiumWorlds() {
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
-      style={{ background:'linear-gradient(180deg,#042f2e 0%,#0d2438 60%,#0d0220 100%)' }}>
+      style={{ background: useScreenBackdrop('linear-gradient(180deg,#042f2e 0%,#0d2438 60%,#0d0220 100%)') }}>
 
       {/* Back */}
       <div className="self-start mb-5">

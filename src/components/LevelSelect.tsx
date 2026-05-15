@@ -5,6 +5,7 @@ import { WORLDS } from '../data/worldData'
 import type { WorldId } from '../data/worlds'
 import { LeaderboardPanel } from './WeeklyEvents'
 import { playSfx } from '../utils/sfx'
+import { useScreenBackdrop } from '../utils/screenBackdrop'
 
 export default function LevelSelect() {
   const setScreen         = useGameStore(s => (s as any).setScreen)
@@ -41,7 +42,7 @@ export default function LevelSelect() {
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
-      style={{ background:'linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)' }}>
+      style={{ background: useScreenBackdrop('linear-gradient(180deg,#2e1065 0%,#1a0533 60%,#0d0220 100%)') }}>
 
       {/* Back — destination depends on whether we came from PREMIUM, EVENTS, or WORLDS */}
       <div className="self-start mb-5 flex items-center gap-2 w-full max-w-sm">

@@ -1,8 +1,60 @@
 import { useState } from 'react'
 import { useGameStore, wipeEconomy } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
+import { useCosmeticsStore } from '../store/cosmeticsStore'
+import { WHEEL_SKIN_LIST, getWheelSkin } from '../skins'
 import { WORLDS } from '../data/worldData'
-import type { WorldId } from '../data/worlds'
+import type { World, WorldId } from '../data/worlds'
+import { currentWeekId, startWeekIdFromDate } from '../utils/gameUtils'
+
+// ── Event-schedule helper ────────────────────────────────────────────────
+// Walks every world flagged as `event:true`, parses its Monday startDate
+// into a real Date, and returns the rows that fall inside a sliding
+// horizon: [today - 7d, today + daysAhead]. The 7-day look-back keeps
+// currently-active events visible (their startDate is already in the
+// past, but they're still playable). Each row is tagged with a phase
+// derived from the same weekId math the rest of the app uses, so the
+// label here matches what WeeklyEvents would show.
+interface ScheduleRow {
+  world: World
+  phase: 'active' | 'upcoming' | 'past'
+  start: Date
+  end:   Date
+}
+
+function getEventSchedule(daysAhead = 30): ScheduleRow[] {
+  const now           = new Date()
+  const horizonStart  = now.getTime() - 7  * 86_400_000
+  const horizonEnd    = now.getTime() + daysAhead * 86_400_000
+  const thisWeek      = currentWeekId(now)
+  const out: ScheduleRow[] = []
+
+  for (const w of WORLDS) {
+    if (!w.event || !w.startDate) continue
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(w.startDate)
+    if (!m) continue
+    // Local-time Date — the dev panel is a local-developer affordance,
+    // we don't need to roundtrip through PST here. The phase tag below
+    // comes from startWeekIdFromDate which DOES use PST anchoring, so
+    // the displayed phase still matches the production rules.
+    const start  = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10))
+    const endMs  = start.getTime() + 7 * 86_400_000
+    if (endMs < horizonStart || start.getTime() > horizonEnd) continue
+
+    const eventWeek = startWeekIdFromDate(w.startDate)
+    const phase: ScheduleRow['phase'] =
+      eventWeek < thisWeek ? 'past'
+        : eventWeek === thisWeek ? 'active'
+        : 'upcoming'
+
+    out.push({ world: w, phase, start, end: new Date(endMs) })
+  }
+  return out.sort((a, b) => a.start.getTime() - b.start.getTime())
+}
+
+function formatShortDate(d: Date): string {
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
 
 // Dev-only debug panel. Renders nothing in production builds because the
 // import.meta.env.DEV check below short-circuits at the top of the component
@@ -26,6 +78,9 @@ export default function DebugMenu() {
   const [open, setOpen] = useState(false)
   const [galaInput, setGalaInput] = useState('')
   const [hintsInput, setHintsInput] = useState('')
+  // 30-day event schedule panel — collapsed by default to keep the menu
+  // compact, expanded on demand so devs can verify the rotation.
+  const [showSchedule, setShowSchedule] = useState(false)
 
   // Game store fields we surface
   const screen          = useGameStore(s => s.screen)
@@ -55,6 +110,11 @@ export default function DebugMenu() {
   const clearDailyAttempt   = useProgressStore(s => s.clearDailyAttempt)
   const setDailyAttempt     = useProgressStore(s => s.setDailyAttempt)
   const todaysDailyAttempt  = useProgressStore(s => s.getTodaysDailyAttempt)()
+
+  // Cosmetics — wheel-skin picker. Reading the id keeps this component
+  // subscribed to skin changes so the active button highlight stays in sync.
+  const wheelSkinId    = useCosmeticsStore(s => s.wheelSkin)
+  const setWheelSkin   = useCosmeticsStore(s => s.setWheelSkin)
 
   // ─── Action helpers ────────────────────────────────────────────────────
   function addGala(n: number) {
@@ -250,6 +310,21 @@ export default function DebugMenu() {
         <button style={btn} onClick={() => { const n = parseInt(hintsInput); if (!isNaN(n)) setHintsExact(n) }}>set</button>
       </div>
 
+      <div style={header}>WHEEL SKIN</div>
+      <div className="flex flex-wrap gap-1">
+        {WHEEL_SKIN_LIST.map(s => {
+          const active = s.id === wheelSkinId
+          return (
+            <button key={s.id}
+              style={active ? btnAccent : btn}
+              onClick={() => setWheelSkin(s.id)}
+              title={s.description}>
+              {active ? '● ' : ''}{s.label}
+            </button>
+          )
+        })}
+      </div>
+
       <div style={header}>PROGRESS (current world: {worldId})</div>
       <div className="flex flex-wrap gap-1">
         <button style={btnAccent} onClick={() => unlockAll(worldId)}>unlock all</button>
@@ -278,7 +353,77 @@ export default function DebugMenu() {
       <div style={header}>WEEKLY EVENTS</div>
       <div className="flex flex-wrap gap-1">
         <button style={btn} onClick={goToEvents}>open events</button>
+        <button style={showSchedule ? btnAccent : btn}
+          onClick={() => setShowSchedule(s => !s)}
+          title="List every event running in the next 30 days, with phase + reward skin">
+          {showSchedule ? '✕ hide 30d schedule' : '📅 30d schedule'}
+        </button>
       </div>
+
+      {showSchedule && (
+        // Scrollable in case the rotation ever grows past the panel height.
+        // Phase color codes match the rest of the UI: cyan=active,
+        // amber=upcoming, gray=past.
+        <div className="flex flex-col gap-1 mt-1"
+          style={{
+            background:'rgba(0,0,0,0.35)',
+            border:'1px solid rgba(34,211,238,0.25)',
+            borderRadius:8, padding:6, maxHeight:240, overflowY:'auto',
+          }}>
+          {(() => {
+            const rows = getEventSchedule(30)
+            if (rows.length === 0) {
+              return (
+                <div style={{ ...subtle, textAlign:'center', padding:'6px 0' }}>
+                  No events scheduled in this window.
+                </div>
+              )
+            }
+            return rows.map(({ world, phase, start, end }) => {
+              const skinId = world.eventReward?.firstPlaceSkin
+              const phaseColor =
+                phase === 'active'   ? '#67e8f9' :
+                phase === 'upcoming' ? '#fbbf24' :
+                                       'rgba(226,232,240,0.45)'
+              return (
+                <div key={world.id} className="flex flex-col"
+                  style={{
+                    background:'rgba(255,255,255,0.04)',
+                    border:`1px solid ${phaseColor}33`,
+                    borderLeft:`3px solid ${phaseColor}`,
+                    borderRadius:6, padding:'4px 6px',
+                  }}>
+                  <div className="flex items-center justify-between" style={{ gap:6 }}>
+                    <span style={{
+                      ...subtle, color:'#e2e8f0', flex:1,
+                      whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+                    }}>
+                      {world.icon} <b>{world.name}</b>
+                    </span>
+                    <span className="font-fredoka" style={{
+                      color: phaseColor, fontSize:'0.6rem', letterSpacing:'1.5px',
+                    }}>
+                      {phase.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{ ...subtle, fontSize:'0.65rem', marginTop:2 }}>
+                    {formatShortDate(start)} → {formatShortDate(end)}
+                    {skinId && (
+                      <>
+                        <span style={{ color:'rgba(226,232,240,0.4)' }}> · </span>
+                        <span style={{ color:'#a5f3fc' }}>
+                          🥇 {getWheelSkin(skinId).label}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          })()}
+        </div>
+      )}
+
       <div className="flex flex-col gap-1 mt-1">
         {WORLDS.filter(w => w.event).map(w => {
           const open = isEventUnlocked(w.id)

@@ -1,9 +1,10 @@
 import type { Level } from '../types'
+import type { WheelSkinId } from '../skins'
 
 export type WorldId =
   | 'townstar' | 'mirandus' | 'galaswap' | 'eternalnight'
   | 'area51' | 'asimov' | 'nature'
-  | 'oceanevent' | 'blooddonor'
+  | 'oceanevent' | 'blooddonor' | 'area515'
   | 'coming_soon'
 
 export interface World {
@@ -33,5 +34,14 @@ export interface World {
    *  reward is claimed exactly once per (player, world) via
    *  progressStore.worldCompletionClaimed. */
   completionReward?: number
+  /** For event worlds: the bundle granted to the player who ends the
+   *  week at rank #1 on this event's leaderboard. Tier 2 / 3 rewards are
+   *  uniform across events and live in WeeklyEvents.tsx; only the
+   *  marquee skin reward is event-specific. Unset on non-event worlds.
+   *  See cosmeticsStore.grantSkin — claim wiring lives in
+   *  components/WeeklyEvents.tsx → LeaderboardPanel.handleClaim. */
+  eventReward?: {
+    firstPlaceSkin?: WheelSkinId
+  }
   levels:      Level[]
 }

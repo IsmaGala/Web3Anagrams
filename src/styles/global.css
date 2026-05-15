@@ -37,6 +37,62 @@ body.daily-mode {
     radial-gradient(ellipse at 50% 50%, rgba(40,10,0,0.9) 0%, transparent 100%);
 }
 
+/* ── PAGE BACKGROUND PER WHEEL SKIN ──────────────────────────────────────
+   Driven by `data-app-skin` on <body>, which App.tsx mirrors from the
+   cosmetics store. The default skin matches the base rules above, so no
+   override is needed for it. Daily-mode variants stack on
+   `body.daily-mode[data-app-skin="..."]` so the daily-warm cue survives
+   inside each themed backdrop. Same id strings as the wheel selectors,
+   keeping the system single-source-of-truth. */
+
+/* — CYBERNETIC: cool slate base with cyan/magenta circuit haze. */
+body[data-app-skin="cybernetic"] {
+  background: #02060f;
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(34,211,238,0.30) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(232,121,249,0.25) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(2,6,15,0.9) 0%, transparent 100%);
+}
+body.daily-mode[data-app-skin="cybernetic"] {
+  background: #1a0510;
+  background-image:
+    radial-gradient(ellipse at 15% 15%, rgba(244,63,94,0.35) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(232,121,249,0.30) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(20,5,16,0.9) 0%, transparent 100%);
+}
+
+/* — DEEP SEA: abyssal navy base with teal/cyan light filtering down. */
+body[data-app-skin="deep-sea"] {
+  background: #020a1a;
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(20,184,166,0.28) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(34,211,238,0.22) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(2,10,26,0.9) 0%, transparent 100%);
+}
+body.daily-mode[data-app-skin="deep-sea"] {
+  background: #0d0a02;
+  background-image:
+    radial-gradient(ellipse at 15% 15%, rgba(217,119,6,0.35) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(251,191,36,0.25) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(8,8,15,0.9) 0%, transparent 100%);
+}
+
+/* — BLOOD: dark crimson base, arterial + venous blooms. */
+body[data-app-skin="blood"] {
+  background: #170303;
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(220,38,38,0.30) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(127,29,29,0.40) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(15,3,3,0.9) 0%, transparent 100%);
+}
+body.daily-mode[data-app-skin="blood"] {
+  background: #1f0410;
+  background-image:
+    radial-gradient(ellipse at 15% 15%, rgba(244,63,94,0.40) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(225,29,72,0.30) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(20,5,15,0.9) 0%, transparent 100%);
+}
+
 /* ── FONTS ───────────────────────────────────────────────────────────────── */
 .font-fredoka { font-family: 'Fredoka One', cursive; }
 .font-nunito  { font-family: 'Nunito', sans-serif; }
@@ -146,6 +202,181 @@ body.daily-mode .wheel-letter.selected {
   border-color: #fde68a;
   box-shadow: 0 3px 0 #451a03, 0 0 20px rgba(245,158,11,0.7);
   color: #fff;
+}
+
+/* ── WHEEL SKIN: CYBERNETIC ──────────────────────────────────────────────
+   Selectors are scoped to `[data-skin="cybernetic"] .wheel-letter` so the
+   default skin is untouched. The component sets data-skin on the wheel
+   container, which means we get clean per-skin cascading without ever
+   needing to toggle a class on the letters themselves. Daily-mode variants
+   stack on `body.daily-mode [data-skin="cybernetic"] ...` to preserve the
+   "this is the daily challenge" affordance under the cyber palette. */
+[data-skin="cybernetic"] .wheel-letter {
+  background: linear-gradient(160deg, #0e1e2e, #020617);
+  border: 2px solid #22d3ee;                 /* electric cyan trace */
+  border-bottom: 2px solid #155e75;          /* darker rim for "depth" */
+  /* Two-layer shadow: hard drop ledge under the tile + neon outer halo. */
+  box-shadow:
+    0 5px 0 #0b3a4a,
+    0 0 0 1px rgba(34,211,238,0.35),
+    0 0 14px rgba(34,211,238,0.35);
+  color: #e0f7fb;
+  /* Faint inner scanline via gradient overlay-feel text-shadow. */
+  text-shadow: 0 0 6px rgba(103,232,249,0.7);
+}
+
+[data-skin="cybernetic"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #7e22ce, #3b0764);
+  border-color: #e879f9;                     /* magenta lock-on */
+  border-bottom-color: #581c87;
+  box-shadow:
+    0 3px 0 #4a044e,
+    0 0 0 2px rgba(232,121,249,0.45),
+    0 0 22px rgba(232,121,249,0.75);
+  color: #fdf4ff;
+  text-shadow: 0 0 8px rgba(244,114,182,0.9);
+  transform: translate(-50%, -50%) scale(1.18) translateY(-3px);
+}
+
+/* Daily-mode pushes the cyber palette toward red/amber so players still
+   read it as "daily challenge" rather than the campaign cyber look. */
+body.daily-mode [data-skin="cybernetic"] .wheel-letter {
+  background: linear-gradient(160deg, #2e1010, #0a0203);
+  border-color: #fb7185;
+  border-bottom-color: #7f1d1d;
+  box-shadow:
+    0 5px 0 #450a0a,
+    0 0 0 1px rgba(251,113,133,0.35),
+    0 0 14px rgba(244,63,94,0.4);
+  color: #fee2e2;
+  text-shadow: 0 0 6px rgba(251,113,133,0.7);
+}
+
+body.daily-mode [data-skin="cybernetic"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #be123c, #4c0519);
+  border-color: #fda4af;
+  box-shadow:
+    0 3px 0 #4c0519,
+    0 0 0 2px rgba(253,164,175,0.45),
+    0 0 22px rgba(244,63,94,0.8);
+  color: #fff;
+  text-shadow: 0 0 8px rgba(253,164,175,0.95);
+}
+
+/* ── WHEEL SKIN: DEEP SEA ────────────────────────────────────────────────
+   Abyssal navy tiles, soft teal trace, bioluminescent aqua lock-on. Same
+   selector strategy as the cybernetic skin: scoped under
+   `[data-skin="deep-sea"]` so the default look stays untouched, with
+   `body.daily-mode` variants stacking on top to preserve the daily-mode
+   affordance. Drop shadows use deep ocean blues so the tiles read as
+   sitting in dark water rather than floating in space. */
+[data-skin="deep-sea"] .wheel-letter {
+  background: linear-gradient(160deg, #0c1d3a, #050a17);
+  border: 2px solid #5eead4;                  /* teal kelp trace */
+  border-bottom: 2px solid #134e4a;
+  box-shadow:
+    0 5px 0 #0a2540,
+    0 0 0 1px rgba(94,234,212,0.30),
+    0 0 14px rgba(34,211,238,0.30);
+  color: #cffafe;
+  /* Soft bioluminescent halo around the letter glyphs. */
+  text-shadow: 0 0 6px rgba(94,234,212,0.6);
+}
+
+[data-skin="deep-sea"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #0891b2, #155e75);
+  border-color: #a5f3fc;                      /* bright aqua lock-on */
+  border-bottom-color: #0e7490;
+  box-shadow:
+    0 3px 0 #083344,
+    0 0 0 2px rgba(165,243,252,0.50),
+    0 0 22px rgba(103,232,249,0.85);
+  color: #ecfeff;
+  text-shadow: 0 0 8px rgba(165,243,252,0.95);
+  transform: translate(-50%, -50%) scale(1.18) translateY(-3px);
+}
+
+/* Daily-mode: anglerfish-lure amber against deeper water. Tile background
+   stays cold-dark, but the trim shifts to warm gold so players still read
+   "this is the daily challenge". */
+body.daily-mode [data-skin="deep-sea"] .wheel-letter {
+  background: linear-gradient(160deg, #1c1306, #050a17);
+  border-color: #fbbf24;
+  border-bottom-color: #78350f;
+  box-shadow:
+    0 5px 0 #0a2540,
+    0 0 0 1px rgba(251,191,36,0.32),
+    0 0 14px rgba(217,119,6,0.35);
+  color: #fde68a;
+  text-shadow: 0 0 6px rgba(251,191,36,0.65);
+}
+
+body.daily-mode [data-skin="deep-sea"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #b45309, #78350f);
+  border-color: #fde68a;
+  box-shadow:
+    0 3px 0 #1c1306,
+    0 0 0 2px rgba(253,230,138,0.50),
+    0 0 22px rgba(251,146,60,0.85);
+  color: #fff7ed;
+  text-shadow: 0 0 8px rgba(253,230,138,0.95);
+}
+
+/* ── WHEEL SKIN: BLOOD ───────────────────────────────────────────────────
+   Visceral crimson. Idle reads as coagulated dark blood with a fresh-red
+   trim; selected flares to arterial brightness with a pale bone-pink
+   halo. Daily-mode pushes into klaxon scarlet — louder, pinker — so the
+   "this is the daily challenge" cue survives without abandoning the red
+   family. Same scoping pattern as the cybernetic and deep-sea skins. */
+[data-skin="blood"] .wheel-letter {
+  background: linear-gradient(160deg, #7f1d1d, #1a0303);
+  border: 2px solid #dc2626;                  /* fresh arterial trim */
+  border-bottom: 2px solid #450a0a;
+  box-shadow:
+    0 5px 0 #3f0808,
+    0 0 0 1px rgba(220,38,38,0.35),
+    0 0 14px rgba(220,38,38,0.30);
+  color: #fecaca;
+  /* Faint red bloom around the glyph so letters look slightly hot. */
+  text-shadow: 0 0 6px rgba(252,165,165,0.65);
+}
+
+[data-skin="blood"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #b91c1c, #7f1d1d);
+  border-color: #fecaca;                      /* near-bone halo */
+  border-bottom-color: #7f1d1d;
+  box-shadow:
+    0 3px 0 #450a0a,
+    0 0 0 2px rgba(254,202,202,0.50),
+    0 0 22px rgba(220,38,38,0.85);
+  color: #fff5f5;
+  text-shadow: 0 0 8px rgba(254,202,202,0.95);
+  transform: translate(-50%, -50%) scale(1.18) translateY(-3px);
+}
+
+/* Daily-mode: klaxon scarlet — same red family, but brighter / pinker so
+   players still read this as the daily challenge. */
+body.daily-mode [data-skin="blood"] .wheel-letter {
+  background: linear-gradient(160deg, #9f1239, #4c0519);
+  border-color: #fb7185;
+  border-bottom-color: #4c0519;
+  box-shadow:
+    0 5px 0 #4c0519,
+    0 0 0 1px rgba(251,113,133,0.35),
+    0 0 14px rgba(244,63,94,0.35);
+  color: #ffe4e6;
+  text-shadow: 0 0 6px rgba(251,113,133,0.7);
+}
+
+body.daily-mode [data-skin="blood"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #e11d48, #881337);
+  border-color: #fda4af;
+  box-shadow:
+    0 3px 0 #4c0519,
+    0 0 0 2px rgba(253,164,175,0.55),
+    0 0 22px rgba(244,63,94,0.9);
+  color: #fff;
+  text-shadow: 0 0 8px rgba(253,164,175,0.95);
 }
 
 /* ── CURRENT WORD ────────────────────────────────────────────────────────── */

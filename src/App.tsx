@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from './store/gameStore'
 import { useProgressStore } from './store/progressStore'
 import { useWalletStore } from './store/walletStore'
+import { useCosmeticsStore } from './store/cosmeticsStore'
 import { WORLDS } from './data/worldData'
 import Splash from './components/Splash'
 import WorldSelect from './components/WorldSelect'
@@ -58,6 +59,23 @@ export default function App() {
       useGameStore.getState().scanForUnclaimedWorldRewards()
     })
   }, [jwt])
+
+  // Mirror the active wheel skin onto <body data-app-skin="..."> so global
+  // styling in global.css can theme the page background per-skin. We do
+  // this here (rather than inside Wheel.tsx) because the background needs
+  // to track the skin on every screen, not only when the wheel is mounted.
+  //
+  // Why an attribute instead of a className: the skin id is already a
+  // kebab-case string ('deep-sea'), and selectors like `body[data-app-skin
+  // ="deep-sea"]` compose cleanly with the existing `body.daily-mode` rules
+  // without polluting the class list.
+  const appSkin = useCosmeticsStore(s => s.wheelSkin)
+  useEffect(() => {
+    document.body.dataset.appSkin = appSkin
+    // Don't clear on unmount — App is the single root and lives for the
+    // entire session. Leaving the attribute in place avoids a one-frame
+    // flicker back to the default backdrop if anything ever remounts.
+  }, [appSkin])
 
   // Subscribe to both stores; any change after login schedules a debounced
   // push to /api/profile/sync. The debounce coalesces a flurry of changes

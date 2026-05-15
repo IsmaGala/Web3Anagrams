@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
+import { useScreenBackdrop } from '../utils/screenBackdrop'
 import { WORLDS } from '../data/worldData'
 import {
   getStreak, timeToMidnight,
@@ -104,7 +105,7 @@ export default function Splash() {
     // content and the player can scroll through the menu naturally.
     <div className="relative min-h-screen w-full flex flex-col items-center overflow-x-hidden"
       style={{
-        background: 'linear-gradient(180deg, #2e1065 0%, #1a0533 60%, #0d0220 100%)',
+        background: useScreenBackdrop('linear-gradient(180deg, #2e1065 0%, #1a0533 60%, #0d0220 100%)'),
         // iOS momentum scrolling — feels native instead of stuttery.
         WebkitOverflowScrolling: 'touch',
       }}>

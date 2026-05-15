@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
+import { useCosmeticsStore } from '../store/cosmeticsStore'
+import { getWheelSkin, type WheelSkinId } from '../skins'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
 import { formatWeekCountdown, eventPhase, currentWeekId, timeToNextPhaseChange, startWeekIdFromDate } from '../utils/gameUtils'
 import { playSfx } from '../utils/sfx'
+import { useScreenBackdrop } from '../utils/screenBackdrop'
 import { api } from '../utils/apiClient'
 import WalletConnectModal from './WalletConnectModal'
 
@@ -17,11 +20,29 @@ import WalletConnectModal from './WalletConnectModal'
 // this event, and a CLAIM REWARD button gated on having completed at least
 // one level this week (and not yet claimed it).
 
-const REWARDS: { rank: number; label: string; hints: number; icon: string }[] = [
-  { rank: 1, label: '100 hints',  hints: 100, icon: '🥇' },
-  { rank: 2, label: '25 hints',   hints: 25,  icon: '🥈' },
-  { rank: 3, label: '5 hints',    hints: 5,   icon: '🥉' },
-]
+// ── REWARD TIER MODEL ───────────────────────────────────────────────────
+// Rank-1 reward is event-specific (the marquee skin lives in the world's
+// `eventReward.firstPlaceSkin`). Ranks 2 and 3 are uniform across events.
+// `rewardsFor(world)` is called per-render rather than memoized — it's a
+// 3-element array literal, cheaper to recompute than to cache.
+interface RewardTier {
+  rank:  1 | 2 | 3
+  gems:  number
+  hints: number
+  /** Wheel skin granted on first claim. Tier 1 only (and only when the
+   *  event declares one — `firstPlaceSkin` is optional on World). */
+  skin?: WheelSkinId
+  icon:  string
+}
+
+function rewardsFor(world: World | undefined): RewardTier[] {
+  const firstSkin = world?.eventReward?.firstPlaceSkin
+  return [
+    { rank: 1, gems: 100, hints: 0, skin: firstSkin, icon: '🥇' },
+    { rank: 2, gems: 100, hints: 5,                  icon: '🥈' },
+    { rank: 3, gems: 60,  hints: 3,                  icon: '🥉' },
+  ]
+}
 
 interface EventCardEntry {
   world:    World
@@ -187,7 +208,7 @@ export default function WeeklyEvents() {
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
-      style={{ background:'linear-gradient(180deg,#0c4a6e 0%,#0a2540 60%,#0d0220 100%)' }}>
+      style={{ background: useScreenBackdrop('linear-gradient(180deg,#0c4a6e 0%,#0a2540 60%,#0d0220 100%)') }}>
 
       <div className="self-start mb-5">
         <button onClick={() => { playSfx('uiTap'); goToSplash() }} className="btn-3d flex items-center gap-2 px-5 py-3"
@@ -535,6 +556,9 @@ export function LeaderboardPanel({ worldId, accent, weekId }: { worldId: WorldId
   // tapped, or when the target week changes (e.g. a past-week card mounts).
   }, [worldId, jwt, score, refreshTick, targetWeek, isPastWeek])
 
+  // Per-event reward tiers. Lookup is by rank — only matters when the
+  // server reports a top-3 placement.
+  const tiers      = rewardsFor(worldMeta)
   // Rank-driven reward — if the server returned a top-3 rank for the player,
   // they're eligible to claim that tier. The phase gate ("settled or later")
   // protects mid-event claims for the CURRENT week. For past weeks the gate
@@ -542,15 +566,38 @@ export function LeaderboardPanel({ worldId, accent, weekId }: { worldId: WorldId
   // ended, so a participant can still claim any time. See gameUtils.eventPhase.
   const phase      = eventPhase()
   const serverRank = board?.you?.rank ?? null
-  const rewardTier = serverRank && serverRank <= 3 ? REWARDS.find(r => r.rank === serverRank) : null
+  const rewardTier = serverRank && serverRank <= 3 ? tiers.find(r => r.rank === serverRank) : null
   const claimWindowOpen = isPastWeek || phase === 'settled'
   const eligible   = !!rewardTier && !claimed && claimWindowOpen
 
   function handleClaim() {
     if (!eligible || !rewardTier) return
-    useGameStore.setState(s => ({ hints: s.hints + rewardTier.hints }) as any)
+    // Credit gems + hints in one setState so the gem counter and hint
+    // counter animate together rather than in two ticks.
+    useGameStore.setState(s => ({
+      gemsBalance: (s as any).gemsBalance + rewardTier.gems,
+      hints:       s.hints + rewardTier.hints,
+    }) as any)
+    // Skin grant — only on first-ever claim of this skin. `grantSkin`
+    // returns true only if the player didn't already own it, so a player
+    // who wins the same skin twice (replay events, multiple weeks)
+    // still gets gems + hints but isn't double-counted as a fresh unlock.
+    let grantedFreshSkin = false
+    if (rewardTier.skin) {
+      grantedFreshSkin = useCosmeticsStore.getState().grantSkin(rewardTier.skin)
+      // Auto-apply the new skin for the celebratory beat. Players can
+      // swap back via the picker — ownership is permanent regardless.
+      if (grantedFreshSkin) useCosmeticsStore.getState().setWheelSkin(rewardTier.skin)
+    }
     claimEventReward(worldId, targetWeek)
-    showToast(`✓ Rank #${rewardTier.rank} reward claimed · +${rewardTier.hints} hints`)
+    // Toast lists exactly what landed in the player's account — keeps
+    // expectation aligned with the tile grid above.
+    const parts: string[] = [`+${rewardTier.gems} gems`]
+    if (rewardTier.hints) parts.push(`+${rewardTier.hints} hints`)
+    if (grantedFreshSkin && rewardTier.skin) {
+      parts.push(`+${getWheelSkin(rewardTier.skin).label} skin`)
+    }
+    showToast(`✓ Rank #${rewardTier.rank} · ${parts.join(' · ')}`)
   }
 
   return (
@@ -594,20 +641,36 @@ export function LeaderboardPanel({ worldId, accent, weekId }: { worldId: WorldId
         </p>
       )}
 
-      {/* Reward tiers */}
+      {/* Reward tiers — gems on every tier, skin on rank 1, hints on
+          ranks 2/3. Multi-line layout keeps the small tiles readable
+          without truncating either reward component. */}
       <div className="grid grid-cols-3 gap-1.5 mb-3">
-        {REWARDS.map(r => (
-          <div key={r.rank} className="rounded-lg p-2 text-center"
-            style={{
-              background: serverRank === r.rank ? `${accent}33` : 'rgba(255,255,255,0.05)',
-              border: serverRank === r.rank
-                ? `1.5px solid ${accent}`
-                : '1.5px solid rgba(255,255,255,0.1)',
-            }}>
-            <div className="text-xl leading-none mb-0.5">{r.icon}</div>
-            <div className="font-fredoka text-xs" style={{ color:'#fde68a' }}>{r.label}</div>
-          </div>
-        ))}
+        {tiers.map(r => {
+          const isYourRank = serverRank === r.rank
+          return (
+            <div key={r.rank} className="rounded-lg p-2 text-center"
+              style={{
+                background: isYourRank ? `${accent}33` : 'rgba(255,255,255,0.05)',
+                border: isYourRank
+                  ? `1.5px solid ${accent}`
+                  : '1.5px solid rgba(255,255,255,0.1)',
+              }}>
+              <div className="text-xl leading-none mb-1">{r.icon}</div>
+              <div className="font-fredoka text-[0.65rem] leading-tight"
+                style={{ color: '#fde68a' }}>
+                <div>{r.gems} gems</div>
+                {r.skin && (
+                  <div style={{ color: '#a5f3fc' }}>
+                    + {getWheelSkin(r.skin).label} skin
+                  </div>
+                )}
+                {r.hints > 0 && (
+                  <div>+ {r.hints} hints</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Top entries from the server */}
@@ -772,7 +835,7 @@ export function LeaderboardPanel({ worldId, accent, weekId }: { worldId: WorldId
               For the current week we surface either "wait for week end" or
               the actual gap to top-3 so they know what they're shooting for. */}
           {eligible && rewardTier
-            ? `CLAIM RANK #${rewardTier.rank} · +${rewardTier.hints} HINTS`
+            ? `CLAIM RANK #${rewardTier.rank} · +${rewardTier.gems} GEMS`
             : !walletAddress
               ? 'CONNECT WALLET TO QUALIFY'
               : !jwt

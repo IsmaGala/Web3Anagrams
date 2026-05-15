@@ -1,7 +1,12 @@
 import type { Level } from '../types'
 
-// Premium world #1: Area 51 / UFO lore. 20 levels, theme-length crescendo
-// from 5 → 10 letters, word-count ramp 10 → 20 matching the rest of the game.
+// Premium world #1: Area 51 / UFO lore. 10 levels selected for the canonical
+// UFO journey — the most iconic themes (ALIEN, SAUCER, ROSWELL, ABDUCTION,
+// MOTHERSHIP) carry the marquee experience while preserving a smooth
+// difficulty crescendo from 3.5 → 13.0 across the full 5 → 10-letter arc.
+// The 10 secondary themes that originally lived here have moved to the
+// 'area515' weekly event (see area515Levels.ts) so they still see play in
+// the rotation without diluting the premium dossier.
 // Every word has been hand-validated against its letter pool (canMakeWord).
 
 export const AREA51_LEVELS: Level[] = [
@@ -24,24 +29,6 @@ export const AREA51_LEVELS: Level[] = [
     }
   },
   {
-    theme: 'ORBIT', difficulty: 3.8,
-    letters: ['O','R','B','I','T'],
-    words: ['ORBIT','BIRO','BORT','RIOT','TIRO','BIO','BIT','BOT','ORB','ROB'], bonus: ['TORI'],
-    defs: {
-      ORBIT: 'A path around a celestial body — sometimes intercepted by unidentified craft',
-      BIRO: 'A ballpoint pen',
-      BORT: 'Industrial-grade diamond fragments',
-      RIOT: 'A violent public disturbance',
-      TIRO: 'A novice',
-      BIO: 'A biography; short for biological',
-      BIT: 'A small piece',
-      BOT: 'A software robot',
-      ORB: 'A sphere; a celestial body',
-      ROB: 'To take by force',
-      TORI: 'Plural of torus; a ring-shape',
-    }
-  },
-  {
     theme: 'PROBE', difficulty: 4.0,
     letters: ['P','R','O','B','E'],
     words: ['PROBE','BORE','PORE','ROBE','ROPE','BOP','BRO','OBE','OPE','ORB','PER'], bonus: ['REPO'],
@@ -58,26 +45,6 @@ export const AREA51_LEVELS: Level[] = [
       ORB: 'A sphere',
       PER: 'For each',
       REPO: 'A repossession',
-    }
-  },
-  {
-    theme: 'CRAFT', difficulty: 4.3,
-    letters: ['C','R','A','F','T'],
-    words: ['CRAFT','CART','FACT','FART','FRAT','RAFT','ACT','ARC','ART','CAR','CAT','FAR'], bonus: ['TRAC'],
-    defs: {
-      CRAFT: 'A vehicle for traveling through air, water, or space — often unidentified',
-      CART: 'A small wheeled vehicle',
-      FACT: 'Something verifiably true',
-      FART: 'A release of intestinal gas',
-      FRAT: 'A fraternity (informal)',
-      RAFT: 'A floating platform',
-      ACT: 'A deed; to perform',
-      ARC: 'A curved path',
-      ART: 'Creative expression',
-      CAR: 'A motor vehicle',
-      CAT: 'A small carnivorous mammal',
-      FAR: 'At a great distance',
-      TRAC: 'A trackable region (informal/abbreviation)',
     }
   },
   {
@@ -123,28 +90,6 @@ export const AREA51_LEVELS: Level[] = [
     }
   },
   {
-    theme: 'BUNKER', difficulty: 6.0,
-    letters: ['B','U','N','K','E','R'],
-    words: ['BUNKER','BUNK','BURE','BURK','NUKE','RUNE','BUN','BUR','ERK','KEN','NEB','NUB','RUB','RUE'], bonus: ['URBE'],
-    defs: {
-      BUNKER: 'A fortified underground room — said to hide what Area 51 doesn\'t want seen',
-      BUNK: 'A narrow bed; nonsense',
-      BURE: 'A Fijian thatched dwelling',
-      BURK: 'A fool (British slang)',
-      NUKE: 'A nuclear weapon (slang); to microwave',
-      RUNE: 'An ancient symbol of power',
-      BUN: 'A bread roll',
-      BUR: 'A rough seed casing',
-      ERK: 'An aircraftman (British slang)',
-      KEN: 'Knowledge; to perceive',
-      NEB: 'A beak or nose',
-      NUB: 'The core of a matter',
-      RUB: 'To press and move; an obstacle',
-      RUE: 'To regret',
-      URBE: 'City (Latin root)',
-    }
-  },
-  {
     theme: 'HANGAR', difficulty: 6.5,
     letters: ['H','A','N','G','A','R'],
     words: ['HANGAR','GRANA','AGAR','AGHA','GNAR','GRAN','HANG','NAGA','AAH','AGA','AHA','GAR','HAG','NAG','NAH'], bonus: ['RANGA'],
@@ -165,54 +110,6 @@ export const AREA51_LEVELS: Level[] = [
       NAG: 'To pester',
       NAH: 'Informal "no"',
       RANGA: 'A redhead (Australian slang)',
-    }
-  },
-  {
-    theme: 'BEACON', difficulty: 7.0,
-    letters: ['B','E','A','C','O','N'],
-    words: ['BEACON','BACON','OCEAN','ACNE','BANC','BANE','BEAN','BONE','CANE','CANOE','CONE','NABE','ABO','ACE','ANE','BAN'], bonus: [],
-    defs: {
-      BEACON: 'A signaling device — used to guide or hail something otherworldly',
-      BACON: 'Cured pork side',
-      OCEAN: 'A vast body of salt water',
-      ACNE: 'A skin condition of inflamed glands',
-      BANC: 'A judicial bench; together as a court',
-      BANE: 'A cause of ruin',
-      BEAN: 'A seed of certain legumes',
-      BONE: 'A piece of the skeleton',
-      CANE: 'A walking stick; a tall grass',
-      CANOE: 'A narrow keel-less boat',
-      CONE: 'A pointed solid; an ice-cream holder',
-      NABE: 'A neighborhood (slang); the boss',
-      ABO: 'Blood type system (informal)',
-      ACE: 'An expert; a playing card',
-      ANE: 'One (Scottish)',
-      BAN: 'To prohibit',
-    }
-  },
-  {
-    theme: 'DESERT', difficulty: 7.5,
-    letters: ['D','E','S','E','R','T'],
-    words: ['DESERT','DEERS','DETER','REEDS','RESET','SERED','STEER','TREES','DEER','DEES','REED','REDS','REST','SEED','SEER','SERE','TEED'], bonus: ['STEED'],
-    defs: {
-      DESERT: 'The arid landscape of southern Nevada — Area 51\'s natural cover',
-      DEERS: 'Plural of deer (rare)',
-      DETER: 'To discourage',
-      REEDS: 'Plural of reed; tall grasses',
-      RESET: 'To set again',
-      SERED: 'Past tense of sere (to wither)',
-      STEER: 'To guide; a young ox',
-      TREES: 'Plural of tree',
-      DEER: 'A hoofed grazing animal',
-      DEES: 'Plural of dee (the letter D)',
-      REED: 'A tall water-loving grass',
-      REDS: 'Plural of red',
-      REST: 'Repose; the remainder',
-      SEED: 'A plant embryo',
-      SEER: 'A prophet',
-      SERE: 'Withered',
-      TEED: 'Past tense of tee',
-      STEED: 'A high-spirited horse',
     }
   },
   {
@@ -269,34 +166,6 @@ export const AREA51_LEVELS: Level[] = [
     }
   },
   {
-    theme: 'CRYPTID', difficulty: 9.0,
-    letters: ['C','R','Y','P','T','I','D'],
-    words: ['CRYPTID','CRYPT','PRICY','CITY','CRIT','DIPT','DIRT','DRIP','PITY','TIDY','TRIP','ICY','PIC','PIT','PRY','TIC','TIP','CIT','CRY','RIP'], bonus: ['TRIPY'],
-    defs: {
-      CRYPTID: 'A creature whose existence is unverified by science — Mothman, Chupacabra et al.',
-      CRYPT: 'An underground burial chamber',
-      PRICY: 'Expensive',
-      CITY: 'A large town',
-      CRIT: 'A critical review (informal)',
-      DIPT: 'Past tense of dip (archaic)',
-      DIRT: 'Loose earth; gossip',
-      DRIP: 'A falling liquid; an annoying person',
-      PITY: 'Sorrow for another\'s suffering',
-      TIDY: 'Neat and orderly',
-      TRIP: 'A journey',
-      ICY: 'Covered with ice; unfriendly',
-      PIC: 'A picture (informal)',
-      PIT: 'A hole in the ground',
-      PRY: 'To force open; to inquire intrusively',
-      TIC: 'An involuntary twitch',
-      TIP: 'A small gratuity',
-      CIT: 'An inhabitant of a city (archaic)',
-      CRY: 'To weep',
-      RIP: 'To tear',
-      TRIPY: 'Resembling tripe (rare/bonus)',
-    }
-  },
-  {
     theme: 'STARSHIP', difficulty: 9.5,
     letters: ['S','T','A','R','S','H','I','P'],
     words: ['STARSHIP','HARPIST','PARISH','RAPIST','SPRATS','STAIRS','STRAPS','AIRTS','APHIS','ATRIP','HARPS','HARTS','PARTS','PATHS','HAIR','HARP','HATS','HIPS','PAIR','PARS'], bonus: ['STIRPS'],
@@ -325,90 +194,6 @@ export const AREA51_LEVELS: Level[] = [
     }
   },
   {
-    theme: 'TELEPATH', difficulty: 10.0,
-    letters: ['T','E','L','E','P','A','T','H'],
-    words: ['TELEPATH','PELTATE','ALEPH','LATHE','LEAPT','PETAL','PLATE','PLEAT','TEETH','TEPAL','ALEE','HALE','HATE','HEAP','HEAT','HEEL','HELP','LATE','LEAP','LEPT'], bonus: ['PALETTE'],
-    defs: {
-      TELEPATH: 'One who can transmit thoughts directly — many contactees claim the ability',
-      PELTATE: 'Shield-shaped (of a leaf)',
-      ALEPH: 'The first Hebrew letter',
-      LATHE: 'A machine for shaping material by rotation',
-      LEAPT: 'Past tense of leap',
-      PETAL: 'A flower segment',
-      PLATE: 'A flat dish; armor section',
-      PLEAT: 'A fold in cloth',
-      TEETH: 'Plural of tooth',
-      TEPAL: 'A petal-like sepal',
-      ALEE: 'On the leeward side',
-      HALE: 'Healthy',
-      HATE: 'Intense dislike',
-      HEAP: 'A pile',
-      HEAT: 'High temperature',
-      HEEL: 'The back of the foot',
-      HELP: 'To assist',
-      LATE: 'After the expected time',
-      LEAP: 'To jump',
-      LEPT: 'Past tense of leap (archaic)',
-      PALETTE: 'A board for mixing colors; a range of options',
-    }
-  },
-  {
-    theme: 'INFRARED', difficulty: 10.5,
-    letters: ['I','N','F','R','A','R','E','D'],
-    words: ['INFRARED','DARNER','FAIRED','FINDER','RAINED','DINAR','DINER','DRAIN','FRIAR','NADIR','RIDER','ARID','DARE','DEAR','DEAN','EARN','FAIR','FANE','FEND','FIRE'], bonus: ['REFRAIN'],
-    defs: {
-      INFRARED: 'Light beyond visible red — preferred by night observers and unknown craft alike',
-      DARNER: 'One who mends; a large dragonfly',
-      FAIRED: 'Smoothed or streamlined',
-      FINDER: 'One who finds; a viewfinder',
-      RAINED: 'Past tense of rain',
-      DINAR: 'A monetary unit of several countries',
-      DINER: 'A small restaurant',
-      DRAIN: 'A channel for liquid',
-      FRIAR: 'A member of certain religious orders',
-      NADIR: 'The lowest point',
-      RIDER: 'One who rides; an added clause',
-      ARID: 'Very dry',
-      DARE: 'To have the courage to',
-      DEAR: 'Beloved; expensive',
-      DEAN: 'A senior official',
-      EARN: 'To gain by work',
-      FAIR: 'Just; an exhibition',
-      FANE: 'A temple',
-      FEND: 'To manage; to ward off',
-      FIRE: 'Combustion; to discharge',
-      REFRAIN: 'To hold back; a recurring phrase in a song',
-    }
-  },
-  {
-    theme: 'BRIEFING', difficulty: 11.0,
-    letters: ['B','R','I','E','F','I','N','G'],
-    words: ['BRIEFING','FIBRIN','BEING','BINGE','BRIEF','BRINE','FIBER','GENII','GRIEF','BERG','BIER','BRIE','FERN','FIRE','FIRN','GIBE','GRIN','RIFE','RING','BIG'], bonus: ['NEIF'],
-    defs: {
-      BRIEFING: 'A classified intelligence summary — most Area 51 records remain need-to-know',
-      FIBRIN: 'A protein involved in blood clotting',
-      BEING: 'Existence; a creature',
-      BINGE: 'Excessive indulgence',
-      BRIEF: 'Short; a legal summary',
-      BRINE: 'Salty water',
-      FIBER: 'A thread-like substance',
-      GENII: 'Plural of genius / spirit',
-      GRIEF: 'Deep sorrow',
-      BERG: 'An iceberg',
-      BIER: 'A stand for a coffin',
-      BRIE: 'A soft French cheese',
-      FERN: 'A flowerless plant',
-      FIRE: 'Combustion',
-      FIRN: 'Granular snow above a glacier',
-      GIBE: 'A taunt',
-      GRIN: 'A broad smile',
-      RIFE: 'Widespread',
-      RING: 'A circular band',
-      BIG: 'Of considerable size',
-      NEIF: 'A fist (archaic, bonus)',
-    }
-  },
-  {
     theme: 'ABDUCTION', difficulty: 11.5,
     letters: ['A','B','D','U','C','T','I','O','N'],
     words: ['ABDUCTION','ABDUCT','BANDIT','DACOIT','OUTBID','ACTIN','ACTON','AUDIO','AUDIT','BANCO','BIDON','CUBIT','DUCAT','INCUT','TONIC','OCTAD','UNCIA','ABUT','ACID','AUTO'], bonus: ['OBTAIN'],
@@ -434,34 +219,6 @@ export const AREA51_LEVELS: Level[] = [
       ACID: 'A sour chemical compound',
       AUTO: 'An automobile',
       OBTAIN: 'To acquire; to come into possession of',
-    }
-  },
-  {
-    theme: 'MONOLITHS', difficulty: 12.0,
-    letters: ['M','O','N','O','L','I','T','H','S'],
-    words: ['MONOLITHS','MONOLITH','MOONLIT','MOTIONS','HOLISM','LOTION','MONISH','MONIST','MOTION','SMOOTH','HOIST','LITHO','MOIST','MOLTS','MOTHS','SHOON','SHOOT','SMITH','SNOOT','STOOL'], bonus: ['HOOTS'],
-    defs: {
-      MONOLITHS: 'Massive single stones of unknown origin — some attribute them to ancient visitors',
-      MONOLITH: 'A single large block of stone',
-      MOONLIT: 'Lit by the moon',
-      MOTIONS: 'Movements; formal proposals',
-      HOLISM: 'The doctrine that wholes are more than the sum of their parts',
-      LOTION: 'A liquid skin preparation',
-      MONISH: 'To admonish (archaic)',
-      MONIST: 'One who believes all things derive from one substance',
-      MOTION: 'Movement',
-      SMOOTH: 'Free from roughness',
-      HOIST: 'To lift',
-      LITHO: 'A lithograph',
-      MOIST: 'Slightly wet',
-      MOLTS: 'Sheds skin or feathers',
-      MOTHS: 'Plural of moth',
-      SHOON: 'Plural of shoe (archaic)',
-      SHOOT: 'To fire; a new plant growth',
-      SMITH: 'A worker in metals',
-      SNOOT: 'A snobbish person',
-      STOOL: 'A simple seat',
-      HOOTS: 'Owl calls; cries of derision',
     }
   },
   {

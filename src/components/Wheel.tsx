@@ -1,5 +1,7 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useGameStore, selectCurrentLevel } from '../store/gameStore'
+import { useCosmeticsStore } from '../store/cosmeticsStore'
+import { getWheelSkin, resolveRing, resolveConnector } from '../skins'
 import { letterPosition } from '../utils/gameUtils'
 
 const CANVAS_SIZE = 260
@@ -14,9 +16,21 @@ export default function Wheel() {
   const continueSelect = useGameStore(s => s.continueSelect)
   const endSelect      = useGameStore(s => s.endSelect)
 
+  // Cosmetics: pull the active skin id (a primitive string) so this
+  // component re-renders on skin change without subscribing to the entire
+  // skin object identity. The actual palette is resolved below via the
+  // skins module — cheap, no allocation per render of any consequence.
+  const skinId  = useCosmeticsStore(s => s.wheelSkin)
+  const skin    = getWheelSkin(skinId)
+  const isDaily = gameMode === 'daily'
+  const ring    = resolveRing(skin, isDaily)
+  const conn    = resolveConnector(skin, isDaily)
+
   const letters = level?.letters ?? []
 
-  // Draw connector lines
+  // Draw connector lines. Re-runs when the skin changes so a swap shows up
+  // immediately on an already-in-progress drag, not just after the next
+  // selection event.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -25,20 +39,15 @@ export default function Wheel() {
     if (selected.length < 2 || !letters.length) return
 
     const grad = ctx.createLinearGradient(0, 0, CANVAS_SIZE, CANVAS_SIZE)
-    if (gameMode === 'daily') {
-      grad.addColorStop(0, 'rgba(251,191,36,0.9)')
-      grad.addColorStop(1, 'rgba(249,115,22,0.9)')
-    } else {
-      grad.addColorStop(0, 'rgba(196,181,253,0.9)')
-      grad.addColorStop(1, 'rgba(124,58,237,0.9)')
-    }
+    grad.addColorStop(0, conn.gradientStart)
+    grad.addColorStop(1, conn.gradientEnd)
 
     ctx.strokeStyle = grad
     ctx.lineWidth   = 5
     ctx.lineCap     = 'round'
     ctx.lineJoin    = 'round'
     ctx.shadowBlur  = 12
-    ctx.shadowColor = gameMode === 'daily' ? 'rgba(251,191,36,0.6)' : 'rgba(167,139,250,0.6)'
+    ctx.shadowColor = conn.shadow
     ctx.beginPath()
 
     selected.forEach((idx, si) => {
@@ -50,7 +59,7 @@ export default function Wheel() {
       else ctx.lineTo(sx, sy)
     })
     ctx.stroke()
-  }, [selected, letters, gameMode])
+  }, [selected, letters, conn.gradientStart, conn.gradientEnd, conn.shadow])
 
   // We DON'T use React's onTouchMove because React registers touchmove as a
   // passive listener (since React 17), which means e.preventDefault() inside
@@ -104,7 +113,9 @@ export default function Wheel() {
   if (!letters.length) return null
 
   return (
-    <div ref={containerRef} className="relative mx-auto mb-3"
+    <div ref={containerRef}
+      data-skin={skin.id}
+      className="wheel-root relative mx-auto mb-3"
       style={{
         width: CANVAS_SIZE, height: CANVAS_SIZE,
         // touch-action:none tells the browser not to handle any default touch
@@ -118,12 +129,13 @@ export default function Wheel() {
         WebkitTouchCallout: 'none',
         WebkitTapHighlightColor: 'transparent',
       }}>
-      {/* Outer glow ring */}
-      <div className="absolute rounded-full pointer-events-none"
+      {/* Outer glow ring — driven by the active skin's `ring` palette so a
+          new skin can recolor it without touching this component. */}
+      <div className="wheel-ring absolute rounded-full pointer-events-none"
         style={{ top:'50%', left:'50%', transform:'translate(-50%,-50%)',
           width: 210, height: 210,
-          border: `3px solid ${gameMode === 'daily' ? 'rgba(245,158,11,0.2)' : 'rgba(124,58,237,0.2)'}`,
-          boxShadow: `0 0 30px ${gameMode === 'daily' ? 'rgba(245,158,11,0.1)' : 'rgba(124,58,237,0.1)'}` }} />
+          border: `3px solid ${ring.border}`,
+          boxShadow: `0 0 30px ${ring.glow}` }} />
 
       <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE}
         className="absolute inset-0 pointer-events-none" />
