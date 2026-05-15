@@ -96,8 +96,17 @@ export default function Splash() {
   const canAffordRetry = gemsBalance >= 1
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
-      style={{ background: 'linear-gradient(180deg, #2e1065 0%, #1a0533 60%, #0d0220 100%)' }}>
+    // Splash is a SCROLLABLE container, not a fixed-position overlay. The
+    // previous `fixed inset-0 ... overflow-hidden flex justify-center` setup
+    // clipped the logo at the top and made it impossible to scroll down to
+    // the buttons on short mobile viewports. Now the page grows with its
+    // content and the player can scroll through the menu naturally.
+    <div className="relative min-h-screen w-full flex flex-col items-center overflow-x-hidden"
+      style={{
+        background: 'linear-gradient(180deg, #2e1065 0%, #1a0533 60%, #0d0220 100%)',
+        // iOS momentum scrolling — feels native instead of stuttery.
+        WebkitOverflowScrolling: 'touch',
+      }}>
 
       <div className="absolute z-20" style={{ top: 16, right: 16 }}>
         <SfxToggle variant="splash" />
@@ -108,14 +117,18 @@ export default function Splash() {
       <div className="splash-blob blob3" />
 
       {[...Array(18)].map((_, i) => (
-        <div key={i} className="absolute rounded-full bg-white"
+        <div key={i} className="absolute rounded-full bg-white pointer-events-none"
           style={{ width: Math.random()*3+1, height: Math.random()*3+1,
             top: `${Math.random()*90}%`, left: `${Math.random()*100}%`,
             opacity: Math.random()*0.6+0.2,
             animation: `pulse ${2+Math.random()*3}s ease infinite`, animationDelay: `${Math.random()*3}s` }} />
       ))}
 
-      <div className="relative z-10 flex flex-col items-center w-full max-w-sm px-5 py-6">
+      {/* Inner column: top padding pushes the logo clear of the iOS notch /
+          status bar instead of being clipped by it; the auto margins keep
+          the column centered horizontally and let it shrink-wrap vertically
+          (no forced justify-center that hides overflow). */}
+      <div className="relative z-10 flex flex-col items-center w-full max-w-sm px-5 pt-10 pb-8" style={{ paddingTop: 'max(2.5rem, env(safe-area-inset-top, 0px) + 1rem)' }}>
         <div className="mb-2 text-6xl" style={{ filter:'drop-shadow(0 6px 20px rgba(167,139,250,0.8))', animation:'bounce 2s ease infinite alternate' }}>
           ⬡
         </div>

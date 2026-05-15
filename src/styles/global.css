@@ -2,7 +2,14 @@
 @import "tailwindcss";
 
 /* ── BASE ────────────────────────────────────────────────────────────────── */
-* { box-sizing: border-box; user-select: none; }
+* { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  /* overscroll-behavior:none kills the iOS "pull-to-refresh" rubber-band
+     that fights the wheel swipe and the bounce-on-overscroll that makes the
+     menu feel detached from the player's finger. */
+  overscroll-behavior: none;
+}
 
 body {
   font-family: 'Nunito', sans-serif;
@@ -12,8 +19,14 @@ body {
     radial-gradient(ellipse at 80% 90%, rgba(59,130,246,0.25) 0%, transparent 55%),
     radial-gradient(ellipse at 50% 50%, rgba(16,5,40,0.9) 0%, transparent 100%);
   min-height: 100vh;
+  /* 100dvh (when supported) tracks the real visible viewport on mobile so
+     content isn't hidden under the browser's collapsing address bar. */
+  min-height: 100dvh;
   color: #fff;
   overflow-x: hidden;
+  /* Vertical scrolling stays available so menus longer than the viewport
+     (Splash, WorldSelect, etc.) can scroll naturally. */
+  overflow-y: auto;
 }
 
 body.daily-mode {
