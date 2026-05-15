@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
@@ -7,6 +7,7 @@ import type { World, WorldId } from '../data/worlds'
 import { formatWeekCountdown, eventPhase, currentWeekId, timeToNextPhaseChange, startWeekIdFromDate } from '../utils/gameUtils'
 import { playSfx } from '../utils/sfx'
 import { api } from '../utils/apiClient'
+import WalletConnectModal from './WalletConnectModal'
 
 // Weekly Events hub. Lists every world flagged as `event:true`. Each card
 // shows: name/subtitle/description, level count, cost, current-week unlock
@@ -38,12 +39,24 @@ export default function WeeklyEvents() {
   const setScreen              = useGameStore(s => (s as any).setScreen)
   const setWorldId             = useGameStore(s => (s as any).setWorldId)
   const purchaseEvent          = useGameStore(s => s.purchaseEvent)
+  const showToast              = useGameStore(s => s.showToast)
   const gemsBalance            = useGameStore(s => s.gemsBalance)
   const isEventUnlockedForWeek = useProgressStore(s => s.isEventUnlockedForWeek)
   const getPendingClaimWeeks   = useProgressStore(s => s.getPendingClaimWeeks)
   // Subscribe to eventState so the entries list re-computes when the player
   // unlocks or claims, without each helper needing its own selector.
   useProgressStore(s => s.eventState)
+
+  // Wallet gating — events are leaderboard-attached identity content, so we
+  // require a connected wallet before letting the player unlock or enter.
+  // Without this, a player could spend Gems on an event with no way to be
+  // credited on the leaderboard or claim a reward, which is a dead-end UX.
+  const walletAddress = useWalletStore(s => s.address)
+  const [showWalletModal, setShowWalletModal] = useState(false)
+  // After the player connects from inside the events page, replay the action
+  // they originally tapped so the flow continues instead of forcing them to
+  // tap the button a second time. `pendingAction` records that intent.
+  const pendingAction = useRef<{ kind: 'play' | 'purchase'; world: World } | null>(null)
 
   const [confirmEvent, setConfirmEvent] = useState<World | null>(null)
   // Track which (worldId, weekId) tuple has its leaderboard panel open.
@@ -107,14 +120,43 @@ export default function WeeklyEvents() {
     }
   }
 
+  // Gate guard — if no wallet is connected, queue the action and pop the
+  // connect modal. The modal calls `connectAndLogin` under the hood; on
+  // success our useEffect below picks up the new walletAddress and replays
+  // the queued action so the player doesn't have to tap twice.
+  function requireWallet(action: { kind: 'play' | 'purchase'; world: World }): boolean {
+    if (walletAddress) return true
+    pendingAction.current = action
+    playSfx('uiTap')
+    setShowWalletModal(true)
+    return false
+  }
+
   function handlePlay(world: World) {
+    if (!requireWallet({ kind: 'play', world })) return
     playSfx('uiTap')
     setWorldId(world.id)
     setScreen('levelSelect')
   }
 
+  function handleUnlockTap(world: World) {
+    if (!requireWallet({ kind: 'purchase', world })) return
+    playSfx('uiTap')
+    setConfirmEvent(world)
+  }
+
   function handleConfirmPurchase() {
     if (!confirmEvent) return
+    // Defensive double-check — by the time the player taps CONFIRM, the
+    // wallet should be connected, but a stale modal could in theory show
+    // up after a disconnect. Re-route through the same gate to keep the
+    // rule airtight.
+    if (!walletAddress) {
+      pendingAction.current = { kind: 'purchase', world: confirmEvent }
+      setConfirmEvent(null)
+      setShowWalletModal(true)
+      return
+    }
     const ok = purchaseEvent(confirmEvent.id, confirmEvent.cost ?? 0)
     setConfirmEvent(null)
     if (ok) {
@@ -122,6 +164,26 @@ export default function WeeklyEvents() {
       setScreen('levelSelect')
     }
   }
+
+  // Replay the queued action once the player finishes connecting. We only
+  // act on the address transitioning from falsy → truthy: if the player
+  // disconnects from elsewhere we just clear the queue without doing
+  // anything surprising.
+  useEffect(() => {
+    if (!walletAddress) return
+    const queued = pendingAction.current
+    if (!queued) return
+    pendingAction.current = null
+    if (queued.kind === 'play') {
+      showToast('✓ Wallet connected · entering event')
+      setWorldId(queued.world.id)
+      setScreen('levelSelect')
+    } else {
+      // For a purchase, drop the player into the confirmation modal — they
+      // still get to see the cost summary and bail out if they want to.
+      setConfirmEvent(queued.world)
+    }
+  }, [walletAddress, setScreen, setWorldId, showToast])
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
@@ -278,7 +340,7 @@ export default function WeeklyEvents() {
                   ENTER EVENT ›
                 </button>
               ) : (
-                <button onClick={() => { playSfx('uiTap'); setConfirmEvent(world) }} disabled={!canAfford}
+                <button onClick={() => handleUnlockTap(world)} disabled={!canAfford}
                   className="btn-3d w-full py-3 mb-2"
                   style={{
                     background: canAfford
@@ -292,7 +354,11 @@ export default function WeeklyEvents() {
                     fontFamily:'Fredoka One,cursive', fontSize:'1rem', letterSpacing:'1px',
                     cursor: canAfford ? 'pointer' : 'not-allowed',
                   }}>
-                  {canAfford ? `UNLOCK · ${cost} GEMS` : 'NOT ENOUGH GEMS'}
+                  {canAfford
+                    ? walletAddress
+                      ? `UNLOCK · ${cost} GEMS`
+                      : `CONNECT WALLET · ${cost} GEMS`
+                    : 'NOT ENOUGH GEMS'}
                 </button>
               )}
 
@@ -376,6 +442,21 @@ export default function WeeklyEvents() {
           </div>
         </div>
       )}
+
+      {/* Wallet gate modal — popped when a wallet-less player taps a
+          purchase or play button. On successful connect the useEffect
+          above resumes whichever action they originally tapped. If they
+          cancel out of the modal we discard the queued intent so they're
+          not surprised by a delayed action later. */}
+      <WalletConnectModal
+        open={showWalletModal}
+        onClose={() => {
+          // If the player closed the modal without connecting, drop the
+          // queued action — they explicitly opted out of this flow.
+          if (!walletAddress) pendingAction.current = null
+          setShowWalletModal(false)
+        }}
+      />
     </div>
   )
 }
