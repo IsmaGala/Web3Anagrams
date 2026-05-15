@@ -36,7 +36,11 @@ export default function WordGrid() {
   }
 
   // ── Legacy path ────────────────────────────────────────────────────────────
-  if (!level) return null
+  // After the bundle-strip milestone this branch can only run if someone
+  // flips VITE_SERVER_AUTHORITATIVE=false on a build that has stripped
+  // data files — in which case `level.words` is undefined and we should
+  // render nothing rather than crash.
+  if (!level || !level.words) return null
 
   const groups: Record<number, string[]> = {}
   level.words.forEach(w => {

@@ -296,6 +296,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── Load & init ──────────────────────────────────────────────────────────
 
   loadLevels: (raw) => {
+    // Server-authoritative mode: the bundled levels are length-only
+    // placeholders (no `words`/`bonus`/`letters`/`theme` after the bundle
+    // strip), so client-side validation would filter every level out as
+    // "below MIN_WORDS_PER_LEVEL". The server handles all validation now;
+    // we just preserve the array shape so currentLevelIndex math works.
+    if (isServerAuthoritative()) {
+      set({ allLevels: raw, levels: raw })
+      return
+    }
     const validated = raw.map(validateLevel).filter(playableLevel)
     const seed      = getSessionSeed()
     const arranged  = arrangeLevels(validated, seed)
@@ -304,6 +313,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Load a specific world's levels in fixed order — no shuffle
   loadWorldLevels: (raw: Level[]) => {
+    if (isServerAuthoritative()) {
+      set({ levels: raw })
+      return
+    }
     const validated = raw.map(validateLevel).filter(playableLevel)
     set({ levels: validated })
   },
@@ -395,6 +408,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
         get().showToast('Daily already played — comes back at midnight')
         return
       }
+
+      // Server-authoritative mode: the bundled levels are length-only
+      // placeholders, so we can't pick a daily level locally. Hand the
+      // selection over to the server entirely — initLevel calls
+      // /api/play/level/start with mode:'daily' and the server returns
+      // an appropriate level for today (TODO server-side: actually pick a
+      // calendar-deterministic level rather than reusing the current
+      // worldId/levelIndex 0).
+      if (isServerAuthoritative()) {
+        updateStreak()
+        // Use a single placeholder slot so currentLevelIndex math works.
+        const placeholder = {} as Level
+        set({ gameMode: mode, screen: 'game', levels: [placeholder], currentLevelIndex: 0, score: 0 })
+        setTimeout(() => get().initLevel(), 0)
+        return
+      }
+
       const picked = pickDailyLevel(allLevels)
       // Daily-specific curation: trim the full word list down to a mixed
       // long/mid/short set (DAILY_WORDS_TARGET = 8) so the daily feels
@@ -617,9 +647,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const lvl = levels[currentLevelIndex % levels.length]
     if (!lvl) return
+    // Bundle-strip guard: with stripped placeholder Levels, `letters` /
+    // `words` / `bonus` may be undefined. Render the partial word from
+    // whatever letters we have (none, in practice — wheel won't show
+    // letters either) and skip the valid/invalid check.
+    if (!lvl.letters) { set({ currentWord: '', _currentWordState: '' } as any); return }
     const word      = sel.map(i => lvl.letters[i]).join('')
-    const allWords  = [...lvl.words, ...lvl.bonus]
-    const wordState = word.length >= 2 ? (allWords.includes(word) ? 'valid' : 'invalid') : ''
+    const allWords  = lvl.words && lvl.bonus ? [...lvl.words, ...lvl.bonus] : []
+    const wordState = word.length >= 2 && allWords.length > 0 ? (allWords.includes(word) ? 'valid' : 'invalid') : ''
     set({ currentWord: word, _currentWordState: wordState } as any)
   },
 
@@ -728,6 +763,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // ── Legacy path ───────────────────────────────────────────────────────
     const lvl = levels[currentLevelIndex % levels.length]
     if (!lvl) return
+    // Bundle-strip guard: if the bundled Level has no `letters` array, we
+    // can't build a word locally. This happens when the server-authoritative
+    // flag is on but `round` hasn't loaded yet (e.g. a fast click before
+    // /api/play/level/start returns) — the right thing to do is silently
+    // ignore the submission, since the legacy path has no useful answer set
+    // to validate against anyway.
+    if (!lvl.letters) { set({ selected: [], currentWord: '' } as any); return }
 
     const word = selected.map(i => lvl.letters[i]).join('')
     set({ selected: [], currentWord: '', _currentWordState: '' } as any)
@@ -869,6 +911,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // ── Legacy path ───────────────────────────────────────────────────────
     const lvl = levels[currentLevelIndex % levels.length]
     if (!lvl) return
+    // Bundle-strip guard — same rationale as in submitWord. If there's no
+    // word list to draw hints from (server mode, round not yet loaded), do
+    // nothing; the user will be able to hint once the round arrives.
+    if (!lvl.words) return
 
     const hintable = lvl.words.filter(w => {
       if (foundWords.has(w)) return false
@@ -1040,7 +1086,9 @@ export const selectActiveSlotCount = (s: GameStore): number => {
 export const selectActiveFoundCount = (s: GameStore): number => {
   if (s.round) return s.round.slots.filter(slot => !!slot.filled).length
   const lvl = selectCurrentLevel(s)
-  return lvl ? lvl.words.filter(w => s.foundWords.has(w)).length : 0
+  // Defensive: bundle-stripped placeholder Levels have no `words` array,
+  // so this can only return a real count in legacy mode.
+  return lvl?.words ? lvl.words.filter(w => s.foundWords.has(w)).length : 0
 }
 
 export const selectFoundCount = selectActiveFoundCount

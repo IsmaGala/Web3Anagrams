@@ -161,7 +161,10 @@ export default function DebugMenu() {
     if (!lvl) return
     // Fill foundWords with every primary word, save progress, and pop the
     // appropriate overlay (daily → triggerDailyWin, single → level-complete).
-    const next = new Set<string>(lvl.words)
+    // After the bundle strip, `lvl.words` is undefined in production builds —
+    // this debug helper is only useful for legacy dev builds that still ship
+    // answer keys, so we default to an empty set when stripped.
+    const next = new Set<string>(lvl.words ?? [])
     useGameStore.setState({ foundWords: next, score: 1000 } as any)
     markLevelComplete(worldId, currentLevelIdx, 1000)
     setTimeout(() => {

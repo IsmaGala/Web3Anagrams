@@ -1,12 +1,24 @@
 // ── Level Data ────────────────────────────────────────────────────────────────
+//
+// Post bundle-strip: the production bundle ships placeholder Levels
+// (`{} as Level`) — the real `words`/`bonus`/`defs`/`letters`/`theme` only
+// exist server-side in api/_data/levels/.
+//
+// The fields below remain REQUIRED in the type so that legacy code paths
+// compile without an `!` everywhere; the data files use `as Level` to
+// satisfy the typechecker. At runtime these fields are `undefined` in the
+// stripped bundle, so any legacy path that reads them must either be gated
+// behind a non-server-mode branch (`!isServerAuthoritative()`) or defensively
+// check for undefined before access (see the bundle-strip guards in
+// gameStore.ts submitWord / useHint / _updateCurrentWord).
 
 export interface Level {
-  theme: string
+  theme:      string
   difficulty: number
-  letters: string[]
-  words: string[]
-  bonus: string[]
-  defs: Record<string, string>
+  letters:    string[]
+  words:      string[]
+  bonus:      string[]
+  defs:       Record<string, string>
 }
 
 // ── Server-authoritative level data (VITE_SERVER_AUTHORITATIVE) ──────────────

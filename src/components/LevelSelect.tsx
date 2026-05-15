@@ -135,24 +135,15 @@ export default function LevelSelect() {
                 style={{ color: isCompleted ? '#fff' : isUnlocked ? '#c4b5fd' : 'rgba(255,255,255,0.25)' }}>
                 {i + 1}
               </span>
-              {isUnlocked && (
-                <span className="font-nunito font-bold text-center"
-                  style={{
-                    // Scale font down for longer themes so MATERIUM/UNDERWORLD/RESURRECTION
-                    // still fit inside the square tile without truncation.
-                    fontSize: level.theme.length > 10 ? '0.42rem'
-                            : level.theme.length > 8  ? '0.48rem'
-                            : '0.55rem',
-                    lineHeight: 1.05,
-                    color: isCompleted ? 'rgba(255,255,255,0.85)' : 'rgba(196,181,253,0.65)',
-                    maxWidth: '95%',
-                    wordBreak: 'break-word',
-                    overflowWrap: 'anywhere',
-                    letterSpacing: '0.5px',
-                  }}>
-                  {level.theme}
-                </span>
-              )}
+              {/*
+                The theme word was rendered here in pre-server-authoritative
+                builds (e.g. "VAULT", "CHAIN") but it is literally the long
+                answer for many levels — displaying it on the card-grid leaked
+                the answer before the player even tapped in. Removed as part
+                of the bundle-strip milestone. The card now shows only the
+                level number; the server returns a non-leaking displayTitle
+                ("Level N") for the in-game header.
+              */}
             </button>
           )
         })}
