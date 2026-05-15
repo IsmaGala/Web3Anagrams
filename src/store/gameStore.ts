@@ -63,32 +63,45 @@ function playableLevel(lvl: Level): boolean {
   return true
 }
 
-const DAILY_HINT_REWARD = 5     // hints granted on daily win (GALA reward removed — hints are the only GALA sink, so we don't bleed supply)
+const DAILY_HINT_REWARD = 5     // hints granted on daily win (no Gem reward — hints are the only Gem sink, so we don't bleed supply)
 const INITIAL_HINTS     = 3
-const INITIAL_GALA      = 10000
+const INITIAL_GEMS      = 10000
 
 // ── Local economy persistence ────────────────────────────────────────────────
-// Until on-chain GALA is wired, the player's GALA + hints are session-local.
-// We mirror them to localStorage so a page reload (or MetaMask switching
-// accounts, which can trigger one) doesn't reset the balance to 10k.
+// Gems are the in-game currency the player spends on hints, premium worlds,
+// and event entries. They're purchased with real GALA / GUSDC tokens via the
+// in-game store (see /api/store/purchase) or earned through gameplay.
 //
-// When v3 lands and the GALA balance comes from GalaChain, delete the
-// hydration on init and replace the subscription with a chain-fetch.
+// Persistence: mirrored to localStorage so a page reload (or MetaMask
+// switching accounts, which can trigger one) doesn't reset the balance.
+// The server's player_state is the cross-device source of truth and overrides
+// the local copy on next sync.
+//
+// Legacy migration: pre-v4 the field was `galaBalance`. We read both keys
+// when hydrating so existing localStorage entries upgrade transparently —
+// no player loses their balance on the cutover.
 
 const ECONOMY_KEY = 'wc_economy_v1'
 
-interface PersistedEconomy { galaBalance: number; hints: number }
+interface PersistedEconomy { gemsBalance: number; hints: number }
 
 function loadEconomy(): PersistedEconomy {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(ECONOMY_KEY) : null
-    if (!raw) return { galaBalance: INITIAL_GALA, hints: INITIAL_HINTS }
-    const obj = JSON.parse(raw) as Partial<PersistedEconomy>
+    if (!raw) return { gemsBalance: INITIAL_GEMS, hints: INITIAL_HINTS }
+    const obj = JSON.parse(raw) as Partial<PersistedEconomy> & { galaBalance?: number }
+    // Prefer the new `gemsBalance` field; fall back to the legacy
+    // `galaBalance` field for forward-compat with pre-v4 localStorage.
+    const balance = typeof obj.gemsBalance === 'number' && obj.gemsBalance >= 0
+      ? obj.gemsBalance
+      : typeof obj.galaBalance === 'number' && obj.galaBalance >= 0
+        ? obj.galaBalance
+        : INITIAL_GEMS
     return {
-      galaBalance: typeof obj.galaBalance === 'number' && obj.galaBalance >= 0 ? obj.galaBalance : INITIAL_GALA,
-      hints:       typeof obj.hints       === 'number' && obj.hints       >= 0 ? obj.hints       : INITIAL_HINTS,
+      gemsBalance: balance,
+      hints:       typeof obj.hints === 'number' && obj.hints >= 0 ? obj.hints : INITIAL_HINTS,
     }
-  } catch { return { galaBalance: INITIAL_GALA, hints: INITIAL_HINTS } }
+  } catch { return { gemsBalance: INITIAL_GEMS, hints: INITIAL_HINTS } }
 }
 
 function saveEconomy(payload: PersistedEconomy) {
@@ -101,7 +114,7 @@ function saveEconomy(payload: PersistedEconomy) {
 
 export function wipeEconomy() {
   try { if (typeof localStorage !== 'undefined') localStorage.removeItem(ECONOMY_KEY) } catch {}
-  useGameStore.setState({ galaBalance: INITIAL_GALA, hints: INITIAL_HINTS })
+  useGameStore.setState({ gemsBalance: INITIAL_GEMS, hints: INITIAL_HINTS })
 }
 
 // ── Store interface ────────────────────────────────────────────────────────────
@@ -119,6 +132,7 @@ interface GameStore extends GameState {
   goToLevelSelect: () => void
   goToPremium:     () => void
   goToEvents:      () => void
+  goToStore:       () => void
   // Premium
   purchaseWorld:   (worldId: string, cost: number) => boolean
   // Weekly events
@@ -182,7 +196,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   score:             0,
   selected:          [],
   dragging:          false,
-  galaBalance:       loadEconomy().galaBalance,
+  gemsBalance:       loadEconomy().gemsBalance,
   hints:             loadEconomy().hints,
   dailySecondsLeft:  DAILY_DURATION,
   dailyComplete:     false,
@@ -297,35 +311,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // Navigate to the weekly events hub.
   goToEvents: () => set({ screen: 'events' }),
 
-  // Spend GALA to unlock the current week's event. The unlock resets every
-  // Monday (epoch-anchored week). Returns true if purchase succeeded.
+  // Navigate to the gem store (buy Gems with GALA or GUSDC tokens).
+  goToStore: () => set({ screen: 'store' }),
+
+  // Spend Gems to unlock the current week's event. The unlock resets every
+  // Monday (Mon-16:00-PST-anchored week). Returns true if purchase succeeded.
   purchaseEvent: (worldId, cost) => {
-    const { galaBalance } = get()
-    if (galaBalance < cost) {
+    const { gemsBalance } = get()
+    if (gemsBalance < cost) {
       playSfx('wordInvalid')
-      get().showToast('⚠ Insufficient GALA balance')
+      get().showToast('⚠ Not enough Gems')
       return false
     }
-    set({ galaBalance: galaBalance - cost })
+    set({ gemsBalance: gemsBalance - cost })
     useProgressStore.getState().unlockEventForWeek(worldId as any)
     playSfx('purchase')
-    get().showToast(`✓ Event unlocked · ${cost} GALA spent`)
+    get().showToast(`✓ Event unlocked · ${cost} Gems spent`)
     return true
   },
 
-  // Spend GALA to unlock a premium world. Returns true if purchase succeeded.
+  // Spend Gems to unlock a premium world. Returns true if purchase succeeded.
   // The actual unlock is persisted in progressStore so it survives reloads.
   purchaseWorld: (worldId, cost) => {
-    const { galaBalance } = get()
-    if (galaBalance < cost) {
+    const { gemsBalance } = get()
+    if (gemsBalance < cost) {
       playSfx('wordInvalid')
-      get().showToast('⚠ Insufficient GALA balance')
+      get().showToast('⚠ Not enough Gems')
       return false
     }
-    set({ galaBalance: galaBalance - cost })
+    set({ gemsBalance: gemsBalance - cost })
     useProgressStore.getState().markPremiumUnlocked(worldId as any)
     playSfx('purchase')
-    get().showToast(`✓ World unlocked · ${cost.toLocaleString()} GALA spent`)
+    get().showToast(`✓ World unlocked · ${cost.toLocaleString()} Gems spent`)
     return true
   },
 
@@ -485,11 +502,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   closeShop: () => set({ showShop: false }),
 
   buyPack: (hintsAmt, cost) => {
-    const { galaBalance, hints } = get()
-    if (galaBalance < cost) { playSfx('wordInvalid'); get().showToast('⚠ Insufficient GALA balance'); return }
-    set({ galaBalance: galaBalance - cost, hints: hints + hintsAmt, showShop: false })
+    const { gemsBalance, hints } = get()
+    if (gemsBalance < cost) { playSfx('wordInvalid'); get().showToast('⚠ Not enough Gems'); return }
+    set({ gemsBalance: gemsBalance - cost, hints: hints + hintsAmt, showShop: false })
     playSfx('purchase')
-    get().showToast(`✓ ${hintsAmt} hints added · ${cost.toLocaleString()} GALA spent`)
+    get().showToast(`✓ ${hintsAmt} hints added · ${cost.toLocaleString()} Gems spent`)
   },
 
   // ── Daily Timer ───────────────────────────────────────────────────────────
@@ -521,27 +538,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
   cancelQuitDaily:  () => set({ showQuitConfirm: false }),
   confirmQuitDaily: () => {
     // Quitting mid-daily counts as a lost attempt — the daily locks until
-    // midnight unless the player spends 1 GALA to retry.
+    // midnight unless the player spends 1 Gem to retry.
     useProgressStore.getState().setDailyAttempt('lost')
     set({ showQuitConfirm: false })
     get().goToSplash()
   },
 
-  // Pay 1 GALA to clear today's "lost" daily attempt and immediately enter
+  // Pay 1 Gem to clear today's "lost" daily attempt and immediately enter
   // a fresh run. Returns true on success.
   payToRetryDaily: () => {
-    const { galaBalance } = get()
+    const { gemsBalance } = get()
     const attempt = useProgressStore.getState().getTodaysDailyAttempt()
     if (!attempt || attempt.status !== 'lost') return false
-    if (galaBalance < 1) {
+    if (gemsBalance < 1) {
       playSfx('wordInvalid')
-      get().showToast('⚠ Need 1 GALA to retry the daily')
+      get().showToast('⚠ Need 1 Gem to retry the daily')
       return false
     }
-    set({ galaBalance: galaBalance - 1 })
+    set({ gemsBalance: gemsBalance - 1 })
     useProgressStore.getState().clearDailyAttempt()
     playSfx('purchase')
-    get().showToast('✓ Daily retry purchased · 1 GALA spent')
+    get().showToast('✓ Daily retry purchased · 1 Gem spent')
     // Hop straight into a fresh daily run.
     get().goToGame('daily')
     return true
@@ -576,15 +593,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
 }))
 
 // ── Persistence subscription ─────────────────────────────────────────────────
-// Whenever galaBalance or hints change, mirror the new values to localStorage.
+// Whenever gemsBalance or hints change, mirror the new values to localStorage.
 // We compare against a snapshot to avoid writing on unrelated state changes
 // (the splash countdown, message toasts, etc. would all otherwise trigger a
 // write on every frame).
 
-let lastEconomy = { galaBalance: useGameStore.getState().galaBalance, hints: useGameStore.getState().hints }
+let lastEconomy = { gemsBalance: useGameStore.getState().gemsBalance, hints: useGameStore.getState().hints }
 useGameStore.subscribe((state) => {
-  if (state.galaBalance !== lastEconomy.galaBalance || state.hints !== lastEconomy.hints) {
-    lastEconomy = { galaBalance: state.galaBalance, hints: state.hints }
+  if (state.gemsBalance !== lastEconomy.gemsBalance || state.hints !== lastEconomy.hints) {
+    lastEconomy = { gemsBalance: state.gemsBalance, hints: state.hints }
     saveEconomy(lastEconomy)
   }
 })

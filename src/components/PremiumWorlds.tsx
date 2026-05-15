@@ -6,9 +6,9 @@ import type { World } from '../data/worlds'
 import { playSfx } from '../utils/sfx'
 
 // Premium worlds storefront. Each entry shows a card with name/subtitle/
-// description/level count/cost. Locked worlds show an "UNLOCK FOR X GALA"
+// description/level count/cost. Locked worlds show an "UNLOCK FOR X GEMS"
 // button which opens a confirmation modal; on confirm we call
-// gameStore.purchaseWorld() which deducts GALA and persists the unlock.
+// gameStore.purchaseWorld() which deducts Gems and persists the unlock.
 // Already-owned worlds show an "ENTER →" button that opens the world's
 // level select grid.
 
@@ -17,7 +17,7 @@ export default function PremiumWorlds() {
   const setScreen       = useGameStore(s => (s as any).setScreen)
   const setWorldId      = useGameStore(s => (s as any).setWorldId)
   const purchaseWorld   = useGameStore(s => s.purchaseWorld)
-  const galaBalance     = useGameStore(s => s.galaBalance)
+  const gemsBalance     = useGameStore(s => s.gemsBalance)
   const isPremiumUnlocked = useProgressStore(s => s.isPremiumUnlocked)
 
   const [confirmWorld, setConfirmWorld] = useState<World | null>(null)
@@ -62,15 +62,15 @@ export default function PremiumWorlds() {
       </h1>
       <p className="font-nunito font-bold text-sm mb-2"
         style={{ color:'rgba(207,250,254,0.5)', letterSpacing:'2px' }}>
-        BUY NEW WORLDS WITH GALA
+        BUY NEW WORLDS WITH GEMS
       </p>
 
-      {/* GALA balance chip */}
+      {/* Gems balance chip */}
       <div className="flex items-center gap-2 px-4 py-2 rounded-full mb-7"
         style={{ background:'rgba(34,211,238,0.08)', border:'2px solid rgba(34,211,238,0.25)' }}>
         <span style={{ color:'#22d3ee' }}>◈</span>
-        <span className="font-fredoka text-base" style={{ color:'#22d3ee' }}>{galaBalance.toLocaleString()}</span>
-        <span className="font-nunito font-bold text-xs" style={{ color:'rgba(207,250,254,0.4)' }}>GALA</span>
+        <span className="font-fredoka text-base" style={{ color:'#22d3ee' }}>{gemsBalance.toLocaleString()}</span>
+        <span className="font-nunito font-bold text-xs" style={{ color:'rgba(207,250,254,0.4)' }}>GEMS</span>
       </div>
 
       {/* Premium world cards */}
@@ -78,7 +78,7 @@ export default function PremiumWorlds() {
         {premiumWorlds.map(world => {
           const owned = isPremiumUnlocked(world.id)
           const cost  = world.cost ?? 0
-          const canAfford = galaBalance >= cost
+          const canAfford = gemsBalance >= cost
 
           return (
             <div key={world.id} className="btn-3d w-full text-left"
@@ -144,7 +144,7 @@ export default function PremiumWorlds() {
                     fontFamily:'Fredoka One,cursive', fontSize:'1rem', letterSpacing:'1px',
                     cursor: canAfford ? 'pointer' : 'not-allowed',
                   }}>
-                  {canAfford ? `UNLOCK · ${cost.toLocaleString()} GALA` : 'NOT ENOUGH GALA'}
+                  {canAfford ? `UNLOCK · ${cost.toLocaleString()} GEMS` : 'NOT ENOUGH GEMS'}
                 </button>
               )}
             </div>
@@ -171,7 +171,7 @@ export default function PremiumWorlds() {
               UNLOCK {confirmWorld.name.toUpperCase()}?
             </h2>
             <p className="font-nunito font-bold mb-2 px-2" style={{ color:'rgba(255,255,255,0.65)', fontSize:'0.9rem' }}>
-              {(confirmWorld.cost ?? 0).toLocaleString()} GALA will be spent.
+              {(confirmWorld.cost ?? 0).toLocaleString()} Gems will be spent.
             </p>
             <p className="font-nunito font-bold mb-6 px-2" style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.78rem' }}>
               After this you'll own {confirmWorld.levelCount} levels in the Premium section. Purchases persist on this device.

@@ -23,8 +23,9 @@ export default function Splash() {
   const goToGame       = useGameStore(s => s.goToGame)
   const goToPremium    = useGameStore(s => s.goToPremium)
   const goToEvents     = useGameStore(s => s.goToEvents)
+  const goToStore      = useGameStore(s => s.goToStore)
   const payToRetryDaily= useGameStore(s => s.payToRetryDaily)
-  const galaBalance    = useGameStore(s => s.galaBalance)
+  const gemsBalance    = useGameStore(s => s.gemsBalance)
   const hints          = useGameStore(s => s.hints)
   // Sub to the raw dailyAttempt field so React re-renders when it flips
   // (calling the selector inside the component is cheap; the getter handles
@@ -67,7 +68,7 @@ export default function Splash() {
     const total  = premiumWorlds.length
     const owned  = premiumWorlds.filter(w => unlockedPremium[w.id]).length
     const locked = total - owned
-    if (total === 0)   return 'UNLOCK NEW WORLDS WITH GALA'
+    if (total === 0)   return 'UNLOCK NEW WORLDS WITH GEMS'
     if (locked === 0)  return `ALL ${total} WORLDS UNLOCKED`
     return `${owned} OF ${total} UNLOCKED · ${locked} NEW`
   }, [unlockedPremium])
@@ -92,7 +93,7 @@ export default function Splash() {
     ? 'available'
     : todaysAttempt.status === 'won' ? 'won' : 'lost'
 
-  const canAffordRetry = galaBalance >= 1
+  const canAffordRetry = gemsBalance >= 1
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
@@ -134,7 +135,7 @@ export default function Splash() {
           style={{ background:'rgba(0,0,0,0.25)', border:'1.5px solid rgba(167,139,250,0.15)' }}>
           <span className="flex items-center gap-1.5">
             <span style={{ color:'#22d3ee' }}>◈</span>
-            <span className="font-fredoka text-sm" style={{ color:'#e9d5ff' }}>{galaBalance.toLocaleString()}</span>
+            <span className="font-fredoka text-sm" style={{ color:'#e9d5ff' }}>{gemsBalance.toLocaleString()}</span>
           </span>
           <span style={{ color:'rgba(167,139,250,0.35)' }}>·</span>
           <span className="flex items-center gap-1.5">
@@ -283,7 +284,7 @@ export default function Splash() {
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs font-bold" style={{ color: canAffordRetry ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)' }}>
-                    {canAffordRetry ? 'RETRY · ◈ 1' : 'NEED 1 GALA · RESETS'}
+                    {canAffordRetry ? 'RETRY · ◈ 1' : 'NEED 1 GEM · RESETS'}
                   </span>
                   <span className="font-fredoka text-sm" style={{ color:'#fda4af' }}>{countdown}</span>
                 </div>
@@ -293,7 +294,7 @@ export default function Splash() {
           </button>
         )}
 
-        <button onClick={tap(goToEvents)} className="btn-3d w-full mb-5"
+        <button onClick={tap(goToEvents)} className="btn-3d w-full mb-3"
           style={{ background:'linear-gradient(160deg, #075985, #0c4a6e)',
             border:'4px solid #0ea5e9', borderBottom:'4px solid #082f49',
             boxShadow:'0 8px 0 #082f49, 0 0 30px rgba(14,165,233,0.4)',
@@ -304,6 +305,25 @@ export default function Splash() {
               <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>WEEKLY EVENTS</div>
               <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(186,230,253,0.7)' }}>
                 {eventCaption}
+              </div>
+            </div>
+            <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
+          </div>
+        </button>
+
+        {/* Gem Store — buy Gems with GALA or GUSDC tokens. Sits at the bottom
+            of the splash navigation, the natural place for a "shop" link. */}
+        <button onClick={tap(goToStore)} className="btn-3d w-full mb-5"
+          style={{ background:'linear-gradient(160deg, #4c1d95, #3b0764)',
+            border:'4px solid #a78bfa', borderBottom:'4px solid #2e1065',
+            boxShadow:'0 8px 0 #1e0050, 0 0 30px rgba(167,139,250,0.4)',
+            borderRadius:'20px', padding:'16px 22px' }}>
+          <div className="flex items-center gap-4">
+            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>💎</span>
+            <div className="flex-1 text-left">
+              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>GEM STORE</div>
+              <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(196,181,253,0.7)' }}>
+                BUY WITH GALA OR GUSDC
               </div>
             </div>
             <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>

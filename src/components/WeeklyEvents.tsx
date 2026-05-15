@@ -38,7 +38,7 @@ export default function WeeklyEvents() {
   const setScreen              = useGameStore(s => (s as any).setScreen)
   const setWorldId             = useGameStore(s => (s as any).setWorldId)
   const purchaseEvent          = useGameStore(s => s.purchaseEvent)
-  const galaBalance            = useGameStore(s => s.galaBalance)
+  const gemsBalance            = useGameStore(s => s.gemsBalance)
   const isEventUnlockedForWeek = useProgressStore(s => s.isEventUnlockedForWeek)
   const getPendingClaimWeeks   = useProgressStore(s => s.getPendingClaimWeeks)
   // Subscribe to eventState so the entries list re-computes when the player
@@ -166,14 +166,14 @@ export default function WeeklyEvents() {
       <div className="flex items-center gap-2 px-4 py-2 rounded-full mb-7"
         style={{ background:'rgba(34,211,238,0.08)', border:'2px solid rgba(34,211,238,0.25)' }}>
         <span style={{ color:'#22d3ee' }}>◈</span>
-        <span className="font-fredoka text-base" style={{ color:'#22d3ee' }}>{galaBalance.toLocaleString()}</span>
-        <span className="font-nunito font-bold text-xs" style={{ color:'rgba(207,250,254,0.4)' }}>GALA</span>
+        <span className="font-fredoka text-base" style={{ color:'#22d3ee' }}>{gemsBalance.toLocaleString()}</span>
+        <span className="font-nunito font-bold text-xs" style={{ color:'rgba(207,250,254,0.4)' }}>GEMS</span>
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-5">
         {entries.map(({ world, weekId, kind }) => {
           const cost      = world.cost ?? 0
-          const canAfford = galaBalance >= cost
+          const canAfford = gemsBalance >= cost
           const cardKey   = `${world.id}:${weekId}:${kind}`
           const isOpen    = showLeaderboard === cardKey
           const isActive   = kind === 'active'
@@ -253,7 +253,7 @@ export default function WeeklyEvents() {
                     color:`${world.color}cc`, fontFamily:'Fredoka One,cursive',
                     fontSize:'0.9rem', letterSpacing:'1px',
                   }}>
-                  STARTS MON 4:00 PM PST · {cost} GALA
+                  STARTS MON 4:00 PM PST · {cost} GEMS
                 </div>
               ) : isFinished || kind === 'past' ? (
                 <div className="w-full py-3 mb-2 rounded-xl text-center"
@@ -292,7 +292,7 @@ export default function WeeklyEvents() {
                     fontFamily:'Fredoka One,cursive', fontSize:'1rem', letterSpacing:'1px',
                     cursor: canAfford ? 'pointer' : 'not-allowed',
                   }}>
-                  {canAfford ? `UNLOCK · ${cost} GALA` : 'NOT ENOUGH GALA'}
+                  {canAfford ? `UNLOCK · ${cost} GEMS` : 'NOT ENOUGH GEMS'}
                 </button>
               )}
 
@@ -346,7 +346,7 @@ export default function WeeklyEvents() {
               ENTER {confirmEvent.name.toUpperCase()}?
             </h2>
             <p className="font-nunito font-bold mb-2 px-2" style={{ color:'rgba(255,255,255,0.65)', fontSize:'0.9rem' }}>
-              {confirmEvent.cost ?? 0} GALA will be spent.
+              {confirmEvent.cost ?? 0} Gems will be spent.
             </p>
             <p className="font-nunito font-bold mb-6 px-2" style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.78rem' }}>
               Access expires when this week's event ends. Complete levels to qualify for leaderboard rewards.

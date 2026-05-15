@@ -21,7 +21,7 @@ export default function GameBoard() {
   const progress    = useGameStore(selectProgress)
   const score       = useGameStore(s => s.score)
   const hints       = useGameStore(s => s.hints)
-  const galaBalance = useGameStore(s => s.galaBalance)
+  const gemsBalance = useGameStore(s => s.gemsBalance)
   const currentWord = useGameStore(s => s.currentWord)
   const wordDef     = useGameStore(s => s.wordDef)
   const message     = useGameStore(s => s.message)
@@ -89,15 +89,15 @@ export default function GameBoard() {
         <SfxToggle variant={isDaily ? 'daily' : 'single'} size="sm" />
       </div>
 
-      {/* ── GALA BAR (single only) ── */}
+      {/* ── GEMS BAR (single only) ── */}
       {!isDaily && (
         <div className="w-full max-w-sm px-4 mb-2">
           <div className="flex items-center gap-2 px-4 py-2 rounded-2xl"
             style={{ background:'rgba(0,0,0,0.3)', border:'3px solid rgba(167,139,250,0.25)',
               boxShadow:'0 4px 0 rgba(0,0,0,0.4)' }}>
             <span className="font-fredoka text-lg" style={{ color:'#a78bfa' }}>◈</span>
-            <span className="font-fredoka text-base" style={{ color:'#a78bfa' }}>{galaBalance.toLocaleString()}</span>
-            <span className="font-nunito font-bold text-xs" style={{ color:'rgba(167,139,250,0.5)' }}>GALA</span>
+            <span className="font-fredoka text-base" style={{ color:'#a78bfa' }}>{gemsBalance.toLocaleString()}</span>
+            <span className="font-nunito font-bold text-xs" style={{ color:'rgba(167,139,250,0.5)' }}>GEMS</span>
             <button onClick={openShop} className="btn-3d ml-auto px-4 py-1.5"
               style={{ background:'linear-gradient(160deg,#7c3aed,#6d28d9)',
                 border:'2px solid #a78bfa', borderBottom:'2px solid #4c1d95',

@@ -11,7 +11,7 @@ export default function ShopModal() {
   const showShop    = useGameStore(s => s.showShop)
   const closeShop   = useGameStore(s => s.closeShop)
   const buyPack     = useGameStore(s => s.buyPack)
-  const galaBalance = useGameStore(s => s.galaBalance)
+  const gemsBalance = useGameStore(s => s.gemsBalance)
 
   if (!showShop) return null
 
@@ -34,8 +34,8 @@ export default function ShopModal() {
           <div>
             <h2 className="font-fredoka text-2xl text-white">HINT SHOP</h2>
             <div className="flex items-center gap-2">
-              <span className="font-fredoka text-lg" style={{ color:'#a78bfa' }}>◈ {galaBalance.toLocaleString()}</span>
-              <span className="font-nunito font-bold text-xs" style={{ color:'rgba(167,139,250,0.5)' }}>GALA</span>
+              <span className="font-fredoka text-lg" style={{ color:'#a78bfa' }}>◈ {gemsBalance.toLocaleString()}</span>
+              <span className="font-nunito font-bold text-xs" style={{ color:'rgba(167,139,250,0.5)' }}>GEMS</span>
             </div>
           </div>
           <button onClick={closeShop} className="ml-auto btn-3d w-10 h-10 flex items-center justify-center"
@@ -50,7 +50,7 @@ export default function ShopModal() {
         {/* Packs */}
         <div className="flex flex-col gap-3">
           {PACKS.map(pack => {
-            const canAfford = galaBalance >= pack.cost
+            const canAfford = gemsBalance >= pack.cost
             return (
               <button key={pack.id} onClick={() => canAfford && buyPack(pack.hints, pack.cost)}
                 className="btn-3d relative flex items-center gap-4 p-4 text-left"
@@ -78,7 +78,7 @@ export default function ShopModal() {
                 </div>
                 <div className="text-right">
                   <div className="font-fredoka text-xl" style={{ color:'#fbbf24' }}>{pack.cost.toLocaleString()}</div>
-                  <div className="font-nunito font-bold text-xs" style={{ color:'rgba(251,191,36,0.5)' }}>GALA</div>
+                  <div className="font-nunito font-bold text-xs" style={{ color:'rgba(251,191,36,0.5)' }}>GEMS</div>
                 </div>
               </button>
             )

@@ -11,7 +11,7 @@ import type { WorldId } from '../data/worlds'
 // What it gives you:
 //   • Navigation — jump straight to splash / worldSelect / premium / any
 //     world's level select.
-//   • Economy   — bump GALA & hints up/down by common amounts, or set to
+//   • Economy   — bump Gems & hints up/down by common amounts, or set to
 //     an exact number.
 //   • Progress  — unlock-all / complete-all / wipe per-world, plus a
 //     grant-or-revoke for the premium-unlock map.
@@ -30,7 +30,7 @@ export default function DebugMenu() {
   // Game store fields we surface
   const screen          = useGameStore(s => s.screen)
   const gameMode        = useGameStore(s => s.gameMode)
-  const galaBalance     = useGameStore(s => s.galaBalance)
+  const gemsBalance     = useGameStore(s => s.gemsBalance)
   const hints           = useGameStore(s => s.hints)
   const currentLevelIdx = useGameStore(s => s.currentLevelIndex)
   const worldId         = useGameStore(s => (s as any).selectedWorldId) as WorldId
@@ -58,10 +58,10 @@ export default function DebugMenu() {
 
   // ─── Action helpers ────────────────────────────────────────────────────
   function addGala(n: number) {
-    useGameStore.setState({ galaBalance: Math.max(0, galaBalance + n) })
+    useGameStore.setState({ gemsBalance: Math.max(0, gemsBalance + n) })
   }
   function setGalaExact(n: number) {
-    useGameStore.setState({ galaBalance: Math.max(0, n) })
+    useGameStore.setState({ gemsBalance: Math.max(0, n) })
   }
   function addHints(n: number) {
     useGameStore.setState({ hints: Math.max(0, hints + n) })
@@ -192,7 +192,7 @@ export default function DebugMenu() {
         screen: <b style={{color:'#a5f3fc'}}>{screen}</b> · world: <b style={{color:'#a5f3fc'}}>{worldId}</b> · L{currentLevelIdx + 1} · mode: {gameMode}
       </div>
       <div style={subtle}>
-        GALA <b style={{color:'#fbbf24'}}>{galaBalance.toLocaleString()}</b> · hints <b style={{color:'#a78bfa'}}>{hints}</b>
+        GEMS <b style={{color:'#fbbf24'}}>{gemsBalance.toLocaleString()}</b> · hints <b style={{color:'#a78bfa'}}>{hints}</b>
       </div>
 
       <div style={header}>NAV</div>
@@ -216,9 +216,9 @@ export default function DebugMenu() {
         ))}
       </div>
 
-      <div style={header}>ECONOMY · GALA</div>
+      <div style={header}>ECONOMY · GEMS</div>
       <div className="flex flex-wrap gap-1 mb-1">
-        <button style={btnDanger} onClick={wipeEconomy} title="Reset GALA + hints to fresh-player defaults (10000 / 3) and clear wc_economy_v1">
+        <button style={btnDanger} onClick={wipeEconomy} title="Reset Gems + hints to fresh-player defaults (10000 / 3) and clear wc_economy_v1">
           wipe economy
         </button>
       </div>

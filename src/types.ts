@@ -12,7 +12,7 @@ export interface Level {
 // ── Game State ────────────────────────────────────────────────────────────────
 
 export type GameMode = 'single' | 'daily'
-export type Screen   = 'splash' | 'worldSelect' | 'levelSelect' | 'game' | 'premium' | 'events'
+export type Screen   = 'splash' | 'worldSelect' | 'levelSelect' | 'game' | 'premium' | 'events' | 'store'
 
 export type MessageType = 'great' | 'error' | 'info' | ''
 
@@ -33,8 +33,11 @@ export interface GameState {
   selected:    number[]
   dragging:    boolean
 
-  // Economy
-  galaBalance: number
+  // Economy — `gemsBalance` is the in-game currency the player spends on
+  // hints, premium worlds, and event entries. Renamed from the original
+  // `galaBalance` in v4 when the store launched: gems are purchased with
+  // real GALA / GUSDC tokens or earned through gameplay.
+  gemsBalance: number
   hints:       number
 
   // Daily
@@ -75,7 +78,7 @@ export interface HintPack {
 
 // ── Daily Attempt ─────────────────────────────────────────────────────────────
 // Stamped each time the player wins, fails, or quits today's daily. The
-// daily is locked until the next midnight unless the player pays 1 GALA to
+// daily is locked until the next midnight unless the player pays 1 GEM to
 // clear a 'lost' attempt and try again.
 
 export interface DailyAttempt {

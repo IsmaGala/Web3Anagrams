@@ -20,10 +20,11 @@
 //                         record, OR the {unlocked, claimed} flags. Legacy
 //                         {unlockedWeek, claimedWeek} entries are folded in
 //                         via normalizeEventEntry before merging.
-//   • economy           → MAX(galaBalance), MAX(hints) (friendly to player)
+//   • economy           → MAX(gemsBalance), MAX(hints) (friendly to player)
 //
-// Future work: when GALA moves on-chain, drop economy from the payload and
-// fetch from chain instead.
+// Future work: gems are server-authoritative as of v4 (the store credits
+// player_state.payload.economy.gemsBalance directly on purchase). The MAX
+// merge above is now a defensive measure — both sides should already agree.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { api } from './apiClient'
@@ -51,11 +52,22 @@ interface DailyAttemptRecord { dateKey: string; status: 'won' | 'lost' }
 
 export interface PlayerStatePayload {
   v: 1
-  economy: { galaBalance: number; hints: number }
+  /** `gemsBalance` is the v4 field name. Older server-stored payloads use
+   *  `galaBalance` — we read both keys via `economyBalance()` so the cutover
+   *  doesn't orphan anyone's balance. New writes always use `gemsBalance`. */
+  economy: { gemsBalance: number; hints: number; galaBalance?: number }
   progress: { worlds: Record<string, WorldProgress> }
   premium: { unlocked: Partial<Record<WorldId, boolean>> }
   events:  { state: Partial<Record<WorldId, EventStateEntry>> }
   daily:   { attempt: DailyAttemptRecord | null }
+}
+
+/** Read the gems balance from a payload, tolerating the legacy field name.
+ *  Returns 0 if neither key is present (defensive). */
+function economyBalance(e: PlayerStatePayload['economy']): number {
+  if (typeof e.gemsBalance === 'number') return e.gemsBalance
+  if (typeof e.galaBalance === 'number') return e.galaBalance
+  return 0
 }
 
 interface ServerResponse {
@@ -72,7 +84,7 @@ export function buildPayload(): PlayerStatePayload {
   return {
     v: 1,
     economy: {
-      galaBalance: game.galaBalance,
+      gemsBalance: game.gemsBalance,
       hints:       game.hints,
     },
     progress: {
@@ -179,8 +191,11 @@ export function mergePayloads(local: PlayerStatePayload, server: PlayerStatePayl
   return {
     v: 1,
     economy: {
-      galaBalance: Math.max(local.economy.galaBalance, server.economy.galaBalance),
-      hints:       Math.max(local.economy.hints,       server.economy.hints),
+      // `economyBalance` reads gemsBalance OR the legacy galaBalance, so a
+      // server payload from before the v4 cutover still contributes its
+      // balance to the merge.
+      gemsBalance: Math.max(economyBalance(local.economy), economyBalance(server.economy)),
+      hints:       Math.max(local.economy.hints, server.economy.hints),
     },
     progress: {
       worlds: mergeWorlds(local.progress.worlds, server.progress.worlds),
@@ -201,7 +216,7 @@ export function mergePayloads(local: PlayerStatePayload, server: PlayerStatePayl
 
 export function applyPayload(p: PlayerStatePayload): void {
   useGameStore.setState({
-    galaBalance: p.economy.galaBalance,
+    gemsBalance: economyBalance(p.economy),
     hints:       p.economy.hints,
   } as any)
   // progressStore doesn't expose a "set everything" action; we reach into

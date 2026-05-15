@@ -17,9 +17,9 @@ export interface World {
   levelCount:  number
   unlockAfter: number          // for non-premium / non-event: complete this many levels in prev world to unlock
   comingSoon?: boolean
-  premium?:    boolean         // sold for GALA in the Premium section
-  event?:      boolean         // sold for GALA in the Weekly Events section (resets weekly)
-  cost?:       number          // GALA price (used by both premium and event)
+  premium?:    boolean         // sold for Gems in the Premium section
+  event?:      boolean         // sold for Gems in the Weekly Events section (resets weekly)
+  cost?:       number          // Gem price (used by both premium and event)
   /** For event worlds: the ISO date (YYYY-MM-DD) of the Monday this event
    *  becomes ACTIVE. Used to schedule which event runs on which week — the
    *  Mon 16:00 PST of this date is the boundary where the event flips from

@@ -9,6 +9,7 @@ import LevelSelect from './components/LevelSelect'
 import GameBoard from './components/GameBoard'
 import PremiumWorlds from './components/PremiumWorlds'
 import WeeklyEvents from './components/WeeklyEvents'
+import GemStore from './components/GemStore'
 import DebugMenu from './components/DebugMenu'
 import OnboardingOverlay, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingOverlay'
 import { pullAndApply, schedulePush, flushPush } from './utils/profileSync'
@@ -73,6 +74,7 @@ export default function App() {
       {screen === 'game'        && <GameBoard />}
       {screen === 'premium'     && <PremiumWorlds />}
       {screen === 'events'      && <WeeklyEvents />}
+      {screen === 'store'       && <GemStore />}
       <DebugMenu />
       {showOnboarding && (
         <OnboardingOverlay onDone={() => { markOnboardingSeen(); setShowOnboarding(false) }} />
