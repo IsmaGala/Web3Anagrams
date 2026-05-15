@@ -7,6 +7,7 @@ import {
   getStreak, timeToMidnight,
   eventPhase, currentWeekId, startWeekIdFromDate,
   timeToNextPhaseChange, formatCountdownShort,
+  DAILY_RETRY_COST,
 } from '../utils/gameUtils'
 import { shortAddress } from '../utils/wallet'
 import { playSfx } from '../utils/sfx'
@@ -93,7 +94,7 @@ export default function Splash() {
     ? 'available'
     : todaysAttempt.status === 'won' ? 'won' : 'lost'
 
-  const canAffordRetry = gemsBalance >= 1
+  const canAffordRetry = gemsBalance >= DAILY_RETRY_COST
 
   return (
     // Splash is a SCROLLABLE container, not a fixed-position overlay. The
@@ -297,7 +298,9 @@ export default function Splash() {
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs font-bold" style={{ color: canAffordRetry ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.4)' }}>
-                    {canAffordRetry ? 'RETRY · ◈ 1' : 'NEED 1 GEM · RESETS'}
+                    {canAffordRetry
+                      ? `RETRY · ◈ ${DAILY_RETRY_COST}`
+                      : `NEED ${DAILY_RETRY_COST} GEMS · RESETS`}
                   </span>
                   <span className="font-fredoka text-sm" style={{ color:'#fda4af' }}>{countdown}</span>
                 </div>

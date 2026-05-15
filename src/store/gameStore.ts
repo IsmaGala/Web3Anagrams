@@ -4,7 +4,7 @@ import type { WorldId } from '../data/worlds'
 import {
   arrangeLevels, pickDailyLevel, getSessionSeed,
   wordScore, wordFeedback, validateLevel,
-  DAILY_DURATION, DAILY_HINT_REWARD, updateStreak,
+  DAILY_DURATION, DAILY_HINT_REWARD, DAILY_RETRY_COST, updateStreak,
   MIN_WORDS_PER_LEVEL,
   computeScoreBreakdown,
   pickDailyWordMix,
@@ -659,27 +659,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
   cancelQuitDaily:  () => set({ showQuitConfirm: false }),
   confirmQuitDaily: () => {
     // Quitting mid-daily counts as a lost attempt — the daily locks until
-    // midnight unless the player spends 1 Gem to retry.
+    // midnight unless the player spends DAILY_RETRY_COST Gems to retry.
     useProgressStore.getState().setDailyAttempt('lost')
     set({ showQuitConfirm: false })
     get().goToSplash()
   },
 
-  // Pay 1 Gem to clear today's "lost" daily attempt and immediately enter
-  // a fresh run. Returns true on success.
+  // Pay DAILY_RETRY_COST Gems to clear today's "lost" daily attempt and
+  // immediately enter a fresh run. Returns true on success.
   payToRetryDaily: () => {
     const { gemsBalance } = get()
     const attempt = useProgressStore.getState().getTodaysDailyAttempt()
     if (!attempt || attempt.status !== 'lost') return false
-    if (gemsBalance < 1) {
+    if (gemsBalance < DAILY_RETRY_COST) {
       playSfx('wordInvalid')
-      get().showToast('⚠ Need 1 Gem to retry the daily')
+      get().showToast(`⚠ Need ${DAILY_RETRY_COST} Gems to retry the daily`)
       return false
     }
-    set({ gemsBalance: gemsBalance - 1 })
+    set({ gemsBalance: gemsBalance - DAILY_RETRY_COST })
     useProgressStore.getState().clearDailyAttempt()
     playSfx('purchase')
-    get().showToast('✓ Daily retry purchased · 1 Gem spent')
+    get().showToast(`✓ Daily retry purchased · ${DAILY_RETRY_COST} Gems spent`)
     // Hop straight into a fresh daily run.
     get().goToGame('daily')
     return true

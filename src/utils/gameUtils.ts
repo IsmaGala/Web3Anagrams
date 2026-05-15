@@ -214,6 +214,10 @@ export const DAILY_WORDS_TARGET = 8        // total words to find in a daily run
  *  so the DailyWinOverlay reward badge reads the same number, keeping the
  *  on-screen value and the actual credit guaranteed in sync. */
 export const DAILY_HINT_REWARD  = 10
+/** Gem cost to retry the daily after a failed attempt. Shared between the
+ *  payToRetryDaily action in gameStore and the splash's "DAILY FAILED"
+ *  retry button so the price the player sees is exactly what they pay. */
+export const DAILY_RETRY_COST   = 3
 
 // Curate the daily word list so the player gets a mix of long / mid / short
 // rather than a single tier. We stratify the validated word pool into three
