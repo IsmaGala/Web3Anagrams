@@ -98,7 +98,10 @@ export default function LevelSelect() {
 
       {/* Level grid */}
       <div className="w-full max-w-sm grid grid-cols-4 gap-3">
-        {world.levels.map((level, i) => {
+        {world.levels.map((_level, i) => {
+          // `_level` is intentionally unused — post bundle-strip the Level
+          // object is an empty placeholder. We iterate it only to get the
+          // right count of tiles and the index `i` for the level label.
           const state       = isLevelUnlocked(worldId, i)
           const isCompleted = state === 2
           const isUnlocked  = state >= 1
