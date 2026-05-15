@@ -112,7 +112,17 @@ export default function Wheel() {
     }
   }, [endSelect])
 
-  if (!letters.length) return null
+  // We INTENTIONALLY do not early-return when letters.length === 0. In
+  // server-authoritative mode, `letters` starts empty for the ~100ms window
+  // between level entry and the /api/play/level/start response. Returning
+  // null during that window unmounts the wheel container, then re-mounts it
+  // when the response lands — causing the native touchstart/touchmove
+  // listeners (attached via useEffect on the containerRef) to be re-bound
+  // mid-interaction. Real devices handle the rebind fine, but Chrome's
+  // DevTools mobile-emulation touch dispatcher gets confused by the
+  // unmount/remount cycle and the wheel stops responding to simulated
+  // touches. Keeping the container mounted continuously fixes emulation
+  // without changing real-device behavior at all.
 
   return (
     <div ref={containerRef}
