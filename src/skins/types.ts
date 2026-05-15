@@ -20,7 +20,7 @@
 // and the default remains a regular registry entry rather than a hardcoded
 // fallback path.
 
-export type WheelSkinId = 'default' | 'cybernetic' | 'deep-sea' | 'blood'
+export type WheelSkinId = 'default' | 'cybernetic' | 'deep-sea' | 'blood' | 'patriot'
 
 export interface WheelConnectorPalette {
   /** Gradient stop at (0,0) of the canvas. */

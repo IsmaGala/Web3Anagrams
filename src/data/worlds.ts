@@ -4,7 +4,7 @@ import type { WheelSkinId } from '../skins'
 export type WorldId =
   | 'townstar' | 'mirandus' | 'galaswap' | 'eternalnight'
   | 'area51' | 'asimov' | 'nature'
-  | 'oceanevent' | 'blooddonor' | 'area515'
+  | 'oceanevent' | 'blooddonor' | 'area515' | 'flags'
   | 'coming_soon'
 
 export interface World {

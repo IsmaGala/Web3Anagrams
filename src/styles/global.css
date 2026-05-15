@@ -93,6 +93,23 @@ body.daily-mode[data-app-skin="blood"] {
     radial-gradient(ellipse at 50% 50%, rgba(20,5,15,0.9) 0%, transparent 100%);
 }
 
+/* — PATRIOT: deep navy base with red bloom upper-left and navy-blue
+   bloom lower-right, like a flag waving against a dark sky. */
+body[data-app-skin="patriot"] {
+  background: #0a1428;
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(220,38,38,0.32) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(30,58,138,0.40) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(10,20,40,0.9) 0%, transparent 100%);
+}
+body.daily-mode[data-app-skin="patriot"] {
+  background: #1a0d05;
+  background-image:
+    radial-gradient(ellipse at 15% 15%, rgba(251,191,36,0.35) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(220,38,38,0.30) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, rgba(26,13,5,0.9) 0%, transparent 100%);
+}
+
 /* ── FONTS ───────────────────────────────────────────────────────────────── */
 .font-fredoka { font-family: 'Fredoka One', cursive; }
 .font-nunito  { font-family: 'Nunito', sans-serif; }
@@ -377,6 +394,65 @@ body.daily-mode [data-skin="blood"] .wheel-letter.selected {
     0 0 22px rgba(244,63,94,0.9);
   color: #fff;
   text-shadow: 0 0 8px rgba(253,164,175,0.95);
+}
+
+/* ── WHEEL SKIN: PATRIOT ─────────────────────────────────────────────────
+   Navy idle (deep flag blue) with a bright-red trim — the "blue field +
+   red stripe edge" feel of a folded flag. Selected tiles flare to Old
+   Glory red ringed in white (the star-on-the-flag beat). Daily-mode
+   shifts to brass/gold trim against a warm dark ground — ceremonial /
+   parade vibe rather than the Blood skin's klaxon. Same scoping pattern
+   as the other branded skins. */
+[data-skin="patriot"] .wheel-letter {
+  background: linear-gradient(160deg, #1e3a8a, #0c1d3d);
+  border: 2px solid #dc2626;                  /* Old Glory red trim */
+  border-bottom: 2px solid #7f1d1d;
+  box-shadow:
+    0 5px 0 #1e1b4b,
+    0 0 0 1px rgba(220,38,38,0.35),
+    0 0 14px rgba(220,38,38,0.30);
+  color: #ffffff;
+  /* Faint red bloom around the white glyph so letters look slightly hot. */
+  text-shadow: 0 0 6px rgba(252,165,165,0.6);
+}
+
+[data-skin="patriot"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #dc2626, #991b1b);
+  border-color: #ffffff;                      /* white star halo */
+  border-bottom-color: #1e3a8a;
+  box-shadow:
+    0 3px 0 #1e1b4b,
+    0 0 0 2px rgba(255,255,255,0.55),
+    0 0 22px rgba(220,38,38,0.85);
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255,255,255,0.95);
+  transform: translate(-50%, -50%) scale(1.18) translateY(-3px);
+}
+
+/* Daily-mode: ceremonial gold/brass trim. Keeps the patriotic identity
+   but in a warmer, parade-style register so players still read it as the
+   daily challenge. */
+body.daily-mode [data-skin="patriot"] .wheel-letter {
+  background: linear-gradient(160deg, #3b1d0a, #1c0a00);
+  border-color: #fbbf24;
+  border-bottom-color: #78350f;
+  box-shadow:
+    0 5px 0 #451a03,
+    0 0 0 1px rgba(251,191,36,0.40),
+    0 0 14px rgba(220,38,38,0.30);
+  color: #fef3c7;
+  text-shadow: 0 0 6px rgba(251,191,36,0.7);
+}
+
+body.daily-mode [data-skin="patriot"] .wheel-letter.selected {
+  background: linear-gradient(160deg, #b45309, #7f1d1d);
+  border-color: #fde68a;
+  box-shadow:
+    0 3px 0 #451a03,
+    0 0 0 2px rgba(253,230,138,0.55),
+    0 0 22px rgba(251,191,36,0.85);
+  color: #fff7ed;
+  text-shadow: 0 0 8px rgba(253,230,138,0.95);
 }
 
 /* ── CURRENT WORD ────────────────────────────────────────────────────────── */

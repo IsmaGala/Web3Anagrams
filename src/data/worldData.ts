@@ -5,6 +5,7 @@ import { GALASWAP_LEVELS }     from './galaswapLevels'
 import { ETERNALNIGHT_LEVELS } from './eternalnightLevels'
 import { AREA51_LEVELS }       from './area51Levels'
 import { AREA515_LEVELS }      from './area515Levels'
+import { FLAGS_LEVELS }        from './flagsLevels'
 import { ASIMOV_LEVELS }       from './asimovLevels'
 import { NATURE_LEVELS }       from './natureLevels'
 import { OCEAN_EVENT_LEVELS }  from './oceanEventLevels'
@@ -164,6 +165,28 @@ export const WORLDS: World[] = [
     startDate:   '2026-05-25',     // week of May 25 — the slot after Blood Donor Day
     eventReward: { firstPlaceSkin: 'cybernetic' },
     levels:      AREA515_LEVELS,
+  },
+  {
+    // Flags and Countries — fourth weekly event, the "release month"
+    // capstone. International scope (STARS, NATION, SPAIN, REPUBLIC,
+    // CONTINENT…) with US examples sprinkled into defs where natural,
+    // since the rank-1 reward is the Patriot skin (US flag palette).
+    // Slotted for the week after Area 51.5 so the rotation reads:
+    // Deep Sea → Blood Donor Day → Area 51.5 → Flags and Countries.
+    id:          'flags',
+    name:        'Flags and Countries',
+    subtitle:    'Release Month Event',
+    icon:        '🚩',
+    description: '10 levels through the language of flags and nations — stars, eagles, anthems, capitals, republics. From Old Glory to the continents.',
+    color:       '#dc2626',
+    gradient:    'linear-gradient(135deg, #1e3a8a 0%, #7f1d1d 50%, #0c1d3d 100%)',
+    levelCount:  FLAGS_LEVELS.length,
+    unlockAfter: 0,
+    event:       true,
+    cost:        5,
+    startDate:   '2026-06-01',     // week of June 1 — the slot after Area 51.5
+    eventReward: { firstPlaceSkin: 'patriot' },
+    levels:      FLAGS_LEVELS,
   },
   {
     id:          'coming_soon',

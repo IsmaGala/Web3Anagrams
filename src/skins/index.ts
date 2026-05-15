@@ -8,6 +8,7 @@ import { defaultSkin } from './default'
 import { cyberneticSkin } from './cybernetic'
 import { deepSeaSkin } from './deepSea'
 import { bloodSkin } from './blood'
+import { patriotSkin } from './patriot'
 
 export type { WheelSkin, WheelSkinId, WheelRingPalette, WheelConnectorPalette } from './types'
 
@@ -16,10 +17,11 @@ export const WHEEL_SKINS: Record<WheelSkinId, WheelSkin> = {
   'cybernetic': cyberneticSkin,
   'deep-sea':   deepSeaSkin,
   'blood':      bloodSkin,
+  'patriot':    patriotSkin,
 }
 
 /** Ordered list — useful for rendering pickers in a stable sequence. */
-export const WHEEL_SKIN_LIST: WheelSkin[] = [defaultSkin, cyberneticSkin, deepSeaSkin, bloodSkin]
+export const WHEEL_SKIN_LIST: WheelSkin[] = [defaultSkin, cyberneticSkin, deepSeaSkin, bloodSkin, patriotSkin]
 
 /** Safe lookup: falls back to the default skin if an unknown id sneaks in
  *  (e.g. a localStorage value left over from a deprecated skin). */
