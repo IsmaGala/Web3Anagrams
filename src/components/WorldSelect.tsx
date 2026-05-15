@@ -10,6 +10,9 @@ export default function WorldSelect() {
   const goToSplash        = useGameStore(s => s.goToSplash)
   const isWorldUnlocked   = useProgressStore(s => s.isWorldUnlocked)
   const getCompletedCount = useProgressStore(s => s.getCompletedCount)
+  // Used to flip the completion-reward badge between "available" and
+  // "claimed" once the player accepts their bounty.
+  const isRewardClaimed   = useProgressStore(s => s.isWorldCompletionRewardClaimed)
 
   function handleWorldClick(world: World) {
     if (world.comingSoon || !isWorldUnlocked(world.id)) return
@@ -104,6 +107,34 @@ export default function WorldSelect() {
                   </div>
                   {completed === world.levelCount && (
                     <div className="font-fredoka text-sm text-center" style={{ color: world.color }}>✓ COMPLETE!</div>
+                  )}
+                  {/* Completion-bounty badge — only for worlds that have a
+                      reward configured. Shows the carrot ("CLEAR FOR ◈ N")
+                      while unclaimed; flips to a muted "CLAIMED" pill once
+                      the player has accepted the bounty so the affordance
+                      doesn't keep advertising a reward they've already taken. */}
+                  {!!world.completionReward && world.completionReward > 0 && (
+                    <div className="flex items-center justify-center gap-1.5 mt-2 px-3 py-1 rounded-full mx-auto"
+                      style={{
+                        width:'fit-content',
+                        background: isRewardClaimed(world.id)
+                          ? 'rgba(0,0,0,0.3)'
+                          : `${world.color}22`,
+                        border: `1.5px solid ${isRewardClaimed(world.id) ? 'rgba(255,255,255,0.15)' : `${world.color}66`}`,
+                      }}>
+                      <span style={{ color: isRewardClaimed(world.id) ? 'rgba(255,255,255,0.4)' : '#22d3ee' }}>
+                        {isRewardClaimed(world.id) ? '✓' : '◈'}
+                      </span>
+                      <span className="font-fredoka text-xs"
+                        style={{
+                          color: isRewardClaimed(world.id) ? 'rgba(255,255,255,0.5)' : '#fff',
+                          letterSpacing:'1px',
+                        }}>
+                        {isRewardClaimed(world.id)
+                          ? `REWARD CLAIMED`
+                          : `CLEAR FOR ${world.completionReward} GEMS`}
+                      </span>
+                    </div>
                   )}
                 </div>
               )}

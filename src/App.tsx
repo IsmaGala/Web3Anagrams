@@ -12,6 +12,7 @@ import WeeklyEvents from './components/WeeklyEvents'
 import GemStore from './components/GemStore'
 import DebugMenu from './components/DebugMenu'
 import OnboardingOverlay, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingOverlay'
+import WorldRewardOverlay from './components/WorldRewardOverlay'
 import { pullAndApply, schedulePush, flushPush } from './utils/profileSync'
 import './styles/global.css'
 
@@ -34,11 +35,18 @@ export default function App() {
         markLevelComplete(worldId as any, levelIndex, score)
       }
     } as any)
+    // Surface any pre-existing world-completion bounties for returning
+    // players. A player who cleared Town Star before this feature shipped
+    // will see the WorldRewardOverlay on the next app load.
+    useGameStore.getState().scanForUnclaimedWorldRewards()
   }, [loadLevels, markLevelComplete])
 
   // Cross-device sync — when the JWT becomes available, pull-and-merge.
   // Each unique JWT triggers exactly one pull (the ref tracks which JWT we
   // already pulled for) so renders don't cause repeated network round-trips.
+  // After the merge lands, re-scan for unclaimed world-completion bounties
+  // so a fresh device sees the same retroactive rewards the player would
+  // see on their original device.
   useEffect(() => {
     if (!jwt) {
       didPullForJwt.current = null
@@ -46,7 +54,9 @@ export default function App() {
     }
     if (didPullForJwt.current === jwt) return
     didPullForJwt.current = jwt
-    pullAndApply()
+    Promise.resolve(pullAndApply()).finally(() => {
+      useGameStore.getState().scanForUnclaimedWorldRewards()
+    })
   }, [jwt])
 
   // Subscribe to both stores; any change after login schedules a debounced
@@ -76,6 +86,9 @@ export default function App() {
       {screen === 'events'      && <WeeklyEvents />}
       {screen === 'store'       && <GemStore />}
       <DebugMenu />
+      {/* Globally mounted so a queued reward (live win or retroactive
+          scan hit) surfaces on whatever screen the player happens to be on. */}
+      <WorldRewardOverlay />
       {showOnboarding && (
         <OnboardingOverlay onDone={() => { markOnboardingSeen(); setShowOnboarding(false) }} />
       )}

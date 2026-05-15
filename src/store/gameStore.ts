@@ -10,6 +10,7 @@ import {
 } from '../utils/gameUtils'
 import { playSfx, isSfxMuted, setSfxMuted, unlockSfx } from '../utils/sfx'
 import { useProgressStore } from './progressStore'
+import { WORLDS } from '../data/worldData'
 
 function saveProgress(worldId: string, levelIndex: number, score: number) {
   try {
@@ -144,6 +145,18 @@ interface GameStore extends GameState {
   // Daily retry
   payToRetryDaily: () => boolean
 
+  // World-completion reward flow
+  /** worldId currently waiting for the player to accept its completion
+   *  bounty via WorldRewardOverlay. Null when nothing is pending. */
+  pendingWorldRewardId:        string | null
+  /** Scan every world for an unclaimed-but-eligible completion bounty
+   *  and queue the first hit. Used on app mount and after cross-device
+   *  sync so retroactive rewards surface without requiring a level replay. */
+  scanForUnclaimedWorldRewards: () => void
+  /** Player tapped CLAIM on the reward modal: atomically claim, credit
+   *  Gems, then re-scan in case there are more queued. */
+  acceptWorldReward:           () => void
+
   // Level lifecycle
   loadLevels:       (raw: Level[]) => void
   loadWorldLevels:  (raw: Level[]) => void
@@ -219,6 +232,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedWorldId:   'townstar',
   _worldId:          'townstar',
   sfxMuted:          isSfxMuted(),
+  pendingWorldRewardId: null,
 
   setScreen:  (screen) => set({ screen } as any),
   setWorldId: (id) => set({ selectedWorldId: id, _worldId: id }),
@@ -334,6 +348,50 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return true
   },
 
+  // ── World-completion reward flow ─────────────────────────────────────────
+  // Two-step contract:
+  //   1. scanForUnclaimedWorldRewards / submitWord flag a world as pending
+  //      by setting `pendingWorldRewardId`.
+  //   2. The player taps CLAIM in the modal → acceptWorldReward atomically
+  //      claims the bounty in progressStore and credits the Gems here.
+
+  scanForUnclaimedWorldRewards: () => {
+    // Don't stomp an already-queued reward. The modal will scan again
+    // after the player accepts it, so any extra pending rewards (e.g. a
+    // player who pre-cleared multiple worlds before this feature shipped)
+    // surface one at a time.
+    if (get().pendingWorldRewardId) return
+    const progress = useProgressStore.getState()
+    for (const world of WORLDS) {
+      if (!world.completionReward || world.completionReward <= 0) continue
+      if (progress.isWorldCompletionRewardClaimed(world.id)) continue
+      const completed = progress.getCompletedCount(world.id)
+      if (completed >= world.levelCount) {
+        set({ pendingWorldRewardId: world.id })
+        return
+      }
+    }
+  },
+
+  acceptWorldReward: () => {
+    const id = get().pendingWorldRewardId
+    if (!id) return
+    // Atomic check-and-mark — returns 0 if the reward was somehow already
+    // claimed (e.g. duplicate tap, cross-device race), guarding against
+    // double-credit.
+    const bounty = useProgressStore.getState().claimWorldCompletionReward(id as any)
+    if (bounty > 0) {
+      set({ gemsBalance: get().gemsBalance + bounty })
+      playSfx('purchase')
+    }
+    set({ pendingWorldRewardId: null })
+    // A player can have multiple unclaimed rewards stacked up (e.g. they
+    // pre-cleared Town Star + Mirandus before this feature shipped). Pop
+    // the next one immediately so they get a sequence of "WORLD COMPLETE"
+    // celebrations rather than having to navigate away and back.
+    get().scanForUnclaimedWorldRewards()
+  },
+
   // Spend Gems to unlock a premium world. Returns true if purchase succeeded.
   // The actual unlock is persisted in progressStore so it survives reloads.
   purchaseWorld: (worldId, cost) => {
@@ -440,21 +498,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // player is signed in. Fire-and-forget — server failure should never
         // block the local progression UI.
         submitEventScoreIfApplicable(_worldId, breakdown.final)
-        // One-time world-completion Gem bounty. The progressStore call is
-        // a check-and-mark atom: it returns the reward amount the first
-        // time the player clears the world and 0 thereafter. Only free
-        // single-player worlds currently carry a reward (see worldData.ts
-        // → completionReward).
-        const bounty = useProgressStore.getState().claimWorldCompletionReward(_worldId as any)
-        if (bounty > 0) {
-          set({ gemsBalance: get().gemsBalance + bounty })
-          // Slight delay so the per-level completion sound/overlay lands
-          // first, then the world-completion celebration toast follows
-          // instead of stepping on it.
-          setTimeout(() => {
-            playSfx('purchase')
-            get().showToast(`🏆 World complete! +${bounty} Gems`)
-          }, 900)
+        // One-time world-completion Gem bounty. We don't pay it directly
+        // here — instead we queue the world as a pending reward so the
+        // WorldRewardOverlay can confirm the grant with the player. The
+        // overlay's CLAIM button calls acceptWorldReward, which is what
+        // actually atomically claims + credits the Gems. Queuing only — we
+        // do NOT modify worldCompletionClaimed yet.
+        const world = WORLDS.find(w => w.id === _worldId)
+        const reward = world?.completionReward ?? 0
+        if (reward > 0 && !useProgressStore.getState().isWorldCompletionRewardClaimed(_worldId as any)) {
+          const completedNow = useProgressStore.getState().getCompletedCount(_worldId as any)
+          if (completedNow >= (world?.levelCount ?? Infinity)) {
+            set({ pendingWorldRewardId: _worldId })
+          }
         }
         setTimeout(() => {
           if (gameMode === 'daily') get().triggerDailyWin()
