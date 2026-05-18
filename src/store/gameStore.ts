@@ -4,7 +4,7 @@ import type { WorldId } from '../data/worlds'
 import {
   arrangeLevels, pickDailyLevel, getSessionSeed,
   wordScore, wordFeedback, validateLevel,
-  DAILY_DURATION, DAILY_HINT_REWARD, DAILY_RETRY_COST, updateStreak,
+  DAILY_DURATION, DAILY_RETRY_COST, updateStreak,
   MIN_WORDS_PER_LEVEL,
   computeScoreBreakdown,
   pickDailyWordMix,
