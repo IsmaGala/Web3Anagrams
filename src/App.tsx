@@ -58,23 +58,19 @@ export default function App() {
     didPullForJwt.current = jwt
     Promise.resolve(pullAndApply()).finally(() => {
       useGameStore.getState().scanForUnclaimedWorldRewards()
-      // First-wallet welcome bonus. Runs AFTER pullAndApply so the synced
-      // `firstWalletBonusClaimed` flag is authoritative — a player who
-      // already claimed on another device won't re-claim here. Anyone who
-      // genuinely hasn't claimed (fresh wallet, first connection ever)
-      // gets +15 Gems and +5 hints, the flag flips, and a celebratory
-      // toast surfaces. The flag mutation triggers App.tsx's profileSync
-      // push subscription, so the server records the claim within ~2s.
-      const progress = useProgressStore.getState()
-      if (!progress.firstWalletBonusClaimed) {
-        const game = useGameStore.getState()
-        useGameStore.setState({
-          gemsBalance: game.gemsBalance + 15,
-          hints:       game.hints + 5,
-        } as any)
-        progress.claimFirstWalletBonus()
-        game.showToast('🎁 Welcome! +15 Gems · +5 hints')
-      }
+      // First-wallet welcome bonus is now SERVER-issued as of milestone 2.
+      // It fires inside the first GET /api/profile call for a given wallet
+      // (see api/profile.ts), gated by a balance_transactions audit row so
+      // it can fire exactly once per address regardless of how many devices
+      // the player connects from.
+      //
+      // `pullAndApply()` reads the response's `balances` and updates the
+      // local gemsBalance/hints; if a bonus was granted, those balances
+      // already include it. The toast UX moved into pullAndApply so the
+      // notification fires in the place that actually applies the balance.
+      // No client-side grant happens here anymore — removing this block
+      // closes the cheat where flipping `firstWalletBonusClaimed` in
+      // localStorage and refreshing re-minted +15 gems / +5 hints.
     })
   }, [jwt])
 

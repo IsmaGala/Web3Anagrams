@@ -21,7 +21,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { applyCors } from '../../_lib/cors.js'
 import { requireAuth } from '../../_lib/jwt.js'
-import { getLevel } from '../../_data/worldsServerData.js'
+import {
+  getLevel, getWorldLevels,
+  WORLD_COMPLETION_REWARDS, DAILY_WIN_HINT_REWARD,
+} from '../../_data/worldsServerData.js'
 import {
   validateLevel, canMakeWord, wordScore, slotForWord, computeScoreBreakdown,
 } from '../../_lib/play.js'
@@ -29,6 +32,8 @@ import {
   loadRound, appendFoundWord, appendFoundBonus,
   incrementMisses, markCompleted,
 } from '../../_lib/round.js'
+import { grantGems, grantHints, hasReceivedGrant } from '../../_lib/economy.js'
+import { sql } from '../../_lib/db.js'
 
 const MAX_WORD_LEN = 24
 const WORD_RE = /^[A-Z]{2,24}$/
@@ -98,6 +103,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Completion?
     const completed = v.words.every(w => newFound.includes(w))
     let breakdown: ReturnType<typeof computeScoreBreakdown> | undefined
+    let worldCompletionGranted: { amount: number; worldId: string } | undefined
+    let dailyWinGranted: { hints: number } | undefined
+
     if (completed) {
       const startMs = new Date(round.started_at).getTime()
       breakdown = computeScoreBreakdown(
@@ -107,6 +115,73 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         startMs,
       )
       await markCompleted(roundId, breakdown.final)
+
+      // ── Daily-win reward ──────────────────────────────────────────────────
+      // Hints granted server-side now (used to be client-asserted, which let
+      // anyone refresh the page after a daily win to multiply the reward).
+      // One per (address, day) — gated on whether a 'daily_win' grant has
+      // already been written for THIS daily date.
+      if (round.mode === 'daily') {
+        // The daily date_key is the YYYY-MM-DD when started. Two dailies on
+        // different calendar days are independent grants; two completions of
+        // the same daily round get exactly one grant.
+        const dateKey = new Date(round.started_at).toISOString().slice(0, 10)
+        const already = await hasReceivedGrant({
+          address,
+          reason: 'daily_win',
+          metadataMatch: { dateKey },
+        })
+        if (!already) {
+          const r = await grantHints({
+            address,
+            amount:   DAILY_WIN_HINT_REWARD,
+            reason:   'daily_win',
+            metadata: { dateKey, worldId: round.world_id },
+          })
+          dailyWinGranted = { hints: DAILY_WIN_HINT_REWARD }
+          void r
+        }
+      }
+
+      // ── World-completion bounty ───────────────────────────────────────────
+      // Only for non-daily, non-premium, non-event runs. We detect "world
+      // cleared" by counting distinct level_indexes the player has cleared
+      // in this world. If that matches the world's level count and no prior
+      // bounty was granted, we grant it now.
+      const bounty = WORLD_COMPLETION_REWARDS[round.world_id as keyof typeof WORLD_COMPLETION_REWARDS]
+      if (round.mode === 'single' && bounty) {
+        const wid = round.world_id
+        const worldLevels = getWorldLevels(wid)
+        if (worldLevels) {
+          // How many distinct levels in this world has the player ever
+          // completed? Includes the round we just marked done above.
+          const db = sql()
+          const rows = await db`
+            SELECT COUNT(DISTINCT level_index)::int AS done
+              FROM play_rounds
+             WHERE address      = ${address}
+               AND world_id     = ${wid}
+               AND completed_at IS NOT NULL
+          ` as Array<{ done: number }>
+          const distinctDone = rows[0]?.done ?? 0
+          if (distinctDone >= worldLevels.length) {
+            const already = await hasReceivedGrant({
+              address,
+              reason:        'world_completion_bounty',
+              metadataMatch: { worldId: wid },
+            })
+            if (!already) {
+              await grantGems({
+                address,
+                amount:   bounty,
+                reason:   'world_completion_bounty',
+                metadata: { worldId: wid },
+              })
+              worldCompletionGranted = { amount: bounty, worldId: wid }
+            }
+          }
+        }
+      }
     }
 
     return res.status(200).json({
@@ -118,6 +193,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       def,
       completed,
       breakdown,
+      // Surface any grants that fired so the client can show the right
+      // toast / overlay without making a follow-up balance fetch. The
+      // balances returned here (if any) are post-grant, authoritative.
+      grants: worldCompletionGranted || dailyWinGranted ? {
+        worldCompletion: worldCompletionGranted,
+        dailyWin:        dailyWinGranted,
+      } : undefined,
     })
   }
 

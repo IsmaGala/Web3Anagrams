@@ -39,6 +39,14 @@ export interface SubmitWordAcceptedPrimary {
     timeBonus:      number
     final:          number
   }
+  // Server-issued grants that fired during this submission. Only present
+  // when the round just completed AND a grant was eligible. The amounts
+  // here are post-grant balances (in player_balances) — the client should
+  // sync its local copy from them rather than computing locally.
+  grants?: {
+    worldCompletion?: { amount: number; worldId: string }
+    dailyWin?:        { hints: number }
+  }
 }
 
 export interface SubmitWordAcceptedBonus {

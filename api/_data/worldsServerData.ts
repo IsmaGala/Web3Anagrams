@@ -42,6 +42,29 @@ export const WORLD_LEVELS: Record<WorldId, Level[]> = {
   flags:        FLAGS_LEVELS,
 }
 
+// One-time gem bounty granted when the player completes every level in the
+// world for the first time. Keep in sync with `completionReward` in
+// src/data/worldData.ts on the client (server is authoritative for the
+// actual grant, but the client uses its copy to display the reward amount
+// on the WorldRewardOverlay).
+//
+// Premium and event worlds don't have a completion bounty (the player
+// already paid Gems to enter), so they're omitted here.
+export const WORLD_COMPLETION_REWARDS: Partial<Record<WorldId, number>> = {
+  townstar:     150,
+  mirandus:     200,
+  galaswap:     200,
+  eternalnight: 200,
+}
+
+// Daily-win reward — hints granted when the player clears the daily mode.
+// Mirrors `DAILY_HINT_REWARD` in src/utils/gameUtils.ts.
+export const DAILY_WIN_HINT_REWARD = 10
+
+// First-wallet welcome bundle — one-time bonus when a wallet connects for
+// the first time. Mirrors the client-side hard-coded values in App.tsx.
+export const FIRST_WALLET_BONUS = { gems: 15, hints: 5 }
+
 // Reserved for the legacy fallback set (the original non-world-scoped
 // levels.ts that fed the daily before worlds existed). Not currently routed
 // through a worldId but kept exported so future endpoints (e.g. a "classic

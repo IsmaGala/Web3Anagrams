@@ -12,12 +12,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
+import { parseWalletAddress } from '../_lib/wallet.js'
 
 const TTL_MS = 5 * 60 * 1000   // 5 minutes
-
-function isHexAddress(s: unknown): s is string {
-  return typeof s === 'string' && /^0x[a-fA-F0-9]{40}$/.test(s)
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return
@@ -26,11 +23,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Accept all four address formats (0x, eth|, client|, bare hex) — see
+  // api/_lib/wallet.ts. Was a strict /^0x[a-f0-9]{40}$/i which the doc
+  // explicitly flags as the "Failed to fetch nonce" footgun.
   const { address } = (req.body ?? {}) as { address?: string }
-  if (!isHexAddress(address)) {
-    return res.status(400).json({ error: 'Invalid address — expected 0x-prefixed 40-char hex' })
+  let parsed
+  try {
+    parsed = parseWalletAddress(address)
+  } catch (e: any) {
+    return res.status(400).json({ error: e?.message ?? 'Invalid address' })
   }
-  const key   = address.toLowerCase()
+  // The nonce-recovery path uses ethers.verifyMessage which only produces
+  // ETH addresses. A client|<id> login would require GalaChain
+  // /GetPublicKey lookup (doc §4) — out of scope until we wire chain calls.
+  if (parsed.kind !== 'eth') {
+    return res.status(400).json({ error: 'client|<id> login not yet supported — pass the underlying 0x address' })
+  }
+  const key = parsed.stored
   const nonce = `wordchain-login: ${crypto.randomUUID()}`
   const expiresAt = new Date(Date.now() + TTL_MS)
 

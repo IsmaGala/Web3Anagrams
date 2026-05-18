@@ -31,13 +31,18 @@ export default function PremiumWorlds() {
     setScreen('levelSelect')
   }
 
-  function handleConfirmPurchase() {
+  async function handleConfirmPurchase() {
     if (!confirmWorld) return
-    const ok = purchaseWorld(confirmWorld.id, confirmWorld.cost ?? 0)
+    // purchaseWorld is now async — it round-trips to /api/economy/spend
+    // before returning success/failure. We dismiss the confirm modal
+    // immediately so the player sees instant feedback while the request
+    // is in flight; the navigation only fires once we know the server
+    // accepted the spend.
+    const target = confirmWorld
     setConfirmWorld(null)
-    // If purchase succeeded, immediately take the player into the world.
+    const ok = await purchaseWorld(target.id, target.cost ?? 0)
     if (ok) {
-      setWorldId(confirmWorld.id)
+      setWorldId(target.id)
       setScreen('levelSelect')
     }
   }

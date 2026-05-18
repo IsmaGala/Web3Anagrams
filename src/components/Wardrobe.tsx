@@ -72,9 +72,10 @@ export default function Wardrobe() {
     showToast(`✓ Equipped ${getWheelSkin(id).label}`)
   }
 
-  function handleBuy(id: WheelSkinId, price: number) {
+  async function handleBuy(id: WheelSkinId, price: number) {
     playSfx('uiTap')
-    const ok = purchaseSkin(id, price)
+    // purchaseSkin is now async — server round-trip via /api/economy/spend.
+    const ok = await purchaseSkin(id, price)
     if (ok) {
       showToast(`✓ Unlocked ${getWheelSkin(id).label} · −${price} gems`)
     } else if (gemsBalance < price) {

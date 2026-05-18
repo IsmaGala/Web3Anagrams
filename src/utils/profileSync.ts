@@ -92,6 +92,16 @@ interface ServerResponse {
   address:   string
   payload:   PlayerStatePayload | null
   updatedAt: string | null
+  /** Server-authoritative balances from player_balances. As of milestone 2
+   *  these are the truth — the `economy` block inside `payload` is a stale
+   *  JSONB mirror that we no longer trust on the client. Pulled separately
+   *  and applied via setBalancesFromServer below. */
+  balances?:  { gems: number; hints: number }
+  /** Surfaces ONCE — only in the response for the first /api/profile call
+   *  after a wallet connects for the very first time ever. The server
+   *  granted the welcome bundle (gems + hints) inside that same call;
+   *  `balances` already reflects it. Use to fire the welcome toast. */
+  firstWalletBonusGranted?: { gems: number; hints: number }
 }
 
 // ── Build a payload from the current client state ───────────────────────────
@@ -103,6 +113,13 @@ export function buildPayload(): PlayerStatePayload {
   return {
     v: 1,
     economy: {
+      // As of milestone 2 these values are NOT authoritative — the server
+      // ignores them on /api/profile/sync writes and reads truth from
+      // `player_balances.gems_balance` / `hints_balance`. We still send
+      // the client's local cache here so the JSONB blob stays roughly
+      // consistent for debugging (`SELECT payload->'economy' FROM
+      // player_state` returns something meaningful), but a cheater
+      // inflating these fields no longer affects anything spendable.
       gemsBalance: game.gemsBalance,
       hints:       game.hints,
     },
@@ -335,11 +352,11 @@ export function applyPayload(p: PlayerStatePayload): void {
 
 // ── Network ─────────────────────────────────────────────────────────────────
 
-async function fetchServerPayload(): Promise<PlayerStatePayload | null> {
+async function fetchServerPayload(): Promise<ServerResponse | null> {
   if (!useWalletStore.getState().jwt) return null
   try {
     const resp = await api.get<ServerResponse>('/api/profile')
-    return resp.payload ?? null
+    return resp
   } catch (e) {
     console.warn('[profileSync] pull failed:', e)
     return null
@@ -375,14 +392,42 @@ export function subscribeSyncStatus(fn: (s: 'idle' | 'pulling' | 'pushing') => v
 
 /** Pull the server payload, merge with local state, apply the merge, and
  *  push the merged blob back so server reflects the union. Idempotent —
- *  safe to call multiple times. */
+ *  safe to call multiple times.
+ *
+ *  As of milestone 2 (server-authoritative gems), the gems/hints balances
+ *  come from the response's top-level `balances` field rather than the
+ *  JSONB economy block. applyPayload still consumes the JSONB economy
+ *  for legacy reasons but the values are immediately overwritten here
+ *  with the server's truth. The welcome bonus is also surfaced here as
+ *  a side-effect of the FIRST pull for a given wallet. */
 export async function pullAndApply(): Promise<void> {
   setStatus('pulling')
   try {
-    const server = await fetchServerPayload()
+    const resp   = await fetchServerPayload()
+    const server = resp?.payload ?? null
     const local  = buildPayload()
     const merged = server ? mergePayloads(local, server) : local
     applyPayload(merged)
+    // Server-authoritative balances override whatever the JSONB merge
+    // produced. If a cheater inflated `gemsBalance` in localStorage,
+    // applyPayload would have applied that — we correct it here.
+    if (resp?.balances) {
+      useGameStore.setState({
+        gemsBalance: resp.balances.gems,
+        hints:       resp.balances.hints,
+      } as any)
+    }
+    // First-wallet welcome bonus — server-issued, surfaced here as a toast.
+    // The balances above already include the bonus, so the +Gems / +hints
+    // numbers in the toast are descriptive of what just happened.
+    if (resp?.firstWalletBonusGranted) {
+      const { gems, hints } = resp.firstWalletBonusGranted
+      // Flip the local "claimed" flag so older cross-device sync code
+      // doesn't try to re-claim. Server is the real gate via the audit
+      // table, but the flag keeps the legacy UI tidy.
+      try { useProgressStore.getState().claimFirstWalletBonus() } catch {}
+      useGameStore.getState().showToast(`🎁 Welcome! +${gems} Gems · +${hints} hints`)
+    }
     // Push the merged result so the server has the union too.
     setStatus('pushing')
     await pushPayload(merged)

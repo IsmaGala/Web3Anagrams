@@ -166,7 +166,7 @@ export default function WeeklyEvents() {
     setConfirmEvent(world)
   }
 
-  function handleConfirmPurchase() {
+  async function handleConfirmPurchase() {
     if (!confirmEvent) return
     // Defensive double-check — by the time the player taps CONFIRM, the
     // wallet should be connected, but a stale modal could in theory show
@@ -178,10 +178,12 @@ export default function WeeklyEvents() {
       setShowWalletModal(true)
       return
     }
-    const ok = purchaseEvent(confirmEvent.id, confirmEvent.cost ?? 0)
+    // purchaseEvent is now async — server round-trip via /api/economy/spend.
+    const target = confirmEvent
     setConfirmEvent(null)
+    const ok = await purchaseEvent(target.id, target.cost ?? 0)
     if (ok) {
-      setWorldId(confirmEvent.id)
+      setWorldId(target.id)
       setScreen('levelSelect')
     }
   }

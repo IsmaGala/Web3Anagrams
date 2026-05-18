@@ -16,10 +16,8 @@ import { verifyMessage, keccak256, recoverAddress } from 'ethers'
 import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
 import { signSession } from '../_lib/jwt.js'
+import { parseWalletAddress } from '../_lib/wallet.js'
 
-function isHexAddress(s: unknown): s is string {
-  return typeof s === 'string' && /^0x[a-fA-F0-9]{40}$/.test(s)
-}
 function isHex(s: unknown): s is string {
   return typeof s === 'string' && /^0x[a-fA-F0-9]+$/.test(s)
 }
@@ -56,11 +54,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { address, signature } = (req.body ?? {}) as { address?: string; signature?: string }
-  if (!isHexAddress(address) || !isHex(signature)) {
-    return res.status(400).json({ error: 'address and signature must be 0x-prefixed hex' })
+  if (!isHex(signature)) {
+    return res.status(400).json({ error: 'signature must be 0x-prefixed hex' })
   }
-
-  const key = address.toLowerCase()
+  // Same parser as /auth/nonce — accept any of the four formats. Only the
+  // eth-kind branch can be signature-verified locally (client|<id> needs a
+  // GalaChain pubkey lookup; see doc §4).
+  let parsed
+  try {
+    parsed = parseWalletAddress(address)
+  } catch (e: any) {
+    return res.status(400).json({ error: e?.message ?? 'Invalid address' })
+  }
+  if (parsed.kind !== 'eth') {
+    return res.status(400).json({ error: 'client|<id> login not yet supported — pass the underlying 0x address' })
+  }
+  const key = parsed.stored
   const db  = sql()
 
   // 1. Fetch the active nonce row.

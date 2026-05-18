@@ -18,6 +18,7 @@ import {
   isServerAuthoritative, startLevel as apiStartLevel,
   submitWord as apiSubmitWord, requestHint as apiRequestHint,
 } from '../utils/playClient'
+import { spendGems as apiSpendGems } from '../utils/economyClient'
 
 // ── Server-authoritative slot helpers ────────────────────────────────────────
 // The server identifies slots by (len, ordinal). To turn a SlotState array
@@ -187,17 +188,20 @@ interface GameStore extends GameState {
   goToEvents:      () => void
   goToStore:       () => void
   goToWardrobe:    () => void
-  // Premium
-  purchaseWorld:   (worldId: string, cost: number) => boolean
+  // Premium — async because each spend round-trips to /api/economy/spend
+  // so the server is authoritative on gem balance. Returns true on success,
+  // false on insufficient gems, throws on network/auth errors (caller
+  // handles via try/catch).
+  purchaseWorld:   (worldId: string, cost: number) => Promise<boolean>
   // Weekly events
-  purchaseEvent:   (worldId: string, cost: number) => boolean
+  purchaseEvent:   (worldId: string, cost: number) => Promise<boolean>
   // Cosmetics (Wardrobe screen)
-  /** Atomically check affordability, debit Gems, and grant the skin via
-   *  the cosmetics store. Returns true if the player just unlocked it,
-   *  false if they already owned it or couldn't afford it. */
-  purchaseSkin:    (skinId: string, cost: number) => boolean
+  /** Spend Gems server-side and grant the skin via the cosmetics store.
+   *  Returns true if the player just unlocked it, false if they already
+   *  owned it or couldn't afford it. */
+  purchaseSkin:    (skinId: string, cost: number) => Promise<boolean>
   // Daily retry
-  payToRetryDaily: () => boolean
+  payToRetryDaily: () => Promise<boolean>
 
   // World-completion reward flow
   /** worldId currently waiting for the player to accept its completion
@@ -233,7 +237,7 @@ interface GameStore extends GameState {
   // Shop
   openShop:  () => void
   closeShop: () => void
-  buyPack:   (hints: number, cost: number) => void
+  buyPack:   (hints: number, cost: number) => Promise<void>
 
   // Daily timer
   tickTimer:        () => void
@@ -488,35 +492,56 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // No-op (and returns false) when the player already owns the skin,
   // can't afford it, or passes a price ≤ 0. Toast surfaces in the
   // Wardrobe; we keep this action focused on the state mutation.
-  purchaseSkin: (skinId, cost) => {
+  purchaseSkin: async (skinId, cost) => {
     if (!skinId || cost <= 0) return false
-    const bal = get().gemsBalance
-    if (bal < cost) return false
     const cosmetics = useCosmeticsStore.getState()
     if (cosmetics.ownsSkin(skinId as WheelSkinId)) return false
-    // Order matters: debit Gems FIRST so a race with another action
-    // can't double-spend. The grant is idempotent inside the
-    // cosmetics store.
-    set({ gemsBalance: bal - cost })
-    cosmetics.grantSkin(skinId as WheelSkinId)
-    cosmetics.setWheelSkin(skinId as WheelSkinId)
-    return true
+    try {
+      const resp = await apiSpendGems({
+        amount:   cost,
+        reason:   'cosmetic_skin',
+        metadata: { skinId },
+      })
+      if (!resp.ok) {
+        set({ gemsBalance: resp.newBalance })
+        return false
+      }
+      set({ gemsBalance: resp.newBalance })
+      cosmetics.grantSkin(skinId as WheelSkinId)
+      cosmetics.setWheelSkin(skinId as WheelSkinId)
+      return true
+    } catch (err) {
+      console.warn('purchaseSkin failed:', err)
+      return false
+    }
   },
 
   // Spend Gems to unlock the current week's event. The unlock resets every
   // Monday (Mon-16:00-PST-anchored week). Returns true if purchase succeeded.
-  purchaseEvent: (worldId, cost) => {
-    const { gemsBalance } = get()
-    if (gemsBalance < cost) {
+  purchaseEvent: async (worldId, cost) => {
+    try {
+      const resp = await apiSpendGems({
+        amount:   cost,
+        reason:   'unlock_event',
+        metadata: { worldId },
+      })
+      if (!resp.ok) {
+        set({ gemsBalance: resp.newBalance })
+        playSfx('wordInvalid')
+        get().showToast('⚠ Not enough Gems')
+        return false
+      }
+      set({ gemsBalance: resp.newBalance })
+      useProgressStore.getState().unlockEventForWeek(worldId as any)
+      playSfx('purchase')
+      get().showToast(`✓ Event unlocked · ${cost} Gems spent`)
+      return true
+    } catch (err) {
+      console.warn('purchaseEvent failed:', err)
       playSfx('wordInvalid')
-      get().showToast('⚠ Not enough Gems')
+      get().showToast('⚠ Connection error')
       return false
     }
-    set({ gemsBalance: gemsBalance - cost })
-    useProgressStore.getState().unlockEventForWeek(worldId as any)
-    playSfx('purchase')
-    get().showToast(`✓ Event unlocked · ${cost} Gems spent`)
-    return true
   },
 
   // ── World-completion reward flow ─────────────────────────────────────────
@@ -558,36 +583,67 @@ export const useGameStore = create<GameStore>((set, get) => ({
   acceptWorldReward: () => {
     const id = get().pendingWorldRewardId
     if (!id) return
-    // Atomic check-and-mark — returns 0 if the reward was somehow already
-    // claimed (e.g. duplicate tap, cross-device race), guarding against
-    // double-credit.
+    // As of milestone 2 (server-authoritative gems), the bounty has ALREADY
+    // been granted by the time this overlay surfaces — the server credits
+    // it inside /api/play/level/submit-word when the round that completes
+    // the world lands, and the client's gemsBalance is bumped in the
+    // submit-word .then() handler from `resp.grants.worldCompletion`. The
+    // claimWorldCompletionReward call below is still useful as a guard:
+    // it returns 0 (no-op) if the world was already marked claimed locally,
+    // which is the common case post-milestone-2. The CLAIM tap is now a
+    // purely celebratory UI step — sound + dismiss + advance to the next
+    // queued reward.
+    //
+    // Legacy fallback path: for very old players whose world completion
+    // PREDATES milestone 2 and was never granted server-side (the
+    // /api/play/level/submit-word grant only fires on a fresh completion),
+    // `claimWorldCompletionReward` will still return >0 and we'll add the
+    // local bounty as before. This keeps retroactive rewards intact.
     const bounty = useProgressStore.getState().claimWorldCompletionReward(id as WorldId)
     if (bounty > 0) {
+      // Only reached for the retroactive/legacy case described above.
       set({ gemsBalance: get().gemsBalance + bounty })
-      playSfx('purchase')
     }
+    playSfx('purchase')
     set({ pendingWorldRewardId: null })
-    // A player can have multiple unclaimed rewards stacked up (e.g. they
-    // pre-cleared Town Star + Mirandus before this feature shipped). Pop
-    // the next one immediately so they get a sequence of "WORLD COMPLETE"
-    // celebrations rather than having to navigate away and back.
+    // Multiple stacked rewards: pop the next one immediately so the player
+    // gets a sequence of celebrations.
     get().scanForUnclaimedWorldRewards()
   },
 
   // Spend Gems to unlock a premium world. Returns true if purchase succeeded.
   // The actual unlock is persisted in progressStore so it survives reloads.
-  purchaseWorld: (worldId, cost) => {
-    const { gemsBalance } = get()
-    if (gemsBalance < cost) {
+  //
+  // Server-authoritative as of milestone 2: the gem debit happens on the
+  // server (via /api/economy/spend), and the response carries the new
+  // authoritative balance. If localStorage was tampered to show inflated
+  // gems, the server still rejects spends the player can't afford.
+  purchaseWorld: async (worldId, cost) => {
+    try {
+      const resp = await apiSpendGems({
+        amount:   cost,
+        reason:   'unlock_premium',
+        metadata: { worldId },
+      })
+      if (!resp.ok) {
+        // Server says "insufficient" — sync local balance to its truth
+        // (which may be lower than the client believed) and bail.
+        set({ gemsBalance: resp.newBalance })
+        playSfx('wordInvalid')
+        get().showToast('⚠ Not enough Gems')
+        return false
+      }
+      set({ gemsBalance: resp.newBalance })
+      useProgressStore.getState().markPremiumUnlocked(worldId as any)
+      playSfx('purchase')
+      get().showToast(`✓ World unlocked · ${cost.toLocaleString()} Gems spent`)
+      return true
+    } catch (err) {
+      console.warn('purchaseWorld failed:', err)
       playSfx('wordInvalid')
-      get().showToast('⚠ Not enough Gems')
+      get().showToast('⚠ Connection error')
       return false
     }
-    set({ gemsBalance: gemsBalance - cost })
-    useProgressStore.getState().markPremiumUnlocked(worldId as any)
-    playSfx('purchase')
-    get().showToast(`✓ World unlocked · ${cost.toLocaleString()} Gems spent`)
-    return true
   },
 
   nextLevel: () => {
@@ -776,18 +832,39 @@ export const useGameStore = create<GameStore>((set, get) => ({
             saveProgress(_worldId, currentLevelIndex, b.final)
             submitEventScoreIfApplicable(_worldId, b.final)
 
-            // World-completion bounty (same eligibility logic as the legacy
-            // path) — see the long comment in the legacy branch below.
-            const wid = _worldId as WorldId
-            const world = WORLDS.find(w => w.id === wid)
-            const reward = world?.completionReward ?? 0
-            if (gameMode !== 'daily'
-                && reward > 0
-                && !useProgressStore.getState().isWorldCompletionRewardClaimed(wid)) {
-              const worldProgress = useProgressStore.getState().worlds[wid]?.levels ?? {}
-              const allLoadedDone = levels.length > 0 && levels.every((_, i) => worldProgress[i]?.completed)
-              if (allLoadedDone) set({ pendingWorldRewardId: _worldId })
+            // ── Server-issued grants ──────────────────────────────────────
+            // As of milestone 2, world-completion and daily-win grants are
+            // computed and applied SERVER-SIDE inside /api/play/level/
+            // submit-word. The response surfaces them here so the client
+            // can update its local balance and trigger the matching UI
+            // (WorldRewardOverlay / DailyWinOverlay).
+            //
+            // World completion: server already debited—er, granted—the
+            // bounty. Client's job is just to flag pendingWorldRewardId so
+            // the celebration overlay surfaces. The local gem balance is
+            // bumped by the grant amount (server's authoritative post-grant
+            // balance isn't carried directly here — we infer it from the
+            // grant `amount` field; profile pulls will reconcile any drift).
+            if (resp.grants?.worldCompletion) {
+              const grant = resp.grants.worldCompletion
+              set({ gemsBalance: get().gemsBalance + grant.amount })
+              // Mark the progress flag locally too so the overlay's "ALREADY
+              // CLAIMED" guard works on subsequent visits. The server has the
+              // real audit row; this is a UI cache only.
+              try { useProgressStore.getState().claimWorldCompletionReward(grant.worldId as WorldId) } catch {}
+              if (gameMode !== 'daily') {
+                set({ pendingWorldRewardId: grant.worldId })
+              }
             }
+
+            // Daily-win hint grant — server-issued. Update local hints from
+            // the delta; the daily-win overlay reads `hints` to show the
+            // post-grant total.
+            if (resp.grants?.dailyWin) {
+              const grant = resp.grants.dailyWin
+              set({ hints: get().hints + grant.hints })
+            }
+
             setTimeout(() => {
               if (gameMode === 'daily') get().triggerDailyWin()
               else {
@@ -988,12 +1065,46 @@ export const useGameStore = create<GameStore>((set, get) => ({
   openShop:  () => set({ showShop: true }),
   closeShop: () => set({ showShop: false }),
 
-  buyPack: (hintsAmt, cost) => {
-    const { gemsBalance, hints } = get()
-    if (gemsBalance < cost) { playSfx('wordInvalid'); get().showToast('⚠ Not enough Gems'); return }
-    set({ gemsBalance: gemsBalance - cost, hints: hints + hintsAmt, showShop: false })
-    playSfx('purchase')
-    get().showToast(`✓ ${hintsAmt} hints added · ${cost.toLocaleString()} Gems spent`)
+  buyPack: async (hintsAmt, cost) => {
+    // Server-authoritative: the spend endpoint atomically debits gems AND
+    // credits hints for the matching packId. We derive packId from
+    // (hintsAmt, cost) to match the catalog the server has in spend.ts —
+    // keeping the call signature compatible with the existing ShopModal.
+    const packId = hintsAmt === 5 ? 'starter'
+                 : hintsAmt === 25 ? 'pro'
+                 : hintsAmt === 100 ? 'whale'
+                 : null
+    if (!packId) {
+      console.warn('buyPack: unknown pack', { hintsAmt, cost })
+      get().showToast('⚠ Unknown pack')
+      return
+    }
+    try {
+      const resp = await apiSpendGems({
+        amount:   cost,
+        reason:   'hint_pack',
+        metadata: { packId },
+      })
+      if (!resp.ok) {
+        set({ gemsBalance: resp.newBalance })
+        playSfx('wordInvalid')
+        get().showToast('⚠ Not enough Gems')
+        return
+      }
+      // Apply both server-authoritative balances. The shop closes either
+      // way, matching the legacy behavior.
+      set({
+        gemsBalance: resp.newBalance,
+        hints:       resp.newHints ?? (get().hints + hintsAmt),
+        showShop:    false,
+      })
+      playSfx('purchase')
+      get().showToast(`✓ ${hintsAmt} hints added · ${cost.toLocaleString()} Gems spent`)
+    } catch (err) {
+      console.warn('buyPack failed:', err)
+      playSfx('wordInvalid')
+      get().showToast('⚠ Connection error')
+    }
   },
 
   // ── Daily Timer ───────────────────────────────────────────────────────────
@@ -1006,9 +1117,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   triggerDailyWin: () => {
+    // Daily-win hint reward is server-issued as of milestone 2 — the
+    // /api/play/level/submit-word response carries `grants.dailyWin.hints`
+    // and the submit-word .then() handler already bumped local `hints`
+    // from it. We DON'T add hints again here; doing so used to grant the
+    // reward client-side, which let anyone replay the daily-win moment
+    // (e.g. refresh-and-replay) and multiply their hints.
     playSfx('dailyWin')
     useProgressStore.getState().setDailyAttempt('won')
-    set({ dailyComplete: true, hints: get().hints + DAILY_HINT_REWARD })
+    set({ dailyComplete: true })
   },
   triggerDailyLose: () => {
     playSfx('dailyLose')
@@ -1033,22 +1150,33 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   // Pay DAILY_RETRY_COST Gems to clear today's "lost" daily attempt and
   // immediately enter a fresh run. Returns true on success.
-  payToRetryDaily: () => {
-    const { gemsBalance } = get()
+  payToRetryDaily: async () => {
     const attempt = useProgressStore.getState().getTodaysDailyAttempt()
     if (!attempt || attempt.status !== 'lost') return false
-    if (gemsBalance < DAILY_RETRY_COST) {
+    try {
+      const resp = await apiSpendGems({
+        amount:   DAILY_RETRY_COST,
+        reason:   'daily_retry',
+        metadata: {},
+      })
+      if (!resp.ok) {
+        set({ gemsBalance: resp.newBalance })
+        playSfx('wordInvalid')
+        get().showToast(`⚠ Need ${DAILY_RETRY_COST} Gems to retry the daily`)
+        return false
+      }
+      set({ gemsBalance: resp.newBalance })
+      useProgressStore.getState().clearDailyAttempt()
+      playSfx('purchase')
+      get().showToast(`✓ Daily retry purchased · ${DAILY_RETRY_COST} Gems spent`)
+      get().goToGame('daily')
+      return true
+    } catch (err) {
+      console.warn('payToRetryDaily failed:', err)
       playSfx('wordInvalid')
-      get().showToast(`⚠ Need ${DAILY_RETRY_COST} Gems to retry the daily`)
+      get().showToast('⚠ Connection error')
       return false
     }
-    set({ gemsBalance: gemsBalance - DAILY_RETRY_COST })
-    useProgressStore.getState().clearDailyAttempt()
-    playSfx('purchase')
-    get().showToast(`✓ Daily retry purchased · ${DAILY_RETRY_COST} Gems spent`)
-    // Hop straight into a fresh daily run.
-    get().goToGame('daily')
-    return true
   },
 
   // ── UI Helpers ────────────────────────────────────────────────────────────
