@@ -81,5 +81,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     you = youRows[0] ?? null
   }
 
-  return res.status(200).json({ event: eventId, week, top, you })
+  return res.status(200).json({
+    event: eventId,
+    week,
+    top,
+    you,
+  })
 }

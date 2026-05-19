@@ -54,36 +54,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const db = sql()
 
   // UPSERT keep-best: only overwrite when the new score is strictly greater.
-  await db`
+  // Bumping updated_at only on actual improvement keeps the tie-break (by
+  // earliest updated_at) honest — submitting the same score twice should
+  // not promote the player above someone who hit that score earlier.
+  const rows = await db`
     INSERT INTO scores (address, event_id, week_id, score, updated_at)
     VALUES (${address}, ${eventId}, ${week}, ${intScore}, NOW())
     ON CONFLICT (address, event_id, week_id) DO UPDATE
       SET score      = GREATEST(scores.score, EXCLUDED.score),
-          updated_at = CASE WHEN EXCLUDED.score > scores.score THEN NOW() ELSE scores.updated_at END
-  `
+          updated_at = CASE WHEN EXCLUDED.score > scores.score
+                            THEN EXCLUDED.updated_at
+                            ELSE scores.updated_at
+                       END
+    RETURNING score
+  ` as Array<{ score: number }>
+  const finalScore = rows[0]?.score ?? intScore
 
-  // Recompute the player's rank with their (possibly improved) score.
-  // Cast RANK() to INT so the value comes back as a JS number (the neon
-  // serverless driver returns bigint as a string by default). Mirrors the
-  // same cast in /api/leaderboard/[event].ts.
-  const ranked = await db`
-    WITH r AS (
+  // Compute rank for this player in the current week. Same INT cast trick
+  // as the leaderboard read endpoint — RANK() returns bigint which Neon
+  // serializes as a string.
+  const rankRows = await db`
+    WITH ranked AS (
       SELECT
         address,
-        score,
         RANK() OVER (ORDER BY score DESC, updated_at ASC)::int AS rank
       FROM scores
       WHERE event_id = ${eventId} AND week_id = ${week}
     )
-    SELECT rank, score FROM r WHERE address = ${address}
-  ` as Array<{ rank: number; score: number }>
+    SELECT rank FROM ranked WHERE address = ${address} LIMIT 1
+  ` as Array<{ rank: number }>
+  const rank = rankRows[0]?.rank ?? null
 
-  const row = ranked[0]
   return res.status(200).json({
-    ok:      true,
+    ok: true,
     address,
     week,
-    score:   row?.score ?? intScore,
-    rank:    row?.rank ?? null,
+    score: finalScore,
+    rank,
   })
 }

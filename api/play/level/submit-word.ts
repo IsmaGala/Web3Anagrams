@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   const W = word.toUpperCase()
   if (!WORD_RE.test(W)) {
-    return res.status(400).json({ error: 'word must be A-Z, 2–24 chars' })
+    return res.status(400).json({ error: 'word must be A-Z, 2-24 chars' })
   }
 
   const round = await loadRound(roundId, address)
@@ -132,19 +132,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           metadataMatch: { dateKey },
         })
         if (!already) {
-          const r = await grantHints({
+          await grantHints({
             address,
             amount:   DAILY_WIN_HINT_REWARD,
             reason:   'daily_win',
             metadata: { dateKey, worldId: round.world_id },
           })
           dailyWinGranted = { hints: DAILY_WIN_HINT_REWARD }
-          void r
         }
       }
 
       // ── World-completion bounty ───────────────────────────────────────────
-      // Only for non-daily, non-premium, non-event runs. We detect "world
+      // Only for non-daily, non-premium, non-event runs. Detect "world
       // cleared" by counting distinct level_indexes the player has cleared
       // in this world. If that matches the world's level count and no prior
       // bounty was granted, we grant it now.
@@ -153,17 +152,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const wid = round.world_id
         const worldLevels = getWorldLevels(wid)
         if (worldLevels) {
-          // How many distinct levels in this world has the player ever
-          // completed? Includes the round we just marked done above.
           const db = sql()
-          const rows = await db`
+          const doneRows = await db`
             SELECT COUNT(DISTINCT level_index)::int AS done
               FROM play_rounds
              WHERE address      = ${address}
                AND world_id     = ${wid}
                AND completed_at IS NOT NULL
           ` as Array<{ done: number }>
-          const distinctDone = rows[0]?.done ?? 0
+          const distinctDone = doneRows[0]?.done ?? 0
           if (distinctDone >= worldLevels.length) {
             const already = await hasReceivedGrant({
               address,
@@ -185,17 +182,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(200).json({
-      result:      'accepted',
-      kind:        'primary',
-      scoreDelta:  sd,
-      totalScore:  base,
+      result:     'accepted',
+      kind:       'primary',
+      scoreDelta: sd,
+      totalScore: base,
       slot,
       def,
       completed,
       breakdown,
       // Surface any grants that fired so the client can show the right
-      // toast / overlay without making a follow-up balance fetch. The
-      // balances returned here (if any) are post-grant, authoritative.
+      // toast / overlay without making a follow-up balance fetch.
       grants: worldCompletionGranted || dailyWinGranted ? {
         worldCompletion: worldCompletionGranted,
         dailyWin:        dailyWinGranted,
