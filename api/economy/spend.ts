@@ -59,6 +59,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Diagnostic guard for the two most common deploy-time misses.
+  if (!process.env.DATABASE_URL) {
+    return res.status(500).json({ error: 'DATABASE_URL is not configured on this deployment' })
+  }
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ error: 'JWT_SECRET is not configured on this deployment' })
+  }
+
+  try {
+
   const address = await requireAuth(req.headers.authorization)
   if (!address) {
     return res.status(401).json({ error: 'Missing or invalid Authorization bearer token' })
@@ -150,4 +160,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     newBalance: result.newBalance,
     reason,
   })
+  } catch (e: any) {
+    const msg = e?.message ?? String(e)
+    const code = e?.code ?? e?.name ?? 'UNKNOWN'
+    return res.status(500).json({
+      error:  'spend handler threw',
+      detail: msg,
+      code,
+    })
+  }
 }
