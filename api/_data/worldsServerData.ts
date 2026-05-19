@@ -61,18 +61,19 @@ export const WORLD_COMPLETION_REWARDS: Partial<Record<WorldId, number>> = {
 // Mirrors `DAILY_HINT_REWARD` in src/utils/gameUtils.ts.
 export const DAILY_WIN_HINT_REWARD = 10
 
-// First-wallet welcome bundle — one-time bonus when a wallet connects for
-// the first time. Mirrors the client-side hard-coded values in App.tsx.
-export const FIRST_WALLET_BONUS = { gems: 15, hints: 5 }
-
 // Reserved for the legacy fallback set (the original non-world-scoped
 // levels.ts that fed the daily before worlds existed). Not currently routed
 // through a worldId but kept exported so future endpoints (e.g. a "classic
 // daily" mode) can pull from it without recopying the data.
 export const LEGACY_LEVELS: Level[] = VALUTCHAIN_LEVELS
 
+// ── Lookup helpers ─────────────────────────────────────────────────────────
+// String-typed inputs (not the WorldId union) because the values come off the
+// wire — request bodies and the play_rounds.world_id column — and we want a
+// safe null return for unknown ids rather than a type assertion.
+
 export function getWorldLevels(worldId: string): Level[] | null {
-  if (!(worldId in WORLD_LEVELS)) return null
+  if (!Object.prototype.hasOwnProperty.call(WORLD_LEVELS, worldId)) return null
   return WORLD_LEVELS[worldId as WorldId]
 }
 
