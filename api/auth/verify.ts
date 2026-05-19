@@ -67,42 +67,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: e?.message ?? 'Invalid address' })
   }
   if (parsed.kind !== 'eth') {
-    return res.status(400).json({ error: 'client|<id> login not yet supported — pass the underlying 0x address' })
+    return res.status(400).json({ error: 'client|<id> verification is not yet supported on this endpoint' })
   }
-  const key = parsed.stored
-  const db  = sql()
 
-  // 1. Fetch the active nonce row.
-  const rows = await db`
-    SELECT nonce, expires_at FROM nonces WHERE address = ${key} LIMIT 1
-  ` as Array<{ nonce: string; expires_at: string }>
-
+  // ── Nonce lookup ─────────────────────────────────────────────────────────
+  const rows = await sql()`
+    SELECT nonce, expires_at FROM nonces WHERE address = ${parsed.stored} LIMIT 1
+  ` as Array<{ nonce: string; expires_at: string | Date }>
   if (rows.length === 0) {
-    return res.status(400).json({ error: 'No active nonce — request one from /api/auth/nonce first' })
+    return res.status(400).json({ error: 'No nonce on file — request /api/auth/nonce first' })
   }
-  const { nonce, expires_at } = rows[0]
-  if (new Date(expires_at).getTime() < Date.now()) {
-    await db`DELETE FROM nonces WHERE address = ${key}`
+  const { nonce } = rows[0]
+  const expiresMs = rows[0].expires_at instanceof Date
+    ? rows[0].expires_at.getTime()
+    : Date.parse(rows[0].expires_at)
+  if (!Number.isFinite(expiresMs) || expiresMs < Date.now()) {
+    // Best-effort cleanup; ignore failures.
+    try { await sql()`DELETE FROM nonces WHERE address = ${parsed.stored}` } catch {}
     return res.status(400).json({ error: 'Nonce expired — request a new one' })
   }
 
-  // 2-3. Recover signer & compare — try all known personal_sign variants.
-  // (MetaMask, modern Gala Wallet, legacy chaincode hash.) Accept if any
-  // variant recovers the requesting address; otherwise reject.
+  // ── Signature verification ───────────────────────────────────────────────
   const recovered = recoverAll(nonce, signature)
-  if (recovered.length === 0) {
-    return res.status(400).json({ error: 'Signature could not be recovered' })
-  }
-  if (!recovered.includes(key)) {
-    return res.status(401).json({ error: 'Signature does not match the requesting address' })
+  const expected  = parsed.stored.toLowerCase()
+  if (!recovered.includes(expected)) {
+    return res.status(401).json({ error: 'Signature did not recover the expected address' })
   }
 
-  // 4. One-time use — delete before issuing the JWT.
-  await db`DELETE FROM nonces WHERE address = ${key}`
+  // ── One-time use ─────────────────────────────────────────────────────────
+  // Delete the nonce so the same (nonce, signature) cannot be replayed.
+  await sql()`DELETE FROM nonces WHERE address = ${parsed.stored}`
 
-  // 5. Mint session.
-  const jwt = await signSession(key)
+  // ── Mint JWT ─────────────────────────────────────────────────────────────
+  const jwt = await signSession(parsed.stored)
   const ttl = parseInt(process.env.JWT_TTL_SECONDS ?? '86400', 10)
-
-  return res.status(200).json({ jwt, address: key, expiresIn: ttl })
+  return res.status(200).json({
+    jwt,
+    address:   parsed.stored,
+    expiresIn: Number.isFinite(ttl) && ttl > 0 ? ttl : 86400,
+  })
 }

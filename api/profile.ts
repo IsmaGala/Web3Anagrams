@@ -65,7 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── Profile JSONB (still client-owned schema) ────────────────────────────
   const rows = await sql()`
     SELECT payload, updated_at FROM player_state WHERE address = ${address} LIMIT 1
-  ` as Array<{ payload: unknown; updated_at: string }>
+  ` as Array<{ payload: unknown; updated_at: string | Date }>
+
+  const row = rows[0]
+  const updatedAt = row?.updated_at
+    ? (row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at)
+    : null
 
   // ── Authoritative balances ───────────────────────────────────────────────
   // Reflects any grant we just made above (getBalances re-reads after the
@@ -74,8 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   return res.status(200).json({
     address,
-    payload:   rows[0]?.payload   ?? null,
-    updatedAt: rows[0]?.updated_at ?? null,
+    payload:   row?.payload ?? null,
+    updatedAt,
     balances,
     firstWalletBonusGranted,
   })

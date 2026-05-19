@@ -141,46 +141,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // { Status: 0, Message: '...' } on failure (per TOKEN_OPS.md "Gateway").
   // We treat anything else (non-2xx HTTP, parse failure, network error)
   // as 502 — the player did everything right; the chain didn't.
-  //
-  // Failure-mode note: if the chain transfer SUCCEEDS but our grantGems
-  // call below fails, the player has paid without receiving gems. This
-  // is a known gap; the audit row (balance_transactions) is keyed by
-  // metadata.uniqueKey so an ops correction can identify and fix the
-  // stuck payment. Belt-and-suspenders: build a reconciliation job
-  // later that scans for chain txs without matching grant rows.
-  let chainResp: any = null
+  let gatewayResp: Response
   try {
-    const r = await fetch(`${GATEWAY}/TransferToken`, {
-      method: 'POST',
+    gatewayResp = await fetch(`${GATEWAY}/TransferToken`, {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(signedDto),
+      body:    JSON.stringify(signedDto),
     })
-    chainResp = await r.json().catch(() => null)
-    if (!r.ok || !chainResp || chainResp.Status !== 1) {
-      const msg = chainResp?.Message ?? `Gateway HTTP ${r.status}`
-      return res.status(502).json({ error: `GalaChain TransferToken failed: ${msg}` })
-    }
   } catch (e: any) {
     return res.status(502).json({
-      error: `GalaChain gateway unreachable: ${e?.message ?? 'unknown error'}`,
+      error:   'GalaChain gateway unreachable',
+      detail:  e?.message ?? String(e),
+    })
+  }
+  if (!gatewayResp.ok) {
+    let body = ''
+    try { body = await gatewayResp.text() } catch {}
+    return res.status(502).json({
+      error:  `GalaChain gateway returned HTTP ${gatewayResp.status}`,
+      detail: body.slice(0, 500),
+    })
+  }
+  let chainResult: any
+  try {
+    chainResult = await gatewayResp.json()
+  } catch (e: any) {
+    return res.status(502).json({ error: 'GalaChain gateway returned non-JSON', detail: e?.message })
+  }
+  if (chainResult?.Status !== 1) {
+    // Chaincode rejected (bad signature, insufficient GALA, replay, …).
+    // Surface the chain's own message to the client so the player sees
+    // "insufficient balance" instead of a generic failure.
+    return res.status(402).json({
+      ok:      false,
+      error:   'GalaChain transfer failed',
+      detail:  chainResult?.Message ?? chainResult?.ErrorKey ?? 'unknown chaincode error',
     })
   }
 
-  // Payment confirmed on-chain. Credit gems. grantGems writes an audit
-  // row to balance_transactions including uniqueKey so we can reconcile
-  // chain txs ↔ credits later if needed.
-  const { newBalance } = await grantGems({
+  // ── Credit gems ────────────────────────────────────────────────────────
+  // Use the audit-logged grant helper so the server economy stays atomic
+  // and inspectable. The metadata captures the chain tx for support.
+  const granted = await grantGems({
     address:  authAddr,
     amount:   pack.gems,
     reason:   'store_purchase',
     metadata: {
       packId,
-      method:    'GALA',
-      usd:       pack.usd,
-      gala:      pack.gala,
-      uniqueKey: signedDto.uniqueKey,
-      network:   NETWORK,
-      txData:    chainResp?.Data ?? null,
+      gala:        pack.gala,
+      uniqueKey:   signedDto.uniqueKey,
+      network:     NETWORK,
+      chainTxData: chainResult?.Data ?? null,
     },
   })
 
@@ -188,6 +199,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ok:           true,
     packId,
     gemsCredited: pack.gems,
-    newBalance,
+    newBalance:   granted.newBalance,
   })
 }

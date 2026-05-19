@@ -10,6 +10,7 @@
 // rotates the nonce — no rate-limiting beyond what Vercel/Neon enforce.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { randomBytes } from 'crypto'
 import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
 import { parseWalletAddress } from '../_lib/wallet.js'
@@ -37,20 +38,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ETH addresses. A client|<id> login would require GalaChain
   // /GetPublicKey lookup (doc §4) — out of scope until we wire chain calls.
   if (parsed.kind !== 'eth') {
-    return res.status(400).json({ error: 'client|<id> login not yet supported — pass the underlying 0x address' })
+    return res.status(400).json({ error: 'client|<id> login is not yet supported on this endpoint' })
   }
-  const key = parsed.stored
-  const nonce = `wordchain-login: ${crypto.randomUUID()}`
-  const expiresAt = new Date(Date.now() + TTL_MS)
 
-  const db = sql()
-  await db`
+  // Human-readable nonce — the wallet UI will show the string the user is
+  // signing, so we include "NFT WordChain" so a user can recognize the
+  // request as coming from this app rather than something phishy.
+  const nonce = `NFT WordChain login\nnonce: ${randomBytes(16).toString('hex')}`
+  const expiresAt = new Date(Date.now() + TTL_MS).toISOString()
+
+  await sql()`
     INSERT INTO nonces (address, nonce, expires_at)
-    VALUES (${key}, ${nonce}, ${expiresAt.toISOString()})
+    VALUES (${parsed.stored}, ${nonce}, ${expiresAt})
     ON CONFLICT (address) DO UPDATE
-      SET nonce = EXCLUDED.nonce,
+      SET nonce      = EXCLUDED.nonce,
           expires_at = EXCLUDED.expires_at
   `
 
-  return res.status(200).json({ nonce, expiresAt: expiresAt.toISOString() })
+  return res.status(200).json({ nonce, expiresAt })
 }

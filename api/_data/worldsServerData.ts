@@ -73,7 +73,7 @@ export const FIRST_WALLET_BONUS = { gems: 15, hints: 5 }
 // daily" mode) can pull from it without recopying the data.
 export const LEGACY_LEVELS: Level[] = VALUTCHAIN_LEVELS
 
-// ── Lookup helpers ─────────────────────────────────────────────────────────
+// ── Lookup helpers ─────────────────────────────────────────────────────────────────────
 // String-typed inputs (not the WorldId union) because the values come off the
 // wire — request bodies and the play_rounds.world_id column — and we want a
 // safe null return for unknown ids rather than a type assertion.
