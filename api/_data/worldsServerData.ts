@@ -61,6 +61,12 @@ export const WORLD_COMPLETION_REWARDS: Partial<Record<WorldId, number>> = {
 // Mirrors `DAILY_HINT_REWARD` in src/utils/gameUtils.ts.
 export const DAILY_WIN_HINT_REWARD = 10
 
+// First-wallet welcome bundle — one-time bonus when a wallet connects for
+// the first time and pulls /api/profile. Granted server-side exactly once
+// per address (deduped via balance_transactions). Mirrors the hard-coded
+// values that used to live client-side in App.tsx.
+export const FIRST_WALLET_BONUS = { gems: 15, hints: 5 }
+
 // Reserved for the legacy fallback set (the original non-world-scoped
 // levels.ts that fed the daily before worlds existed). Not currently routed
 // through a worldId but kept exported so future endpoints (e.g. a "classic
