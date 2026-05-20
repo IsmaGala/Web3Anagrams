@@ -21,12 +21,14 @@ import { ASIMOV_LEVELS }               from './levels/asimovLevels.js'
 import { NATURE_LEVELS }               from './levels/natureLevels.js'
 import { OCEAN_EVENT_LEVELS }          from './levels/oceanEventLevels.js'
 import { BLOOD_DONOR_LEVELS }          from './levels/bloodDonorLevels.js'
+import { DAILY_LEVELS }                from './levels/dailyLevels.js'
 import type { Level } from './types.js'
 
 export type WorldId =
   | 'townstar' | 'mirandus' | 'galaswap' | 'eternalnight'
   | 'area51'   | 'asimov'   | 'nature'
   | 'oceanevent' | 'blooddonor' | 'area515' | 'flags'
+  | 'daily'
 
 export const WORLD_LEVELS: Record<WorldId, Level[]> = {
   townstar:     TOWNSTAR_LEVELS,
@@ -40,7 +42,17 @@ export const WORLD_LEVELS: Record<WorldId, Level[]> = {
   blooddonor:   BLOOD_DONOR_LEVELS,
   area515:      AREA515_LEVELS,
   flags:        FLAGS_LEVELS,
+  // Daily-challenge pool — NOT a player-facing world. Routed through the
+  // same WORLD_LEVELS lookup so /api/play/level/start can resolve a daily
+  // pick without a second code path. The client always pairs
+  // worldId="daily" with a calendar-deterministic levelIndex.
+  daily:        DAILY_LEVELS,
 }
+
+// Daily-challenge pool size, exported so the client picker can use the
+// same length the server validates against. Keep this in sync with the
+// DAILY_LEVELS array length if you swap pools.
+export const DAILY_POOL_SIZE = DAILY_LEVELS.length
 
 // One-time gem bounty granted when the player completes every level in the
 // world for the first time. Keep in sync with `completionReward` in

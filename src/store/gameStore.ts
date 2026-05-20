@@ -8,7 +8,9 @@ import {
   MIN_WORDS_PER_LEVEL,
   computeScoreBreakdown,
   pickDailyWordMix,
+  getDailyLevelIndex,
 } from '../utils/gameUtils'
+import { DAILY_POOL_SIZE } from '../data/dailyLevels'
 import { playSfx, isSfxMuted, setSfxMuted, unlockSfx } from '../utils/sfx'
 import { useProgressStore } from './progressStore'
 import { useCosmeticsStore } from './cosmeticsStore'
@@ -414,17 +416,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       // Server-authoritative mode: the bundled levels are length-only
-      // placeholders, so we can't pick a daily level locally. Hand the
-      // selection over to the server entirely — initLevel calls
-      // /api/play/level/start with mode:'daily' and the server returns
-      // an appropriate level for today (TODO server-side: actually pick a
-      // calendar-deterministic level rather than reusing the current
-      // worldId/levelIndex 0).
+      // placeholders, so we can't pick a daily level locally. We instead
+      // tell the server which slot of the dedicated daily pool to serve.
+      //
+      // Routing:
+      //   • worldId          → 'daily' (resolves to DAILY_LEVELS on the
+      //                        server, NOT a player-facing world)
+      //   • currentLevelIndex → getDailyLevelIndex(DAILY_POOL_SIZE), a
+      //                        calendar-deterministic 0..N-1 index so every
+      //                        player gets the same puzzle on the same day
+      //
+      // Expansion: when we add additional daily pools (e.g. "Space"),
+      // either rotate the worldId here based on weekday / week-id, or pass
+      // a `poolId` through the start endpoint and have the server pick
+      // the array.
       if (isServerAuthoritative()) {
         updateStreak()
-        // Use a single placeholder slot so currentLevelIndex math works.
+        const dailyIndex = getDailyLevelIndex(DAILY_POOL_SIZE)
         const placeholder = {} as Level
-        set({ gameMode: mode, screen: 'game', levels: [placeholder], currentLevelIndex: 0, score: 0 })
+        set({
+          gameMode:          mode,
+          screen:            'game',
+          levels:            [placeholder],
+          currentLevelIndex: dailyIndex,
+          _worldId:          'daily',
+          score:             0,
+        })
         setTimeout(() => get().initLevel(), 0)
         return
       }

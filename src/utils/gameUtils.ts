@@ -116,13 +116,27 @@ export function getDailySeed(): number {
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate()
 }
 
-/** Pick the hardest level for today's daily challenge */
+/** Pick the hardest level for today's daily challenge.
+ *
+ *  DEPRECATED — kept for the legacy (non-server-authoritative) code path.
+ *  Production runs through `getDailyLevelIndex` against the dedicated
+ *  DAILY_LEVELS pool in api/_data/levels/dailyLevels.ts instead, which
+ *  is curated for the daily and no longer re-uses world levels. */
 export function pickDailyLevel(levels: Level[]): Level {
   const seed     = getDailySeed()
   const hardPool = [...levels]
     .sort((a, b) => (b.difficulty ?? 0) - (a.difficulty ?? 0))
     .slice(0, 5)
   return hardPool[seed % hardPool.length]
+}
+
+/** Map today's date to a calendar-deterministic index within a daily pool
+ *  of size `poolSize`. Same day → same index for every player, so the
+ *  daily challenge is "the same puzzle for everyone today" without any
+ *  server-side state. Rotates back to index 0 after `poolSize` days. */
+export function getDailyLevelIndex(poolSize: number): number {
+  if (poolSize <= 0) return 0
+  return getDailySeed() % poolSize
 }
 
 // ── Wheel Geometry ────────────────────────────────────────────────────────────
