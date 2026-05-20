@@ -148,15 +148,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // as 502 — the player did everything right; the chain didn't.
   let gatewayResp: Response
   try {
+    // Hard 20s timeout. Real TransferToken latency is sub-second; anything
+    // that takes longer is upstream-broken (testnet flaking, wrong path
+    // accepted-then-hung, …) and we'd rather surface that as a real 502
+    // than let the Vercel function run to its own platform timeout (which
+    // returns an opaque "function timed out" banner with no clue what hung).
     gatewayResp = await fetch(`${GATEWAY}/TransferToken`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(signedDto),
+      signal:  AbortSignal.timeout(20_000),
     })
   } catch (e: any) {
+    const isTimeout = e?.name === 'TimeoutError' || e?.code === 'ETIMEDOUT'
+    // undici hides the actual network reason (ENOTFOUND, ECONNREFUSED, etc.)
+    // in e.cause — surface it so "fetch failed" turns into something
+    // diagnosable. The cause may also have its own .cause chain (e.g.,
+    // TLS error -> system error); walk it to a depth of 3.
+    const causeChain: string[] = []
+    let cur: any = e?.cause
+    for (let i = 0; cur && i < 3; i++) {
+      const part = cur.code ? `${cur.code}: ${cur.message ?? ''}` : (cur.message ?? String(cur))
+      causeChain.push(part)
+      cur = cur.cause
+    }
     return res.status(502).json({
-      error:   'GalaChain gateway unreachable',
-      detail:  e?.message ?? String(e),
+      error:  isTimeout
+        ? 'GalaChain gateway timed out after 20s — testnet may be unhealthy, retry in a minute'
+        : 'GalaChain gateway unreachable',
+      detail: e?.message ?? String(e),
+      cause:  causeChain.length > 0 ? causeChain : undefined,
+      url:    `${GATEWAY}/TransferToken`,
     })
   }
   if (!gatewayResp.ok) {
