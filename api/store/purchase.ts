@@ -41,12 +41,17 @@ const PACK_CATALOG: Record<string, { gems: number; usd: number; gala: string }> 
 // Testnet by default. Flip to mainnet by setting GALACHAIN_NETWORK=mainnet
 // (and funding GAME_TREASURY_ADDRESS with real GALA). The full URLs are
 // overridable for staging / private gateways.
+//
+// Note (2026-05): the bootstrap doc's older testnet URL
+// (.../api/testnet01/gc-<hash>-GalaChainToken) returns 404. Gala's
+// current testnet uses the same /api/asset/token-contract path layout
+// as mainnet — only the host differs.
 const NETWORK = (process.env.GALACHAIN_NETWORK ?? 'testnet').toLowerCase()
 const GATEWAY = NETWORK === 'mainnet'
   ? (process.env.GALACHAIN_GATEWAY_MAINNET
       ?? 'https://gateway-mainnet.galachain.com/api/asset/token-contract')
   : (process.env.GALACHAIN_GATEWAY_TESTNET
-      ?? 'https://gateway-testnet.galachain.com/api/testnet01/gc-a9b8b472b035c0510508c248d1110d3162b7e5f4-GalaChainToken')
+      ?? 'https://gateway-testnet.galachain.com/api/asset/token-contract')
 
 // Required. The wallet that receives player GALA payments. MUST be in
 // gala form (`eth|<EIP55>`) — we compare it byte-for-byte against

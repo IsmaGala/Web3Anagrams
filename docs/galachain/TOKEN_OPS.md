@@ -9,7 +9,12 @@ All operations are `POST {gatewayUrl}/{MethodName}` with JSON body. Response: `{
 | Network | Gateway URL |
 |---------|-------------|
 | Mainnet | `https://gateway-mainnet.galachain.com/api/asset/token-contract` |
-| Testnet | `https://gateway-testnet.galachain.com/api/testnet01/gc-a9b8b472b035c0510508c248d1110d3162b7e5f4-GalaChainToken` |
+| Testnet | `https://gateway-testnet.galachain.com/api/asset/token-contract` |
+
+> The bootstrap doc previously listed an older testnet path
+> (`/api/testnet01/gc-<hash>-GalaChainToken`) — that URL now 404s.
+> Both networks use the same `/api/asset/token-contract` layout; only
+> the host differs.
 
 ## Token Identification
 
