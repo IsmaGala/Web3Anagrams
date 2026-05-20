@@ -50,8 +50,10 @@ to live in the same env source as the regular Vercel vars.
 |---|---|---|
 | `GAME_TREASURY_ADDRESS` | `eth|3A1F...d4E5` | **Required.** Server validates `signedDto.to` against this. |
 | `GALACHAIN_NETWORK` | `testnet` | `testnet` (default) or `mainnet`. |
-| `GALACHAIN_GATEWAY_TESTNET` | _(unset)_ | Optional override. Defaults to the canonical testnet URL. |
+| `GALACHAIN_GATEWAY_TESTNET` | _(unset)_ | Optional override. Defaults to `https://gateway-testnet.galachain.com/api/asset/token-contract`. |
 | `GALACHAIN_GATEWAY_MAINNET` | _(unset)_ | Optional override. Defaults to the canonical mainnet URL. |
+| `GALACHAIN_GATEWAY_API_KEY` | `<key-id>` | **Required for writes on most gateway deployments.** HMAC API key. Without this, `TransferToken` silently hangs because the gateway expects auth and never responds without it. Get from Gala admin / your teammate. |
+| `GALACHAIN_GATEWAY_SECRET` | `<secret>` | **Required if `GALACHAIN_GATEWAY_API_KEY` is set.** HMAC secret. Used to sign each request per WALLET_AUTH §8. Treat like a password. |
 | `VITE_GAME_TREASURY_ADDRESS` | `eth|3A1F...d4E5` | **Required.** Same value as `GAME_TREASURY_ADDRESS`; baked into the client bundle. |
 | `VITE_GALACHAIN_NETWORK` | `testnet` | Drives the TESTNET/MAINNET pill in the UI. |
 

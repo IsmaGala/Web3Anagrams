@@ -24,6 +24,7 @@
 //   docs/galachain/WALLET_AUTH.md §8
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createHmac, createHash } from 'node:crypto'
 import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'
 import { parseWalletAddress } from '../_lib/wallet.js'
@@ -58,6 +59,19 @@ const GATEWAY = NETWORK === 'mainnet'
 // signedDto.to. If unset, purchases are disabled at the server boundary
 // rather than silently misrouting funds.
 const TREASURY = process.env.GAME_TREASURY_ADDRESS
+
+// Optional HMAC auth for the gateway. If both env vars are set, every
+// request to GalaChain gets X-Api-Key / X-Timestamp / X-Signature headers
+// computed per WALLET_AUTH.md §8. If unset, requests go out unauth'd
+// (matches the old behavior; works only for gateways that don't gate
+// writes behind HMAC).
+//
+// Observed (2026-05): testnet gateway accepts read endpoints without
+// auth but silently hangs on writes when these headers are absent.
+// Without the key+secret pair from Gala, every TransferToken request
+// will time out. Set both env vars when your teammate sends them.
+const GATEWAY_API_KEY = process.env.GALACHAIN_GATEWAY_API_KEY
+const GATEWAY_SECRET  = process.env.GALACHAIN_GATEWAY_SECRET
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return
@@ -146,17 +160,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // { Status: 0, Message: '...' } on failure (per TOKEN_OPS.md "Gateway").
   // We treat anything else (non-2xx HTTP, parse failure, network error)
   // as 502 — the player did everything right; the chain didn't.
+  // Serialize once so the HMAC body-hash and the actual POST body are
+  // byte-identical. Even though JSON.stringify is deterministic for a
+  // given object, computing it twice is a footgun waiting to bite.
+  const bodyStr     = JSON.stringify(signedDto)
+  const transferUrl = `${GATEWAY}/TransferToken`
+
+  // Build headers. If gateway HMAC is configured, attach the three auth
+  // headers per WALLET_AUTH.md §8. If not, send a plain POST and hope
+  // the gateway accepts unauth'd writes (it usually doesn't on testnet).
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (GATEWAY_API_KEY && GATEWAY_SECRET) {
+    const urlPath   = new URL(transferUrl).pathname  // e.g. /api/asset/token-contract/TransferToken
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const bodyHash  = createHash('sha256').update(bodyStr).digest('hex')
+    const toSign    = `${timestamp}\nPOST\n${urlPath}\n${bodyHash}`
+    const signature = createHmac('sha256', GATEWAY_SECRET).update(toSign).digest('hex')
+    headers['X-Api-Key']   = GATEWAY_API_KEY
+    headers['X-Timestamp'] = timestamp
+    headers['X-Signature'] = signature
+  }
+
   let gatewayResp: Response
   try {
     // Hard 20s timeout. Real TransferToken latency is sub-second; anything
     // that takes longer is upstream-broken (testnet flaking, wrong path
-    // accepted-then-hung, …) and we'd rather surface that as a real 502
-    // than let the Vercel function run to its own platform timeout (which
-    // returns an opaque "function timed out" banner with no clue what hung).
-    gatewayResp = await fetch(`${GATEWAY}/TransferToken`, {
+    // accepted-then-hung, missing auth, …) and we'd rather surface that
+    // as a real 502 than let the Vercel function run to its own platform
+    // timeout (which returns an opaque banner with no clue what hung).
+    gatewayResp = await fetch(transferUrl, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(signedDto),
+      headers,
+      body:    bodyStr,
       signal:  AbortSignal.timeout(20_000),
     })
   } catch (e: any) {
@@ -174,19 +209,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return res.status(502).json({
       error:  isTimeout
-        ? 'GalaChain gateway timed out after 20s — testnet may be unhealthy, retry in a minute'
+        ? 'GalaChain gateway timed out after 20s — testnet may be unhealthy, or gateway HMAC auth is required and not configured'
         : 'GalaChain gateway unreachable',
-      detail: e?.message ?? String(e),
-      cause:  causeChain.length > 0 ? causeChain : undefined,
-      url:    `${GATEWAY}/TransferToken`,
+      detail:    e?.message ?? String(e),
+      cause:     causeChain.length > 0 ? causeChain : undefined,
+      url:       transferUrl,
+      hmacAuth:  GATEWAY_API_KEY && GATEWAY_SECRET ? 'enabled' : 'disabled (no GALACHAIN_GATEWAY_API_KEY / GALACHAIN_GATEWAY_SECRET)',
     })
   }
   if (!gatewayResp.ok) {
     let body = ''
     try { body = await gatewayResp.text() } catch {}
     return res.status(502).json({
-      error:  `GalaChain gateway returned HTTP ${gatewayResp.status}`,
-      detail: body.slice(0, 500),
+      error:    `GalaChain gateway returned HTTP ${gatewayResp.status}`,
+      detail:   body.slice(0, 500),
+      url:      transferUrl,
+      hmacAuth: GATEWAY_API_KEY && GATEWAY_SECRET ? 'enabled' : 'disabled',
     })
   }
   let chainResult: any
