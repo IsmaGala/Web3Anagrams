@@ -39,20 +39,21 @@ const PACK_CATALOG: Record<string, { gems: number; usd: number; gala: string }> 
   '10k': { gems: 10000, usd: 10, gala: '500' },
 }
 
-// Testnet by default. Flip to mainnet by setting GALACHAIN_NETWORK=mainnet
-// (and funding GAME_TREASURY_ADDRESS with real GALA). The full URLs are
-// overridable for staging / private gateways.
+// Gala's working write gateway. The bootstrap doc and the older
+// gateway-{testnet,mainnet}.galachain.com hosts can serve reads but
+// silently hang on TransferToken writes — gateway.gala.games is the
+// host the official PoC and the team's production code actually hit.
 //
-// Note (2026-05): the bootstrap doc's older testnet URL
-// (.../api/testnet01/gc-<hash>-GalaChainToken) returns 404. Gala's
-// current testnet uses the same /api/asset/token-contract path layout
-// as mainnet — only the host differs.
+// GALACHAIN_NETWORK is retained as a label only (drives the
+// TESTNET/MAINNET pill in the UI) — there's effectively one host;
+// "test" vs "real" is a function of which wallets you connect with
+// connect.gala.com and how much GALA they're funded with.
 const NETWORK = (process.env.GALACHAIN_NETWORK ?? 'testnet').toLowerCase()
 const GATEWAY = NETWORK === 'mainnet'
   ? (process.env.GALACHAIN_GATEWAY_MAINNET
-      ?? 'https://gateway-mainnet.galachain.com/api/asset/token-contract')
+      ?? 'https://gateway.gala.games/api/asset/token-contract')
   : (process.env.GALACHAIN_GATEWAY_TESTNET
-      ?? 'https://gateway-testnet.galachain.com/api/asset/token-contract')
+      ?? 'https://gateway.gala.games/api/asset/token-contract')
 
 // Required. The wallet that receives player GALA payments. MUST be in
 // gala form (`eth|<EIP55>`) — we compare it byte-for-byte against
@@ -227,20 +228,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hmacAuth: GATEWAY_API_KEY && GATEWAY_SECRET ? 'enabled' : 'disabled',
     })
   }
+  // Canonical chain tx ID lives in the X-Transaction-Id header (the body's
+  // Data field is opaque). Capture it for the audit log so support can
+  // trace a credit back to the on-chain payment.
+  const chainTxId = gatewayResp.headers.get('x-transaction-id') ?? null
+
   let chainResult: any
   try {
     chainResult = await gatewayResp.json()
   } catch (e: any) {
     return res.status(502).json({ error: 'GalaChain gateway returned non-JSON', detail: e?.message })
   }
-  if (chainResult?.Status !== 1) {
-    // Chaincode rejected (bad signature, insufficient GALA, replay, …).
-    // Surface the chain's own message to the client so the player sees
+
+  // ErrorCode 409 = "uniqueKey already processed" — the payment IS on-chain,
+  // we're just seeing a retry. Treat it as success per PoC line 232.
+  const isReplaySuccess = chainResult?.Status !== 1
+    && chainResult?.Error?.ErrorCode === 409
+
+  if (chainResult?.Status !== 1 && !isReplaySuccess) {
+    // Chaincode rejected (bad signature, insufficient GALA, unregistered
+    // wallet, …). Surface the chain's own message so the player sees
     // "insufficient balance" instead of a generic failure.
     return res.status(402).json({
       ok:      false,
       error:   'GalaChain transfer failed',
-      detail:  chainResult?.Message ?? chainResult?.ErrorKey ?? 'unknown chaincode error',
+      detail:  chainResult?.Error?.Message
+            ?? chainResult?.Message
+            ?? chainResult?.ErrorKey
+            ?? 'unknown chaincode error',
+      errorCode: chainResult?.Error?.ErrorCode ?? null,
     })
   }
 
@@ -256,7 +272,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       gala:        pack.gala,
       uniqueKey:   signedDto.uniqueKey,
       network:     NETWORK,
+      chainTxId,
       chainTxData: chainResult?.Data ?? null,
+      replay:      isReplaySuccess || undefined,
     },
   })
 

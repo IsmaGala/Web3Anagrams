@@ -1,21 +1,23 @@
 // GalaChain TransferToken DTO construction + signing.
 //
-// We use @gala-chain/api for the deterministic-JSON helper
-// (`signatures.getPayloadToSign`) and route the actual signing through our
-// existing wallet abstraction (src/utils/wallet.ts → personal_sign on
-// whichever provider is connected). This gives us:
+// Routes signing through our existing wallet abstraction
+// (src/utils/wallet.ts → personal_sign on whichever provider is connected).
+// Matches the team's working PoC byte-for-byte:
+//   • Hand-rolled deterministic JSON (sorted keys, no whitespace).
+//   • EIP-191 prefix with byte-length, ASCII-safe.
+//   • personal_sign returns the 0x-prefixed signature.
+//   • DTO + prefix + signature posted to /api/asset/token-contract/TransferToken.
 //
-//   • The doc-recommended override pattern from TOKEN_OPS.md "Browser",
-//     which fixes the v2.x SDK MISSING_SIGNER bugs.
-//   • Uniform support for both MetaMask (window.ethereum) and Gala Wallet
-//     (window.gala), instead of fighting BrowserConnectClient's
-//     window.ethereum default.
+// Note: this is the MetaMask path (EIP-191). Gala Wallet writes need
+// EIP-712 typed-data signing per the team's doc (Section 2, Route B) —
+// not yet wired here. For MetaMask players, this flow is complete.
 //
 // References:
-//   docs/galachain/TOKEN_OPS.md  — sign override, DTO rules
-//   docs/galachain/WALLET_AUTH.md §6 — EIP-191 signature shape
+//   docs/galachain/TOKEN_OPS.md       — sign override, DTO rules
+//   docs/galachain/WALLET_AUTH.md §6  — EIP-191 signature shape
+//   uploads/transfer-token-flow.md    — team's authoritative flow doc
+//   uploads/index.js                  — working PoC (mirrors this file)
 
-import { signatures } from '@gala-chain/api'
 import { signMessage, type WalletType } from './wallet'
 
 // Fungible GALA token class. The four-part composite key is the same on
@@ -29,14 +31,36 @@ export const GALA_TOKEN_INSTANCE = {
   instance:      '0',
 } as const
 
-/** 32 random bytes, base64-encoded. Required on every write DTO for
- *  replay protection — the chain rejects duplicate uniqueKeys. */
-function uniqueKey(): string {
-  const bytes = new Uint8Array(32)
-  crypto.getRandomValues(bytes)
-  let s = ''
-  for (const b of bytes) s += String.fromCharCode(b)
-  return btoa(s)
+/** Deterministic JSON serializer: keys sorted alphabetically (recursive),
+ *  no whitespace. The chain reconstructs the same string before recovering
+ *  the signer — any mismatch (different key order, extra spaces) produces
+ *  a different digest and the signature fails to verify.
+ *
+ *  We implement this ourselves rather than relying on the SDK helper to
+ *  guarantee byte-for-byte parity with the team's working PoC (which
+ *  hand-rolls it identically). */
+export function deterministicJSON(v: unknown): string {
+  if (Array.isArray(v)) {
+    return '[' + v.map(deterministicJSON).join(',') + ']'
+  }
+  if (v !== null && typeof v === 'object') {
+    const keys = Object.keys(v as object).sort()
+    return '{' + keys.map((k) =>
+      JSON.stringify(k) + ':' + deterministicJSON((v as Record<string, unknown>)[k]),
+    ).join(',') + '}'
+  }
+  return JSON.stringify(v)
+}
+
+/** Meaningful uniqueKey: project prefix + step + random tx id + timestamp +
+ *  truncated from-address. Matches the PoC's pattern so the chain's replay
+ *  protection works AND we can grep the chain history for a specific
+ *  player's purchases. */
+function uniqueKey(from: string): string {
+  const txId      = (crypto as any).randomUUID?.() ?? Math.random().toString(36).slice(2)
+  const hexTime   = Date.now().toString(16)
+  const fromShort = from.length > 12 ? from.slice(0, 12) + '…' + from.slice(-4) : from
+  return `wordchain-buy-${txId}-${hexTime}-${fromShort}`
 }
 
 export interface TransferGalaArgs {
@@ -57,7 +81,7 @@ export function buildTransferGalaDto(args: TransferGalaArgs): Record<string, unk
     to:            args.to,
     tokenInstance: { ...GALA_TOKEN_INSTANCE },
     quantity:      args.quantity,
-    uniqueKey:     uniqueKey(),
+    uniqueKey:     uniqueKey(args.from),
   }
 }
 
@@ -82,12 +106,11 @@ export async function signGalaDto(
   walletAddress: string,
   payload:       Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  // `signatures.getPayloadToSign` returns a sorted-keys, no-whitespace
-  // string. The SDK runtime is JS-only so this is safe to call in the
-  // browser. If the installed @gala-chain/api version doesn't export
-  // `signatures.getPayloadToSign`, the TS error here is the right
-  // place to find out.
-  const data: string = (signatures as any).getPayloadToSign(payload)
+  // Hand-rolled deterministic JSON (matches the team's PoC byte-for-byte).
+  // We previously used signatures.getPayloadToSign from @gala-chain/api,
+  // but ditched that to remove any risk that the SDK's helper diverges
+  // from what the chain reconstructs.
+  const data = deterministicJSON(payload)
 
   // EIP-191 prefix. The leading '' (0x19 byte) is the spec-mandated
   // EM control character; dropping it makes the chain re-hash to a
