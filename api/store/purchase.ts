@@ -39,21 +39,22 @@ const PACK_CATALOG: Record<string, { gems: number; usd: number; gala: string }> 
   '10k': { gems: 10000, usd: 10, gala: '500' },
 }
 
-// Gala's working write gateway. The bootstrap doc and the older
-// gateway-{testnet,mainnet}.galachain.com hosts can serve reads but
-// silently hang on TransferToken writes — gateway.gala.games is the
-// host the official PoC and the team's production code actually hit.
-//
-// GALACHAIN_NETWORK is retained as a label only (drives the
-// TESTNET/MAINNET pill in the UI) — there's effectively one host;
-// "test" vs "real" is a function of which wallets you connect with
-// connect.gala.com and how much GALA they're funded with.
+// GalaChain gateway base URL. The older hostnames behave like this:
+//   • gateway-testnet.galachain.com — serves reads fine but hangs
+//     indefinitely on TransferToken writes. Avoid for writes.
+//   • gateway.gala.games — referenced by the team's PoC but does NOT
+//     resolve publicly (NXDOMAIN even from Cloudflare). Likely an
+//     internal-only host.
+//   • gateway-mainnet.galachain.com — exists publicly and is the
+//     canonical write gateway per the team's own bootstrap doc.
+// We default to the mainnet host on both branches and let GALACHAIN_*
+// env vars override per environment.
 const NETWORK = (process.env.GALACHAIN_NETWORK ?? 'testnet').toLowerCase()
 const GATEWAY = NETWORK === 'mainnet'
   ? (process.env.GALACHAIN_GATEWAY_MAINNET
-      ?? 'https://gateway.gala.games/api/asset/token-contract')
+      ?? 'https://gateway-mainnet.galachain.com/api/asset/token-contract')
   : (process.env.GALACHAIN_GATEWAY_TESTNET
-      ?? 'https://gateway.gala.games/api/asset/token-contract')
+      ?? 'https://gateway-mainnet.galachain.com/api/asset/token-contract')
 
 // Required. The wallet that receives player GALA payments. MUST be in
 // gala form (`eth|<EIP55>`) — we compare it byte-for-byte against
