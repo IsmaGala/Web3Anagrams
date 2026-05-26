@@ -173,7 +173,7 @@ export const useWalletStore = create<WalletState>((set, get) => {
     },
 
     disconnect: async () => {
-      const jwtBeforeWipe = get().jwt
+      const jwtBeforeWipe = get().jwt ?? null
       // Signal "logged out" to subscribers before wiping — prevents any
       // in-flight sync from writing with a stale JWT.
       set({ jwt: null })
