@@ -29,6 +29,7 @@ export type GrantReason =
   | 'store_purchase'             // real-money gem purchase via /api/store/purchase
   | 'admin_correction'           // manual ops adjustment
   | 'support_refund'             // refunding a disputed spend
+  | 'event_rank1_skin'           // skin awarded for rank #1 in a weekly event
 
 // ── Spend ────────────────────────────────────────────────────────────────────
 
@@ -185,4 +186,43 @@ export async function hasReceivedGrant(args: {
      LIMIT 1
   ` as Array<{ '?column?': number }>
   return rows.length > 0
+}
+
+// ── Grant (skin) ─────────────────────────────────────────────────────────────
+// Records a cosmetic skin ownership event in the audit log. Does NOT touch
+// gem/hint balances — this path is for skins purchased with GALA (real money)
+// or awarded as event rank rewards. The inventory module reads `cosmetic_skin`
+// rows from balance_transactions to derive ownership.
+
+export interface SkinGrantResult {
+  ok:     boolean
+  skinId: string
+}
+
+/** Record a skin as owned by `address`. Returns ok:false if already owned. */
+export async function grantSkin(args: {
+  address: string
+  skinId:  string
+  reason:  'cosmetic_skin' | 'event_rank1_skin'
+  metadata?: Record<string, unknown>
+}): Promise<SkinGrantResult> {
+  const db = sql()
+  // Check idempotency — don't grant the same skin twice.
+  const existing = await db`
+    SELECT 1 FROM balance_transactions
+     WHERE address  = ${args.address}
+       AND reason   = 'cosmetic_skin'
+       AND metadata @> ${JSON.stringify({ skinId: args.skinId })}::jsonb
+     LIMIT 1
+  ` as Array<unknown>
+  if (existing.length > 0) return { ok: false, skinId: args.skinId }
+
+  await db`
+    INSERT INTO balance_transactions (address, gems_delta, hints_delta, reason, metadata)
+    VALUES (
+      ${args.address}, 0, 0, 'cosmetic_skin',
+      ${JSON.stringify({ skinId: args.skinId, ...args.metadata })}::jsonb
+    )
+  `
+  return { ok: true, skinId: args.skinId }
 }

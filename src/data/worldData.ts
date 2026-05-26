@@ -111,7 +111,7 @@ export const WORLDS: World[] = [
   {
     id:          'oceanevent',
     name:        'Deep Sea',
-    subtitle:    'This Week\'s Event',
+    subtitle:    'Weekly Event',
     icon:        '🌊',
     description: 'A 10-level dive into the deep — waves, coral, sharks, krakens and the lost city of Atlantis. Unlocks for 5 Gems per week. Top the leaderboard for hint pack rewards.',
     color:       '#0ea5e9',
@@ -120,7 +120,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-05-11',     // week of May 11 — this week's event
+    startDate:   '2026-06-01',     // week of Jun 1 — event rotation restart
     eventReward: { firstPlaceSkin: 'deep-sea' },
     levels:      OCEAN_EVENT_LEVELS,
   },
@@ -131,7 +131,7 @@ export const WORLDS: World[] = [
     // when you want it to align with the actual June 14 observance.
     id:          'blooddonor',
     name:        'Blood Donor Day',
-    subtitle:    'Next Week\'s Event',
+    subtitle:    'Weekly Event',
     icon:        '🩸',
     description: '10 levels through the language of blood donation — veins, pulses, plasma, the people and the courage. Honors World Blood Donor Day (June 14). Unlocks for 5 Gems per week.',
     color:       '#ef4444',
@@ -140,7 +140,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-05-18',     // week of May 18 — next week's event (testing slot)
+    startDate:   '2026-06-08',     // week of Jun 8
     eventReward: { firstPlaceSkin: 'blood' },
     levels:      BLOOD_DONOR_LEVELS,
   },
@@ -162,7 +162,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-05-25',     // week of May 25 — the slot after Blood Donor Day
+    startDate:   '2026-06-15',     // week of Jun 15 — slot after Blood Donor Day
     eventReward: { firstPlaceSkin: 'cybernetic' },
     levels:      AREA515_LEVELS,
   },
@@ -184,7 +184,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-06-01',     // week of June 1 — the slot after Area 51.5
+    startDate:   '2026-06-22',     // week of Jun 22 — slot after Area 51.5
     eventReward: { firstPlaceSkin: 'patriot' },
     levels:      FLAGS_LEVELS,
   },

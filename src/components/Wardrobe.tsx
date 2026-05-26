@@ -5,16 +5,10 @@ import { WORLDS } from '../data/worldData'
 import { playSfx } from '../utils/sfx'
 import { useScreenBackdrop } from '../utils/screenBackdrop'
 
-// Wardrobe — cosmetics hub. Shows every wheel skin as a card with a
-// preview row, ownership state, and the appropriate action: equip (for
-// owned skins), buy with Gems (for skins that have a `price` and the
-// player doesn't yet own), or a reminder of which event grants the
-// skin at rank #1 (for any earn-only skin).
-//
-// Why a separate screen rather than tabs inside GemStore: GemStore is
-// real-money → Gems. This is Gems → cosmetics, which is a different
-// mental model and likely to grow (gem styles, tile backgrounds, SFX
-// packs) — keeping it stand-alone makes those additions feel natural.
+// Wardrobe — cosmetics hub. Shows only skins the player has earned or
+// unlocked (via rank #1 in weekly events, or always-owned default).
+// No purchase flow here — skins can only be won through events.
+// The Gem Store handles the event-skin direct-purchase path.
 
 // Helper: find the event world (if any) whose rank-1 reward is this skin.
 // Used to render the "Win [Event Name] to unlock" hint on locked skins
@@ -51,8 +45,6 @@ function SkinPreview({ skinId, equipped }: { skinId: WheelSkinId; equipped: bool
 
 export default function Wardrobe() {
   const goToSplash    = useGameStore(s => s.goToSplash)
-  const gemsBalance   = useGameStore(s => s.gemsBalance)
-  const purchaseSkin  = useGameStore(s => s.purchaseSkin)
   const showToast     = useGameStore(s => s.showToast)
 
   // Cosmetics — pull primitives + the owned Set; reads of `ownedSkins`
@@ -72,16 +64,8 @@ export default function Wardrobe() {
     showToast(`✓ Equipped ${getWheelSkin(id).label}`)
   }
 
-  async function handleBuy(id: WheelSkinId, price: number) {
-    playSfx('uiTap')
-    // purchaseSkin is now async — server round-trip via /api/economy/spend.
-    const ok = await purchaseSkin(id, price)
-    if (ok) {
-      showToast(`✓ Unlocked ${getWheelSkin(id).label} · −${price} gems`)
-    } else if (gemsBalance < price) {
-      showToast('Not enough Gems')
-    }
-  }
+  // Only show skins the player actually owns.
+  const availableSkins = WHEEL_SKIN_LIST.filter(skin => ownedSkins.has(skin.id))
 
   return (
     <div className="min-h-screen flex flex-col items-center pt-6 pb-10 px-4"
@@ -102,98 +86,39 @@ export default function Wardrobe() {
           style={{ color:'#e9d5ff', fontSize:'1.4rem', letterSpacing:'2px' }}>
           WARDROBE
         </h1>
-        <div className="flex items-center gap-1 px-3 py-2 rounded-xl"
-          style={{
-            background:'rgba(0,0,0,0.35)',
-            border:'2px solid rgba(167,139,250,0.4)',
-          }}>
-          <span style={{ color:'#fbbf24', fontSize:'1rem' }}>◈</span>
-          <span className="font-fredoka" style={{ color:'#fbbf24', fontSize:'0.95rem' }}>
-            {gemsBalance.toLocaleString()}
-          </span>
-        </div>
+        {/* Spacer to keep title centered */}
+        <div style={{ width: 48 }} />
       </div>
 
       {/* ── SUBHEAD ── */}
       <p className="w-full max-w-sm text-center font-nunito font-bold mb-4 px-2"
         style={{ color:'rgba(196,181,253,0.7)', fontSize:'0.85rem', lineHeight:1.45 }}>
-        Wheel skins customize how the letter ring looks. Earn skins at rank #1 in
-        weekly events, or buy them here with Gems.
+        Wheel skins customize how the letter ring looks. Win rank #1 in a weekly
+        event to earn that event's skin.
       </p>
 
       {/* ── SKIN CARDS ── */}
       <div className="w-full max-w-sm flex flex-col gap-3">
-        {WHEEL_SKIN_LIST.map(skin => {
-          const owned     = ownedSkins.has(skin.id)
+        {availableSkins.length === 0 && (
+          <div className="text-center py-10 px-4">
+            <div className="text-5xl mb-3">🏆</div>
+            <p className="font-fredoka text-lg mb-1" style={{ color:'#c4b5fd' }}>
+              No skins yet
+            </p>
+            <p className="font-nunito font-bold text-sm" style={{ color:'rgba(196,181,253,0.5)', lineHeight:1.5 }}>
+              Win rank #1 in a weekly event to earn that event's skin.
+              Check the Gem Store to grab the current event skin directly.
+            </p>
+          </div>
+        )}
+
+        {availableSkins.map(skin => {
           const equipped  = wheelSkin === skin.id
-          const price     = skin.price
-          const canAfford = typeof price === 'number' && gemsBalance >= price
           const event     = eventForSkin(skin.id)
 
-          // Pick the action button's content + behavior based on state.
-          // Order: equipped > owned > affordable > price-but-broke > earn-only.
-          let actionLabel: string
-          let actionDisabled = false
-          let actionOnClick: () => void = () => {}
-          let actionStyle: React.CSSProperties = {}
-
-          if (equipped) {
-            actionLabel = '✓ EQUIPPED'
-            actionDisabled = true
-            actionStyle = {
-              background:'linear-gradient(160deg,#374151,#1f2937)',
-              border:'2px solid rgba(255,255,255,0.15)',
-              borderBottom:'2px solid rgba(0,0,0,0.4)',
-              boxShadow:'0 3px 0 rgba(0,0,0,0.4)',
-              color:'rgba(255,255,255,0.65)',
-            }
-          } else if (owned) {
-            actionLabel = 'EQUIP'
-            actionOnClick = () => handleEquip(skin.id)
-            actionStyle = {
-              background:'linear-gradient(160deg,#7c3aed,#6d28d9)',
-              border:'2px solid #a78bfa', borderBottom:'2px solid #4c1d95',
-              boxShadow:'0 3px 0 #4c1d95', color:'#fff',
-            }
-          } else if (typeof price === 'number' && canAfford) {
-            actionLabel = `BUY · ◈ ${price}`
-            actionOnClick = () => handleBuy(skin.id, price)
-            actionStyle = {
-              background:'linear-gradient(160deg,#0891b2,#155e75)',
-              border:'2px solid #22d3ee', borderBottom:'2px solid #0c4a6e',
-              boxShadow:'0 3px 0 #0c4a6e', color:'#fff',
-            }
-          } else if (typeof price === 'number') {
-            actionLabel = `NEED ◈ ${price - gemsBalance} MORE`
-            actionDisabled = true
-            actionStyle = {
-              background:'linear-gradient(160deg,#374151,#1f2937)',
-              border:'2px solid rgba(255,255,255,0.15)',
-              borderBottom:'2px solid rgba(0,0,0,0.4)',
-              boxShadow:'0 3px 0 rgba(0,0,0,0.4)',
-              color:'rgba(255,255,255,0.45)',
-            }
-          } else {
-            // Earn-only (no price). Should be rare; today only 'default'
-            // hits this branch and 'default' is always owned, so this is
-            // mostly defensive.
-            actionLabel = event ? `🏆 WIN ${event.name.toUpperCase()}` : 'LOCKED'
-            actionDisabled = true
-            actionStyle = {
-              background:'linear-gradient(160deg,#374151,#1f2937)',
-              border:'2px solid rgba(255,255,255,0.15)',
-              borderBottom:'2px solid rgba(0,0,0,0.4)',
-              boxShadow:'0 3px 0 rgba(0,0,0,0.4)',
-              color:'rgba(255,255,255,0.55)',
-            }
-          }
-
-          // Status pill in the card header — equipped > owned > available.
-          const badge =
-            equipped ? { text: 'EQUIPPED', color:'#86efac', bg:'rgba(34,197,94,0.12)' }
-              : owned ? { text: 'OWNED',    color:'#a5f3fc', bg:'rgba(34,211,238,0.12)' }
-              : typeof price === 'number' ? { text: 'AVAILABLE', color:'#fde68a', bg:'rgba(251,191,36,0.12)' }
-              : { text: 'LOCKED', color:'rgba(226,232,240,0.6)', bg:'rgba(255,255,255,0.06)' }
+          const badge = equipped
+            ? { text: 'EQUIPPED', color:'#86efac', bg:'rgba(34,197,94,0.12)' }
+            : { text: 'OWNED',    color:'#a5f3fc', bg:'rgba(34,211,238,0.12)' }
 
           return (
             <div key={skin.id}
@@ -229,27 +154,36 @@ export default function Wardrobe() {
                 {skin.description}
               </p>
 
-              {/* Earn-path hint for non-default branded skins. Shown
-                  even after purchase so players know the event grants
-                  it for free if they place rank #1 next week. */}
-              {event && skin.id !== 'default' && !equipped && (
+              {/* Source hint — which event this came from */}
+              {event && skin.id !== 'default' && (
                 <p className="font-nunito font-bold mb-2 px-1"
                   style={{ color:'rgba(196,181,253,0.55)', fontSize:'0.7rem', lineHeight:1.4 }}>
-                  Also unlocks free at rank #1 in {event.icon} {event.name}.
+                  {event.icon} Earned from {event.name}
                 </p>
               )}
 
-              <button onClick={actionOnClick}
-                disabled={actionDisabled}
+              <button
+                onClick={() => handleEquip(skin.id)}
+                disabled={equipped}
                 className="btn-3d w-full py-2.5"
                 style={{
-                  ...actionStyle,
                   borderRadius:'12px',
                   fontFamily:'Fredoka One,cursive',
                   fontSize:'0.95rem', letterSpacing:'1px',
-                  cursor: actionDisabled ? 'default' : 'pointer',
+                  cursor: equipped ? 'default' : 'pointer',
+                  ...(equipped ? {
+                    background:'linear-gradient(160deg,#374151,#1f2937)',
+                    border:'2px solid rgba(255,255,255,0.15)',
+                    borderBottom:'2px solid rgba(0,0,0,0.4)',
+                    boxShadow:'0 3px 0 rgba(0,0,0,0.4)',
+                    color:'rgba(255,255,255,0.65)',
+                  } : {
+                    background:'linear-gradient(160deg,#7c3aed,#6d28d9)',
+                    border:'2px solid #a78bfa', borderBottom:'2px solid #4c1d95',
+                    boxShadow:'0 3px 0 #4c1d95', color:'#fff',
+                  }),
                 }}>
-                {actionLabel}
+                {equipped ? '✓ EQUIPPED' : 'EQUIP'}
               </button>
             </div>
           )

@@ -1,7 +1,8 @@
 // POST /api/store/purchase
 // Headers: Authorization: Bearer <jwt>
-// Body:    { packId: '1k' | '3k' | '10k', signedDto: <signed TransferToken DTO> }
-// Returns: { ok, packId, gemsCredited, newBalance }
+// Body:    { packId: '1k' | '3k' | '10k' | 'event-skin', signedDto: <signed TransferToken DTO> }
+// Returns: { ok, packId, gemsCredited, newBalance }  (gems packs)
+//          { ok, packId, skinId, message }             (event-skin pack)
 //
 // Real GalaChain flow. The client:
 //   1. Built a TransferToken DTO via src/utils/galaChain.buildTransferGalaDto
@@ -28,16 +29,53 @@ import { createHmac, createHash } from 'node:crypto'
 import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'
 import { parseWalletAddress } from '../_lib/wallet.js'
-import { grantGems } from '../_lib/economy.js'
+import { grantGems, grantSkin } from '../_lib/economy.js'
 import { track } from '../_lib/analytics.js'
 
 // Pack catalog — keep in sync with src/components/GemStore.tsx PACKS.
 // `gala` is the GALA quantity (integer string) the player pays. Server
 // is authoritative on pricing; we ignore whatever the client claims.
 const PACK_CATALOG: Record<string, { gems: number; usd: number; gala: string }> = {
-  '1k':  { gems: 1000,  usd: 2,  gala: '100' },
-  '3k':  { gems: 3000,  usd: 5,  gala: '250' },
-  '10k': { gems: 10000, usd: 10, gala: '500' },
+  '1k':  { gems: 1000,  usd: 4,  gala: '500'  },
+  '3k':  { gems: 3000,  usd: 8,  gala: '1000' },
+  '10k': { gems: 10000, usd: 20, gala: '3000' },
+}
+
+// Event skin catalog entry — 5000 GALA, no gem credit.
+const EVENT_SKIN_GALA = '5000'
+
+// ── Week-ID helpers (server-side mirror of src/utils/gameUtils.ts) ───────────
+// Kept minimal — we only need currentWeekId and the event lookup.
+// The anchor is Mon 2024-01-01 16:00 PST = Mon 2024-01-02 00:00 UTC.
+const EVENT_WEEK_ANCHOR_MS = Date.UTC(2024, 0, 2, 0, 0, 0)
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
+function serverCurrentWeekId(): number {
+  return Math.floor((Date.now() - EVENT_WEEK_ANCHOR_MS) / WEEK_MS)
+}
+
+function startWeekIdFromDate(dateISO: string): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateISO)
+  if (!m) return NaN
+  const [, y, mo, d] = m
+  const fake = Date.UTC(parseInt(y, 10), parseInt(mo, 10) - 1, parseInt(d, 10), 18, 0, 0)
+  return Math.floor((fake - EVENT_WEEK_ANCHOR_MS) / WEEK_MS)
+}
+
+// Events with their skin rewards — mirrors worldData.ts event entries.
+// Update startDate here whenever worldData.ts is updated.
+const EVENT_ROTATION: Array<{ worldId: string; startDate: string; skinId: string }> = [
+  { worldId: 'oceanevent',  startDate: '2026-06-01', skinId: 'deep-sea'   },
+  { worldId: 'blooddonor',  startDate: '2026-06-08', skinId: 'blood'      },
+  { worldId: 'area515',     startDate: '2026-06-15', skinId: 'cybernetic' },
+  { worldId: 'flags',       startDate: '2026-06-22', skinId: 'patriot'    },
+]
+
+/** Return the skin ID for the currently-active event (or null if none). */
+function currentEventSkinId(): string | null {
+  const weekId = serverCurrentWeekId()
+  const entry = EVENT_ROTATION.find(e => startWeekIdFromDate(e.startDate) === weekId)
+  return entry?.skinId ?? null
 }
 
 // GalaChain gateway base URL. The older hostnames behave like this:
@@ -99,13 +137,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     signedDto?: Record<string, any>
   }
 
-  if (!packId || !PACK_CATALOG[packId]) {
+  const isEventSkin = packId === 'event-skin'
+  if (!packId || (!PACK_CATALOG[packId] && !isEventSkin)) {
     return res.status(400).json({ error: 'Invalid packId' })
   }
   if (!signedDto || typeof signedDto !== 'object') {
     return res.status(400).json({ error: 'signedDto is required' })
   }
-  const pack = PACK_CATALOG[packId]
+
+  // For the event-skin pack, resolve which skin is active right now.
+  let eventSkinId: string | null = null
+  if (isEventSkin) {
+    eventSkinId = currentEventSkinId()
+    if (!eventSkinId) {
+      return res.status(400).json({ error: 'No event skin is active this week' })
+    }
+  }
+
+  const pack = isEventSkin
+    ? { gems: 0, usd: 0, gala: EVENT_SKIN_GALA }
+    : PACK_CATALOG[packId]
 
   // Translate the JWT-derived storage address (0x<lower>) → gala form
   // (eth|<EIP55>) so it can be compared against signedDto.from exactly.
@@ -306,6 +357,107 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     chain_tx_id:  chainTxId,
     network:      NETWORK,
     replay:       isReplaySuccess || undefined,
+  })
+
+  return res.status(200).json({
+    ok:           true,
+    packId,
+    gemsCredited: pack.gems,
+    newBalance:   granted.newBalance,
+  })
+}
+      hmacAuth:  GATEWAY_API_KEY && GATEWAY_SECRET ? 'enabled' : 'disabled',
+    })
+  }
+  // Canonical chain tx ID lives in the X-Transaction-Id header.
+  const chainTxId = gatewayResp.headers.get('x-transaction-id') ?? null
+
+  let chainResult: any
+  try {
+    chainResult = await gatewayResp.json()
+  } catch (e: any) {
+    return res.status(502).json({ error: 'GalaChain gateway returned non-JSON', detail: e?.message })
+  }
+
+  // ErrorCode 409 = "uniqueKey already processed" — payment IS on-chain.
+  const isReplaySuccess = chainResult?.Status !== 1
+    && chainResult?.Error?.ErrorCode === 409
+
+  if (chainResult?.Status !== 1 && !isReplaySuccess) {
+    track('gala_purchase_failed', {
+      address:      authAddr,
+      pack_id:      packId,
+      gala_amount:  pack.gala,
+      error_detail: chainResult?.Error?.Message ?? chainResult?.Message ?? chainResult?.ErrorKey ?? 'unknown chaincode error',
+      error_code:   chainResult?.Error?.ErrorCode ?? null,
+      network:      NETWORK,
+    })
+    return res.status(402).json({
+      ok:      false,
+      error:   'GalaChain transfer failed',
+      detail:  chainResult?.Error?.Message
+            ?? chainResult?.Message
+            ?? chainResult?.ErrorKey
+            ?? 'unknown chaincode error',
+      errorCode: chainResult?.Error?.ErrorCode ?? null,
+    })
+  }
+
+  // ── Event skin purchase ───────────────────────────────────────────────
+  if (isEventSkin) {
+    const result = await grantSkin({
+      address: authAddr,
+      skinId:  eventSkinId!,
+      reason:  'cosmetic_skin',
+      metadata: {
+        packId:     'event-skin',
+        gala:       EVENT_SKIN_GALA,
+        uniqueKey:  signedDto.uniqueKey,
+        network:    NETWORK,
+        chainTxId,
+        replay:     isReplaySuccess || undefined,
+      },
+    })
+    track('event_skin_purchased', {
+      address:    authAddr,
+      skin_id:    eventSkinId,
+      gala_spent: EVENT_SKIN_GALA,
+      already_owned: !result.ok,
+      network:    NETWORK,
+    })
+    return res.status(200).json({
+      ok:      true,
+      packId:  'event-skin',
+      skinId:  eventSkinId,
+      message: result.ok ? 'Skin granted' : 'Already owned — payment recorded',
+    })
+  }
+
+  // ── Credit gems ───────────────────────────────────────────────────────
+  const granted = await grantGems({
+    address:  authAddr,
+    amount:   pack.gems,
+    reason:   'store_purchase',
+    metadata: {
+      packId,
+      gala:        pack.gala,
+      uniqueKey:   signedDto.uniqueKey,
+      network:     NETWORK,
+      chainTxId,
+      chainTxData: chainResult?.Data ?? null,
+      replay:      isReplaySuccess || undefined,
+    },
+  })
+
+  track('gala_purchase_success', {
+    address:       authAddr,
+    pack_id:       packId,
+    gala_spent:    pack.gala,
+    gems_credited: pack.gems,
+    new_balance:   granted.newBalance,
+    chain_tx_id:   chainTxId,
+    network:       NETWORK,
+    replay:        isReplaySuccess || undefined,
   })
 
   return res.status(200).json({

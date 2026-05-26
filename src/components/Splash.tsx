@@ -311,7 +311,7 @@ export default function Splash() {
             boxShadow:'0 8px 0 #082f49, 0 0 30px rgba(14,165,233,0.4)',
             borderRadius:'20px', padding:'16px 22px' }}>
           <div className="flex items-center gap-4">
-            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>🌊</span>
+            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>⭐</span>
             <div className="flex-1 text-left">
               <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>WEEKLY EVENTS</div>
               <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(186,230,253,0.7)' }}>
@@ -394,6 +394,28 @@ export default function Splash() {
               style={{
                 background:'linear-gradient(160deg,#991b1b,#7f1d1d)',
                 border:'4px solid #f87171', borderBottom:'4px solid #450a0a',
+                boxShadow:'0 6px 0 #450a0a', borderRadius:'18px', color:'#fff',
+                fontFamily:'Fredoka One,cursive', fontSize:'1.1rem',
+              }}>
+              DISCONNECT
+            </button>
+
+            <button onClick={tap(() => setShowDisconnectConfirm(false))} className="btn-3d w-full py-3"
+              style={{
+                background:'linear-gradient(160deg,#4c1d95,#3b0764)',
+                border:'4px solid #7c3aed', borderBottom:'4px solid #2e1065',
+                boxShadow:'0 6px 0 #1e0050', borderRadius:'18px', color:'#e9d5ff',
+                fontFamily:'Fredoka One,cursive', fontSize:'1rem',
+              }}>
+              CANCEL
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+om:'4px solid #450a0a',
                 boxShadow:'0 6px 0 #450a0a', borderRadius:'18px', color:'#fff',
                 fontFamily:'Fredoka One,cursive', fontSize:'1.1rem',
               }}>
