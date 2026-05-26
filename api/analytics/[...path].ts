@@ -341,12 +341,21 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return
 
-  switch (route(req)) {
-    case 'track':    return handleTrack(req, res)
-    case 'overview': return handleOverview(req, res)
-    case 'daily':    return handleDaily(req, res)
-    case 'funnel':   return handleFunnel(req, res)
-    default:
-      return res.status(404).json({ error: `Unknown analytics route: ${route(req)}` })
+  try {
+    switch (route(req)) {
+      case 'track':    return await handleTrack(req, res)
+      case 'overview': return await handleOverview(req, res)
+      case 'daily':    return await handleDaily(req, res)
+      case 'funnel':   return await handleFunnel(req, res)
+      default:
+        return res.status(404).json({ error: `Unknown analytics route: ${route(req)}` })
+    }
+  } catch (err: any) {
+    console.error('[analytics] unhandled crash:', err)
+    return res.status(500).json({
+      error:   err?.message ?? String(err),
+      route:   route(req),
+      url:     req.url,
+    })
   }
 }
