@@ -415,25 +415,3 @@ export default function Splash() {
     </div>
   )
 }
-om:'4px solid #450a0a',
-                boxShadow:'0 6px 0 #450a0a', borderRadius:'18px', color:'#fff',
-                fontFamily:'Fredoka One,cursive', fontSize:'1.1rem',
-              }}>
-              DISCONNECT
-            </button>
-
-            <button onClick={tap(() => setShowDisconnectConfirm(false))} className="btn-3d w-full py-3"
-              style={{
-                background:'linear-gradient(160deg,#4c1d95,#3b0764)',
-                border:'4px solid #7c3aed', borderBottom:'4px solid #2e1065',
-                boxShadow:'0 6px 0 #1e0050', borderRadius:'18px', color:'#e9d5ff',
-                fontFamily:'Fredoka One,cursive', fontSize:'1rem',
-              }}>
-              CANCEL
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
