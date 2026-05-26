@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'gala_purchase_success','gala_purchase_failed','gala_gateway_timeout'
       )
       AND received_at >= ${since}
-    ` as Promise<Array<{
+    ` as unknown as Promise<Array<{
         initiated: string; submitted: string; success: string
         failed: string; timeout: string
       }>>,
@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'gem_spent','gala_purchase_success'
       )
       AND received_at >= ${since}
-    ` as Promise<Array<{
+    ` as unknown as Promise<Array<{
         shop_opened: string; hint_denied: string
         hint_pack_bought: string; gem_pack_bought: string
       }>>,
@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       WHERE event IN ('wallet_connected','level_started','level_completed')
         AND address IS NOT NULL
         AND received_at >= ${since}
-    ` as Promise<Array<{ connected: string; played: string; completed: string }>>,
+    ` as unknown as Promise<Array<{ connected: string; played: string; completed: string }>>,
 
     // ── 4. Gem spend breakdown by reason ─────────────────────────────────
     db`
@@ -88,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         AND received_at >= ${since}
       GROUP BY properties->>'reason'
       ORDER BY total_gems DESC
-    ` as Promise<Array<{ reason: string; count: number; total_gems: string }>>,
+    ` as unknown as Promise<Array<{ reason: string; count: number; total_gems: string }>>,
 
     // ── 5. World popularity ───────────────────────────────────────────────
     db`
@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       GROUP BY properties->>'world_id'
       ORDER BY starts DESC
       LIMIT 15
-    ` as Promise<Array<{ world_id: string; starts: number; completions: number }>>,
+    ` as unknown as Promise<Array<{ world_id: string; starts: number; completions: number }>>,
   ])
 
   const gala = galaFunnel[0] ?? {}

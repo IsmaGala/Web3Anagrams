@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         FROM analytics_events
        WHERE received_at >= NOW()::date
          AND address IS NOT NULL
-    ` as Promise<Array<{ dau: number }>>,
+    ` as unknown as Promise<Array<{ dau: number }>>,
 
     // MAU — unique wallets in the last 30 days
     db`
@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         FROM analytics_events
        WHERE received_at >= NOW() - INTERVAL '30 days'
          AND address IS NOT NULL
-    ` as Promise<Array<{ mau: number }>>,
+    ` as unknown as Promise<Array<{ mau: number }>>,
 
     // Levels started and completed today
     db`
@@ -52,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         COUNT(*) FILTER (WHERE event = 'level_completed') AS completed
         FROM analytics_events
        WHERE received_at >= NOW()::date
-    ` as Promise<Array<{ started: string; completed: string }>>,
+    ` as unknown as Promise<Array<{ started: string; completed: string }>>,
 
     // All-time level completion rate (last 7 days for relevance)
     db`
@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         COUNT(*) FILTER (WHERE event = 'level_completed') AS completed
         FROM analytics_events
        WHERE received_at >= NOW() - INTERVAL '7 days'
-    ` as Promise<Array<{ started: string; completed: string }>>,
+    ` as unknown as Promise<Array<{ started: string; completed: string }>>,
 
     // Gems spent today (all reasons)
     db`
@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         FROM analytics_events
        WHERE event = 'gem_spent'
          AND received_at >= NOW()::date
-    ` as Promise<Array<{ gems_spent: number }>>,
+    ` as unknown as Promise<Array<{ gems_spent: number }>>,
 
     // GALA purchases — count and total GALA last 7 days
     db`
@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         FROM analytics_events
        WHERE event = 'gala_purchase_success'
          AND received_at >= NOW() - INTERVAL '7 days'
-    ` as Promise<Array<{ purchase_count: number; gala_total: string }>>,
+    ` as unknown as Promise<Array<{ purchase_count: number; gala_total: string }>>,
 
     // Hint denied (shop conversion pressure) — last 7 days
     db`
@@ -87,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         FROM analytics_events
        WHERE event = 'hint_denied_no_balance'
          AND received_at >= NOW() - INTERVAL '7 days'
-    ` as Promise<Array<{ hint_denied_7d: number }>>,
+    ` as unknown as Promise<Array<{ hint_denied_7d: number }>>,
 
     // New wallets today (first ever wallet_connected)
     db`
@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
        WHERE event = 'wallet_connected'
          AND (properties->>'first_time')::boolean = true
          AND received_at >= NOW()::date
-    ` as Promise<Array<{ new_wallets: number }>>,
+    ` as unknown as Promise<Array<{ new_wallets: number }>>,
   ])
 
   const started7d  = parseInt(completionRow[0]?.started  ?? '0', 10)
