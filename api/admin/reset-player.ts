@@ -70,13 +70,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       profiles,
       nonces,
     ] = await Promise.all([
-      db`DELETE FROM player_state         WHERE LOWER(address) = LOWER(${address}) RETURNING address`,
-      db`DELETE FROM player_balances       WHERE LOWER(address) = LOWER(${address}) RETURNING address`,
-      db`DELETE FROM balance_transactions  WHERE LOWER(address) = LOWER(${address}) RETURNING id`,
-      db`DELETE FROM scores                WHERE LOWER(address) = LOWER(${address}) RETURNING id`,
-      db`DELETE FROM play_rounds           WHERE LOWER(address) = LOWER(${address}) RETURNING id`,
-      db`DELETE FROM profiles              WHERE LOWER(address) = LOWER(${address}) RETURNING address`,
-      db`DELETE FROM nonces                WHERE LOWER(address) = LOWER(${address}) RETURNING address`,
+      db`DELETE FROM player_state         WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+      db`DELETE FROM player_balances       WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+      db`DELETE FROM balance_transactions  WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
+      db`DELETE FROM scores                WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
+      db`DELETE FROM play_rounds           WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
+      db`DELETE FROM profiles              WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+      db`DELETE FROM nonces                WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
     ])
 
     const summary = {
