@@ -233,7 +233,7 @@ export default function DebugMenu() {
     setGrantStatus('busy')
     setGrantMsg('Granting…')
     try {
-      const r = await fetch('/api/admin/grant-gems', {
+      const r = await fetch('/api/admin/grant-gems', {  // → api/admin/[action].ts
         method:  'POST',
         headers: {
           'Content-Type':   'application/json',
@@ -282,7 +282,7 @@ export default function DebugMenu() {
     setResetMsg('Deleting server data…')
 
     try {
-      const resp = await fetch('/api/admin/reset-player', {
+      const resp = await fetch('/api/admin/reset-player', {  // → api/admin/[action].ts
         method: 'POST',
         headers: {
           'Content-Type':   'application/json',

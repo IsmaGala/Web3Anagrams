@@ -398,7 +398,7 @@ async function fetchServerPayload(): Promise<ServerResponse | null> {
 async function pushPayload(payload: PlayerStatePayload): Promise<boolean> {
   if (!useWalletStore.getState().jwt) return false
   try {
-    await api.post('/api/profile/sync', payload)
+    await api.post('/api/profile', payload)
     return true
   } catch (e) {
     console.warn('[profileSync] push failed:', e)
