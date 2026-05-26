@@ -106,29 +106,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ` as unknown as Promise<Array<{ world_id: string; starts: number; completions: number }>>,
   ])
 
-  const gala = galaFunnel[0] ?? {}
-  const shop = shopFunnel[0] ?? {}
-  const game = gameplayFunnel[0] ?? {}
+  const gala = galaFunnel[0]
+  const shop = shopFunnel[0]
+  const game = gameplayFunnel[0]
 
   return res.status(200).json({
     days,
     gala_purchase_funnel: {
-      initiated: parseInt(gala.initiated ?? '0', 10),
-      submitted: parseInt(gala.submitted ?? '0', 10),
-      success:   parseInt(gala.success   ?? '0', 10),
-      failed:    parseInt(gala.failed    ?? '0', 10),
-      timeout:   parseInt(gala.timeout   ?? '0', 10),
+      initiated: parseInt(gala?.initiated ?? '0', 10),
+      submitted: parseInt(gala?.submitted ?? '0', 10),
+      success:   parseInt(gala?.success   ?? '0', 10),
+      failed:    parseInt(gala?.failed    ?? '0', 10),
+      timeout:   parseInt(gala?.timeout   ?? '0', 10),
     },
     shop_funnel: {
-      shop_opened:      parseInt(shop.shop_opened      ?? '0', 10),
-      hint_denied:      parseInt(shop.hint_denied      ?? '0', 10),
-      hint_pack_bought: parseInt(shop.hint_pack_bought ?? '0', 10),
-      gem_pack_bought:  parseInt(shop.gem_pack_bought  ?? '0', 10),
+      shop_opened:      parseInt(shop?.shop_opened      ?? '0', 10),
+      hint_denied:      parseInt(shop?.hint_denied      ?? '0', 10),
+      hint_pack_bought: parseInt(shop?.hint_pack_bought ?? '0', 10),
+      gem_pack_bought:  parseInt(shop?.gem_pack_bought  ?? '0', 10),
     },
     gameplay_funnel: {
-      wallets_connected: parseInt(game.connected ?? '0', 10),
-      wallets_played:    parseInt(game.played    ?? '0', 10),
-      wallets_completed: parseInt(game.completed ?? '0', 10),
+      wallets_connected: parseInt(game?.connected ?? '0', 10),
+      wallets_played:    parseInt(game?.played    ?? '0', 10),
+      wallets_completed: parseInt(game?.completed ?? '0', 10),
     },
     gem_spend_by_reason: gemBreakdown.map(r => ({
       reason:     r.reason,
