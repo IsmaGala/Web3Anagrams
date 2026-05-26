@@ -1,5 +1,5 @@
 // Single Vercel function that handles all analytics routes.
-// Dispatches on the catch-all `path` segment to stay within the Hobby
+// Dispatches on the URL path segment to stay within the Hobby
 // plan's 12-function limit.
 //
 //   POST /api/analytics/track    — client-side event relay
@@ -14,12 +14,11 @@ import { requireAuth } from '../_lib/jwt.js'
 import { track } from '../_lib/analytics.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// helpers
+// Route helper — reads last path segment from URL, not from req.query
+// (Vercel catch-all params are unreliable under framework:vite)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function route(req: VercelRequest): string {
-  // req.query path params are unreliable under framework:vite — read from URL.
-  // e.g. /api/analytics/overview?days=7  →  'overview'
   const seg = (req.url ?? '').split('?')[0].split('/').filter(Boolean).pop() ?? ''
   return seg.toLowerCase()
 }
@@ -80,70 +79,62 @@ async function handleTrack(req: VercelRequest, res: VercelResponse) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/analytics/overview
+// NOTE: All type assertions are on the AWAITED results (never inline on
+// template literals) so the bundler doesn't emit a bare `as` identifier.
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleOverview(_req: VercelRequest, res: VercelResponse) {
   const db = sql()
 
-  const [
-    dauRow, mauRow, levelsRow, completionRow,
-    gemRow, purchaseRow, hintDeniedRow, walletRow,
-  ] = await Promise.all([
+  const results = await Promise.all([
     db`SELECT COUNT(DISTINCT address)::int AS dau FROM analytics_events
-       WHERE received_at >= NOW()::date AND address IS NOT NULL`
-      as unknown as Promise<Array<{ dau: number }>>,
-
+       WHERE received_at >= NOW()::date AND address IS NOT NULL`,
     db`SELECT COUNT(DISTINCT address)::int AS mau FROM analytics_events
-       WHERE received_at >= NOW() - INTERVAL '30 days' AND address IS NOT NULL`
-      as unknown as Promise<Array<{ mau: number }>>,
-
+       WHERE received_at >= NOW() - INTERVAL '30 days' AND address IS NOT NULL`,
     db`SELECT
          COUNT(*) FILTER (WHERE event = 'level_started')   AS started,
          COUNT(*) FILTER (WHERE event = 'level_completed') AS completed
-       FROM analytics_events WHERE received_at >= NOW()::date`
-      as unknown as Promise<Array<{ started: string; completed: string }>>,
-
+       FROM analytics_events WHERE received_at >= NOW()::date`,
     db`SELECT
          COUNT(*) FILTER (WHERE event = 'level_started')   AS started,
          COUNT(*) FILTER (WHERE event = 'level_completed') AS completed
-       FROM analytics_events WHERE received_at >= NOW() - INTERVAL '7 days'`
-      as unknown as Promise<Array<{ started: string; completed: string }>>,
-
+       FROM analytics_events WHERE received_at >= NOW() - INTERVAL '7 days'`,
     db`SELECT COALESCE(SUM((properties->>'amount')::int), 0)::int AS gems_spent
-       FROM analytics_events WHERE event = 'gem_spent' AND received_at >= NOW()::date`
-      as unknown as Promise<Array<{ gems_spent: number }>>,
-
+       FROM analytics_events WHERE event = 'gem_spent' AND received_at >= NOW()::date`,
     db`SELECT COUNT(*)::int AS purchase_count,
               COALESCE(SUM((properties->>'gala_spent')::numeric), 0) AS gala_total
        FROM analytics_events
-       WHERE event = 'gala_purchase_success' AND received_at >= NOW() - INTERVAL '7 days'`
-      as unknown as Promise<Array<{ purchase_count: number; gala_total: string }>>,
-
+       WHERE event = 'gala_purchase_success' AND received_at >= NOW() - INTERVAL '7 days'`,
     db`SELECT COUNT(*)::int AS hint_denied_7d FROM analytics_events
-       WHERE event = 'hint_denied_no_balance' AND received_at >= NOW() - INTERVAL '7 days'`
-      as unknown as Promise<Array<{ hint_denied_7d: number }>>,
-
+       WHERE event = 'hint_denied_no_balance' AND received_at >= NOW() - INTERVAL '7 days'`,
     db`SELECT COUNT(*)::int AS new_wallets FROM analytics_events
        WHERE event = 'wallet_connected'
          AND (properties->>'first_time')::boolean = true
-         AND received_at >= NOW()::date`
-      as unknown as Promise<Array<{ new_wallets: number }>>,
+         AND received_at >= NOW()::date`,
   ])
+
+  // Cast after await — never inline on the template literal
+  const dauRow        = results[0] as Array<{ dau: number }>
+  const mauRow        = results[1] as Array<{ mau: number }>
+  const levelsRow     = results[2] as Array<{ started: string; completed: string }>
+  const completionRow = results[3] as Array<{ started: string; completed: string }>
+  const gemRow        = results[4] as Array<{ gems_spent: number }>
+  const purchaseRow   = results[5] as Array<{ purchase_count: number; gala_total: string }>
+  const hintRow       = results[6] as Array<{ hint_denied_7d: number }>
+  const walletRow     = results[7] as Array<{ new_wallets: number }>
 
   const started7d    = parseInt(completionRow[0]?.started  ?? '0', 10)
   const completed7d  = parseInt(completionRow[0]?.completed ?? '0', 10)
   const completionRate = started7d > 0 ? Math.round((completed7d / started7d) * 100) : null
-  const startedToday   = parseInt(levelsRow[0]?.started  ?? '0', 10)
-  const completedToday = parseInt(levelsRow[0]?.completed ?? '0', 10)
 
   return res.status(200).json({
     dau:              dauRow[0]?.dau ?? 0,
     mau:              mauRow[0]?.mau ?? 0,
     new_wallets_today: walletRow[0]?.new_wallets ?? 0,
-    levels_started_today:   startedToday,
-    levels_completed_today: completedToday,
+    levels_started_today:   parseInt(levelsRow[0]?.started  ?? '0', 10),
+    levels_completed_today: parseInt(levelsRow[0]?.completed ?? '0', 10),
     completion_rate_7d_pct: completionRate,
-    hint_denied_7d:         hintDeniedRow[0]?.hint_denied_7d ?? 0,
+    hint_denied_7d:         hintRow[0]?.hint_denied_7d ?? 0,
     gems_spent_today:   gemRow[0]?.gems_spent ?? 0,
     gala_purchases_7d:  purchaseRow[0]?.purchase_count ?? 0,
     gala_total_7d:      parseFloat(purchaseRow[0]?.gala_total ?? '0'),
@@ -208,7 +199,9 @@ async function handleDaily(req: VercelRequest, res: VercelResponse) {
     FROM date_series d
     LEFT JOIN daily_events e ON e.day = d.day
     ORDER BY d.day ASC
-  ` as Array<{
+  `
+
+  const typed = rows as Array<{
     date: string; dau: number; new_wallets: number
     levels_started: number; levels_completed: number
     words_rejected: number; hint_denied: number
@@ -219,7 +212,7 @@ async function handleDaily(req: VercelRequest, res: VercelResponse) {
 
   return res.status(200).json({
     days,
-    series: rows.map(r => ({
+    series: typed.map(r => ({
       ...r,
       gala_spent:          parseFloat(r.gala_spent),
       completion_rate_pct: r.completion_rate_pct !== null ? parseFloat(r.completion_rate_pct) : null,
@@ -237,73 +230,72 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
   const db = sql()
   const since = db`NOW() - (${days} || ' days')::interval`
 
-  const [galaFunnel, shopFunnel, gameplayFunnel, gemBreakdown, worldPopularity] =
-    await Promise.all([
-      db`SELECT
-           COUNT(*) FILTER (WHERE event = 'gala_purchase_initiated') AS initiated,
-           COUNT(*) FILTER (WHERE event = 'gala_transfer_submitted') AS submitted,
-           COUNT(*) FILTER (WHERE event = 'gala_purchase_success')   AS success,
-           COUNT(*) FILTER (WHERE event = 'gala_purchase_failed')    AS failed,
-           COUNT(*) FILTER (WHERE event = 'gala_gateway_timeout')    AS timeout
-         FROM analytics_events
-         WHERE event IN (
-           'gala_purchase_initiated','gala_transfer_submitted',
-           'gala_purchase_success','gala_purchase_failed','gala_gateway_timeout'
-         ) AND received_at >= ${since}`
-        as unknown as Promise<Array<{
-          initiated: string; submitted: string; success: string; failed: string; timeout: string
-        }>>,
+  const funnelResults = await Promise.all([
+    db`SELECT
+         COUNT(*) FILTER (WHERE event = 'gala_purchase_initiated') AS initiated,
+         COUNT(*) FILTER (WHERE event = 'gala_transfer_submitted') AS submitted,
+         COUNT(*) FILTER (WHERE event = 'gala_purchase_success')   AS success,
+         COUNT(*) FILTER (WHERE event = 'gala_purchase_failed')    AS failed,
+         COUNT(*) FILTER (WHERE event = 'gala_gateway_timeout')    AS timeout
+       FROM analytics_events
+       WHERE event IN (
+         'gala_purchase_initiated','gala_transfer_submitted',
+         'gala_purchase_success','gala_purchase_failed','gala_gateway_timeout'
+       ) AND received_at >= ${since}`,
 
-      db`SELECT
-           COUNT(*) FILTER (WHERE event = 'shop_opened')                             AS shop_opened,
-           COUNT(*) FILTER (WHERE event = 'hint_denied_no_balance')                  AS hint_denied,
-           COUNT(*) FILTER (WHERE event = 'hint_pack_purchased'
-             OR (event = 'gem_spent' AND properties->>'reason' = 'hint_pack'))       AS hint_pack_bought,
-           COUNT(*) FILTER (WHERE event = 'gala_purchase_success')                   AS gem_pack_bought
-         FROM analytics_events
-         WHERE event IN (
-           'shop_opened','hint_denied_no_balance','hint_pack_purchased',
-           'gem_spent','gala_purchase_success'
-         ) AND received_at >= ${since}`
-        as unknown as Promise<Array<{
-          shop_opened: string; hint_denied: string; hint_pack_bought: string; gem_pack_bought: string
-        }>>,
+    db`SELECT
+         COUNT(*) FILTER (WHERE event = 'shop_opened')                            AS shop_opened,
+         COUNT(*) FILTER (WHERE event = 'hint_denied_no_balance')                 AS hint_denied,
+         COUNT(*) FILTER (WHERE event = 'hint_pack_purchased'
+           OR (event = 'gem_spent' AND properties->>'reason' = 'hint_pack'))      AS hint_pack_bought,
+         COUNT(*) FILTER (WHERE event = 'gala_purchase_success')                  AS gem_pack_bought
+       FROM analytics_events
+       WHERE event IN (
+         'shop_opened','hint_denied_no_balance','hint_pack_purchased',
+         'gem_spent','gala_purchase_success'
+       ) AND received_at >= ${since}`,
 
-      db`SELECT
-           COUNT(DISTINCT address) FILTER (WHERE event = 'wallet_connected') AS connected,
-           COUNT(DISTINCT address) FILTER (WHERE event = 'level_started')    AS played,
-           COUNT(DISTINCT address) FILTER (WHERE event = 'level_completed')  AS completed
-         FROM analytics_events
-         WHERE event IN ('wallet_connected','level_started','level_completed')
-           AND address IS NOT NULL AND received_at >= ${since}`
-        as unknown as Promise<Array<{ connected: string; played: string; completed: string }>>,
+    db`SELECT
+         COUNT(DISTINCT address) FILTER (WHERE event = 'wallet_connected') AS connected,
+         COUNT(DISTINCT address) FILTER (WHERE event = 'level_started')    AS played,
+         COUNT(DISTINCT address) FILTER (WHERE event = 'level_completed')  AS completed
+       FROM analytics_events
+       WHERE event IN ('wallet_connected','level_started','level_completed')
+         AND address IS NOT NULL AND received_at >= ${since}`,
 
-      db`SELECT
-           properties->>'reason'                           AS reason,
-           COUNT(*)::int                                   AS count,
-           COALESCE(SUM((properties->>'amount')::int), 0)  AS total_gems
-         FROM analytics_events
-         WHERE event = 'gem_spent' AND received_at >= ${since}
-         GROUP BY properties->>'reason'
-         ORDER BY total_gems DESC`
-        as unknown as Promise<Array<{ reason: string; count: number; total_gems: string }>>,
+    db`SELECT
+         properties->>'reason'                           AS reason,
+         COUNT(*)::int                                   AS count,
+         COALESCE(SUM((properties->>'amount')::int), 0)  AS total_gems
+       FROM analytics_events
+       WHERE event = 'gem_spent' AND received_at >= ${since}
+       GROUP BY properties->>'reason'
+       ORDER BY total_gems DESC`,
 
-      db`SELECT
-           properties->>'world_id'  AS world_id,
-           COUNT(*)::int            AS starts,
-           COUNT(*) FILTER (WHERE event = 'level_completed')::int AS completions
-         FROM analytics_events
-         WHERE event IN ('level_started','level_completed')
-           AND properties->>'world_id' IS NOT NULL
-           AND received_at >= ${since}
-         GROUP BY properties->>'world_id'
-         ORDER BY starts DESC LIMIT 15`
-        as unknown as Promise<Array<{ world_id: string; starts: number; completions: number }>>,
-    ])
+    db`SELECT
+         properties->>'world_id'  AS world_id,
+         COUNT(*)::int            AS starts,
+         COUNT(*) FILTER (WHERE event = 'level_completed')::int AS completions
+       FROM analytics_events
+       WHERE event IN ('level_started','level_completed')
+         AND properties->>'world_id' IS NOT NULL
+         AND received_at >= ${since}
+       GROUP BY properties->>'world_id'
+       ORDER BY starts DESC LIMIT 15`,
+  ])
 
-  const gala = galaFunnel[0]
-  const shop = shopFunnel[0]
-  const game = gameplayFunnel[0]
+  // Cast after await
+  type GalaRow = { initiated: string; submitted: string; success: string; failed: string; timeout: string }
+  type ShopRow = { shop_opened: string; hint_denied: string; hint_pack_bought: string; gem_pack_bought: string }
+  type GameRow = { connected: string; played: string; completed: string }
+  type GemRow  = { reason: string; count: number; total_gems: string }
+  type WorldRow = { world_id: string; starts: number; completions: number }
+
+  const gala  = (funnelResults[0] as Array<GalaRow>)[0]
+  const shop  = (funnelResults[1] as Array<ShopRow>)[0]
+  const game  = (funnelResults[2] as Array<GameRow>)[0]
+  const gems  = funnelResults[3] as Array<GemRow>
+  const world = funnelResults[4] as Array<WorldRow>
 
   return res.status(200).json({
     days,
@@ -325,12 +317,12 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
       wallets_played:    parseInt(game?.played    ?? '0', 10),
       wallets_completed: parseInt(game?.completed ?? '0', 10),
     },
-    gem_spend_by_reason: gemBreakdown.map(r => ({
+    gem_spend_by_reason: gems.map(r => ({
       reason:     r.reason,
       count:      r.count,
       total_gems: parseInt(r.total_gems, 10),
     })),
-    world_popularity: worldPopularity,
+    world_popularity: world,
   })
 }
 
@@ -348,14 +340,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'daily':    return await handleDaily(req, res)
       case 'funnel':   return await handleFunnel(req, res)
       default:
-        return res.status(404).json({ error: `Unknown analytics route: ${route(req)}` })
+        return res.status(404).json({ error: `Unknown analytics route: ${route(req)}`, url: req.url })
     }
   } catch (err: any) {
     console.error('[analytics] unhandled crash:', err)
-    return res.status(500).json({
-      error:   err?.message ?? String(err),
-      route:   route(req),
-      url:     req.url,
-    })
+    return res.status(500).json({ error: err?.message ?? String(err), route: route(req), url: req.url })
   }
 }
