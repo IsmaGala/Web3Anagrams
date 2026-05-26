@@ -18,8 +18,9 @@ import { track } from '../_lib/analytics.js'
 // ─────────────────────────────────────────────────────────────────────────────
 
 function route(req: VercelRequest): string {
-  const p = req.query['path']
-  const seg = Array.isArray(p) ? p[0] : (p ?? '')
+  // req.query path params are unreliable under framework:vite — read from URL.
+  // e.g. /api/analytics/overview?days=7  →  'overview'
+  const seg = (req.url ?? '').split('?')[0].split('/').filter(Boolean).pop() ?? ''
   return seg.toLowerCase()
 }
 

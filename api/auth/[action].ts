@@ -20,8 +20,9 @@ function isHex(s: unknown): s is string {
 }
 
 function action(req: VercelRequest): string {
-  const a = req.query['action']
-  return (Array.isArray(a) ? a[0] : (a ?? '')).toLowerCase()
+  // req.query path params are unreliable under framework:vite — read from URL.
+  const seg = (req.url ?? '').split('?')[0].split('/').filter(Boolean).pop() ?? ''
+  return seg.toLowerCase()
 }
 
 // ── POST /api/auth/nonce ──────────────────────────────────────────────────────
