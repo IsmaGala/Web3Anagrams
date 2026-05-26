@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getAddress } from 'ethers'
 import { useGameStore } from '../store/gameStore'
 import { useWalletStore } from '../store/walletStore'
@@ -6,6 +6,7 @@ import { api } from '../utils/apiClient'
 import { playSfx } from '../utils/sfx'
 import { useScreenBackdrop } from '../utils/screenBackdrop'
 import { buildTransferGalaDto, signGalaDto } from '../utils/galaChain'
+import { track } from '../utils/analytics'
 
 // Gem Store — real GalaChain GALA payments.
 //
@@ -73,6 +74,15 @@ export default function GemStore() {
 
   const signedIn = !!walletAddress && !!jwt && !!walletType
 
+  // Track shop_opened once on mount — GemStore is a full screen, so mounting
+  // is equivalent to the player opening it.
+  useEffect(() => {
+    track('shop_opened', {
+      current_gems: gemsBalance,
+      entry_point:  'gem_store',
+    })
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
   function openPurchase(pack: Pack, method: PayMethod) {
     playSfx('uiTap')
     if (!signedIn) {
@@ -89,6 +99,11 @@ export default function GemStore() {
       showToast('Treasury not configured — set VITE_GAME_TREASURY_ADDRESS')
       return
     }
+    track('gala_purchase_initiated', {
+      pack_id:      pack.id,
+      gala_amount:  pack.gala,
+      gems_to_credit: pack.gems,
+    })
     setPendingPack(pack)
     setPendingMethod(method)
   }

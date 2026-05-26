@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WordChain Analytics</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    /* ── Layout ── */
+    .header {
+      display: flex; align-items: center; gap: 16px;
+      padding: 18px 28px;
+      background: #1a1a2e;
+      border-bottom: 1px solid rgba(167,139,250,0.2);
+    }
+    .header h1 { font-size: 1.3rem; font-weight: 700; color: #a78bfa; }
+    .header .subtitle { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
+    .header .spacer { flex: 1; }
+    .header .as-of { font-size: 0.72rem; color: #475569; }
+    .refresh-btn {
+      padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(167,139,250,0.4);
+      background: rgba(167,139,250,0.1); color: #a78bfa; cursor: pointer;
+      font-size: 0.8rem; transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: rgba(167,139,250,0.2); }
+    .refresh-btn:disabled { opacity: 0.4; cursor: wait; }
+    .tabs {
+      display: flex; gap: 4px;
+      padding: 12px 28px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: #1a1a2e;
+    }
+    .tab {
+      padding: 8px 18px; border-radius: 8px 8px 0 0; cursor: pointer;
+      font-size: 0.82rem; font-weight: 600; color: #64748b;
+      border: 1px solid transparent; border-bottom: none;
+      transition: all 0.15s;
+    }
+    .tab.active {
+      background: #0f0f1a; color: #a78bfa;
+      border-color: rgba(167,139,250,0.25);
+    }
+    .tab:hover:not(.active) { color: #94a3b8; }
+    .content { padding: 24px 28px; max-width: 1400px; }
+
+    /* ── KPI cards ── */
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .kpi-card {
+      background: #1a1a2e; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px; padding: 16px 18px;
+    }
+    .kpi-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .kpi-value { font-size: 1.7rem; font-weight: 700; color: #f1f5f9; }
+    .kpi-sub   { font-size: 0.72rem; color: #475569; margin-top: 4px; }
+    .kpi-up    { color: #4ade80; }
+    .kpi-down  { color: #f87171; }
+    .kpi-neutral { color: #94a3b8; }
+
+    /* ── Charts ── */
+    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .chart-row.single { grid-template-columns: 1fr; }
+    .chart-row.thirds { grid-template-columns: 2fr 1fr; }
+    .card {
+      background: #1a1a2e; border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px; padding: 20px;
+    }
+    .card-title { font-size: 0.8rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+
+    /* ── Funnel bars ── */
+    .funnel { display: flex; flex-direction: column; gap: 10px; }
+    .funnel-step { display: flex; align-items: center; gap: 12px; }
+    .funnel-label { font-size: 0.78rem; color: #94a3b8; width: 130px; flex-shrink: 0; }
+    .funnel-track { flex: 1; height: 26px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; }
+    .funnel-fill  { height: 100%; border-radius: 6px; transition: width 0.6s ease; display: flex; align-items: center; padding-left: 10px; }
+    .funnel-count { font-size: 0.75rem; font-weight: 700; color: #fff; }
+    .funnel-pct   { font-size: 0.7rem; color: #94a3b8; width: 44px; text-align: right; flex-shrink: 0; }
+
+    /* ── Error / loading ── */
+    .loading { display: flex; align-items: center; justify-content: center; height: 120px; color: #475569; font-size: 0.85rem; }
+    .error-msg { color: #f87171; font-size: 0.8rem; padding: 12px; background: rgba(248,113,113,0.08); border-radius: 8px; }
+
+    /* ── Custom tooltip ── */
+    .recharts-tooltip-wrapper .custom-tooltip {
+      background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+      padding: 10px 14px; font-size: 0.78rem;
+    }
+    .custom-tooltip .label { color: #94a3b8; margin-bottom: 6px; }
+    .custom-tooltip .item  { color: #f1f5f9; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, useEffect, useCallback } = React;
+const {
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend
+} = Recharts;
+
+// ── Config ────────────────────────────────────────────────────────────────────
+// If the dashboard is served from a different origin than the API,
+// set DASHBOARD_API_ORIGIN in the build. Otherwise same-origin works.
+const API = (window.DASHBOARD_API_ORIGIN || '');
+
+const COLORS = ['#a78bfa','#34d399','#60a5fa','#f472b6','#fbbf24','#fb923c'];
+const WORLD_LABELS = {
+  area51:'Area 51', area515:'Area 51.5', asimov:'Asimov',
+  blood_donor:'Blood Donor', daily:'Daily', eternal_night:'Eternal Night',
+  flags:'Flags', galaswap:'GalaSwap', miranda:'Miranda',
+  nature:'Nature', ocean_event:'Ocean Event', townstar:'Town Star',
+};
+
+// ── Fetch helper ──────────────────────────────────────────────────────────────
+function useFetch(url, deps = []) {
+  const [data,  setData]  = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(() => {
+    setLoading(true); setError(null);
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 8000);
+    fetch(API + url, { signal: ctrl.signal })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false); } })
+      .finally(() => clearTimeout(tid));
+    return () => { clearTimeout(tid); ctrl.abort(); };
+  }, [url]);
+
+  useEffect(() => { return load(); }, [load, ...deps]);
+  return { data, error, loading, reload: load };
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+const fmt  = n => n == null ? '—' : n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n);
+const fmtD = s => s ? s.slice(5) : '';  // "YYYY-MM-DD" → "MM-DD"
+
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+function KPICard({ label, value, sub, accent }) {
+  return React.createElement('div', { className: 'kpi-card' },
+    React.createElement('div', { className: 'kpi-label' }, label),
+    React.createElement('div', { className: 'kpi-value', style: accent ? { color: accent } : {} }, value),
+    sub && React.createElement('div', { className: 'kpi-sub' }, sub),
+  );
+}
+
+// ── Custom tooltip ────────────────────────────────────────────────────────────
+function Tip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return React.createElement('div', { className: 'custom-tooltip' },
+    React.createElement('div', { className: 'label' }, label),
+    payload.map((p, i) =>
+      React.createElement('div', { key: i, className: 'item', style: { color: p.color } },
+        `${p.name}: ${p.value}`
+      )
+    )
+  );
+}
+
+// ── Funnel bar ────────────────────────────────────────────────────────────────
+function FunnelBar({ label, count, max, color, pct }) {
+  const w = max > 0 ? Math.round((count / max) * 100) : 0;
+  return React.createElement('div', { className: 'funnel-step' },
+    React.createElement('div', { className: 'funnel-label' }, label),
+    React.createElement('div', { className: 'funnel-track' },
+      React.createElement('div', { className: 'funnel-fill', style: { width: w + '%', background: color } },
+        React.createElement('span', { className: 'funnel-count' }, count)
+      )
+    ),
+    React.createElement('div', { className: 'funnel-pct' }, pct != null ? pct + '%' : '')
+  );
+}
+
+// ── Overview tab ──────────────────────────────────────────────────────────────
+function OverviewTab({ onAsOf }) {
+  const ov = useFetch('/api/analytics/overview');
+  const dy = useFetch('/api/analytics/daily?days=30');
+
+  useEffect(() => { if (ov.data?.as_of) onAsOf(ov.data.as_of); }, [ov.data]);
+
+  if (ov.error || dy.error)
+    return React.createElement('div', { className: 'error-msg' }, '⚠ ' + (ov.error || dy.error));
+
+  const d = ov.data || {};
+  const series = dy.data?.series || [];
+
+  return React.createElement('div', null,
+    // KPI row
+    React.createElement('div', { className: 'kpi-row' },
+      React.createElement(KPICard, { label: 'DAU (today)',       value: fmt(d.dau),              sub: 'active wallets' }),
+      React.createElement(KPICard, { label: 'MAU (30d)',         value: fmt(d.mau),              sub: 'active wallets' }),
+      React.createElement(KPICard, { label: 'New wallets today', value: fmt(d.new_wallets_today), sub: 'first connect' }),
+      React.createElement(KPICard, { label: 'Levels today',      value: fmt(d.levels_started_today), sub: `${fmt(d.levels_completed_today)} completed` }),
+      React.createElement(KPICard, { label: 'Completion rate',   value: d.completion_rate_7d_pct != null ? d.completion_rate_7d_pct + '%' : '—', sub: '7-day rolling', accent: d.completion_rate_7d_pct >= 60 ? '#4ade80' : '#fbbf24' }),
+      React.createElement(KPICard, { label: 'GALA purchases',    value: fmt(d.gala_purchases_7d), sub: `${d.gala_total_7d || 0} GALA (7d)`, accent: '#fbbf24' }),
+    ),
+
+    // DAU time-series
+    React.createElement('div', { className: 'chart-row single' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Daily Active Wallets — 30 days'),
+        ov.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : React.createElement(ResponsiveContainer, { width: '100%', height: 240 },
+              React.createElement(AreaChart, { data: series },
+                React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+                React.createElement(XAxis, { dataKey: 'date', tickFormatter: fmtD, tick: { fill: '#475569', fontSize: 11 } }),
+                React.createElement(YAxis, { tick: { fill: '#475569', fontSize: 11 } }),
+                React.createElement(Tooltip, { content: React.createElement(Tip) }),
+                React.createElement(Area, { type: 'monotone', dataKey: 'dau', name: 'DAU', stroke: '#a78bfa', fill: 'rgba(167,139,250,0.15)' }),
+                React.createElement(Area, { type: 'monotone', dataKey: 'new_wallets', name: 'New wallets', stroke: '#34d399', fill: 'rgba(52,211,153,0.1)' }),
+              )
+            )
+      )
+    ),
+
+    // Levels + completion rate
+    React.createElement('div', { className: 'chart-row' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Levels per Day'),
+        React.createElement(ResponsiveContainer, { width: '100%', height: 220 },
+          React.createElement(BarChart, { data: series },
+            React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+            React.createElement(XAxis, { dataKey: 'date', tickFormatter: fmtD, tick: { fill: '#475569', fontSize: 11 } }),
+            React.createElement(YAxis, { tick: { fill: '#475569', fontSize: 11 } }),
+            React.createElement(Tooltip, { content: React.createElement(Tip) }),
+            React.createElement(Legend, { wrapperStyle: { fontSize: '0.75rem' } }),
+            React.createElement(Bar, { dataKey: 'levels_started',   name: 'Started',   fill: '#60a5fa', radius: [3,3,0,0] }),
+            React.createElement(Bar, { dataKey: 'levels_completed', name: 'Completed', fill: '#4ade80', radius: [3,3,0,0] }),
+          )
+        )
+      ),
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'GALA Revenue — 30 days'),
+        React.createElement(ResponsiveContainer, { width: '100%', height: 220 },
+          React.createElement(AreaChart, { data: series },
+            React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+            React.createElement(XAxis, { dataKey: 'date', tickFormatter: fmtD, tick: { fill: '#475569', fontSize: 11 } }),
+            React.createElement(YAxis, { tick: { fill: '#475569', fontSize: 11 } }),
+            React.createElement(Tooltip, { content: React.createElement(Tip) }),
+            React.createElement(Area, { type: 'monotone', dataKey: 'gala_spent', name: 'GALA', stroke: '#fbbf24', fill: 'rgba(251,191,36,0.15)' }),
+          )
+        )
+      ),
+    ),
+  );
+}
+
+// ── Funnels tab ───────────────────────────────────────────────────────────────
+function FunnelsTab() {
+  const fn = useFetch('/api/analytics/funnel?days=7');
+  if (fn.error) return React.createElement('div', { className: 'error-msg' }, '⚠ ' + fn.error);
+  if (fn.loading) return React.createElement('div', { className: 'loading' }, 'Loading…');
+
+  const { gala_purchase_funnel: gala, shop_funnel: shop, gameplay_funnel: game,
+          gem_spend_by_reason: gems, world_popularity: worlds } = fn.data || {};
+
+  const galaMax  = gala?.initiated || 1;
+  const shopMax  = shop?.shop_opened || 1;
+  const gameMax  = game?.wallets_connected || 1;
+
+  const pct = (n, d) => d > 0 ? Math.round(n / d * 100) : 0;
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'kpi-row', style: { marginBottom: 24 } },
+      React.createElement(KPICard, { label: 'Gameplay funnel', value: pct(game?.wallets_completed, game?.wallets_connected) + '%', sub: 'connected → completed (7d)' }),
+      React.createElement(KPICard, { label: 'GALA conversion', value: pct(gala?.success, gala?.initiated) + '%', sub: 'initiated → success (7d)', accent: '#fbbf24' }),
+      React.createElement(KPICard, { label: 'Shop → hint buy', value: pct(shop?.hint_pack_bought, shop?.hint_denied) + '%', sub: 'denied → bought (7d)' }),
+      React.createElement(KPICard, { label: 'Gateway errors', value: ((gala?.failed || 0) + (gala?.timeout || 0)).toString(), sub: 'failed + timeouts (7d)', accent: (gala?.failed + gala?.timeout) > 0 ? '#f87171' : '#4ade80' }),
+    ),
+
+    React.createElement('div', { className: 'chart-row' },
+      // GALA purchase funnel
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'GALA Purchase Funnel — 7 days'),
+        React.createElement('div', { className: 'funnel' },
+          React.createElement(FunnelBar, { label: 'Initiated',  count: gala?.initiated, max: galaMax, color: '#a78bfa', pct: 100 }),
+          React.createElement(FunnelBar, { label: 'Submitted',  count: gala?.submitted, max: galaMax, color: '#60a5fa', pct: pct(gala?.submitted, gala?.initiated) }),
+          React.createElement(FunnelBar, { label: '✓ Success',  count: gala?.success,   max: galaMax, color: '#4ade80', pct: pct(gala?.success, gala?.initiated) }),
+          React.createElement(FunnelBar, { label: '✗ Failed',   count: gala?.failed,    max: galaMax, color: '#f87171', pct: pct(gala?.failed, gala?.initiated) }),
+          React.createElement(FunnelBar, { label: '⏱ Timeout', count: gala?.timeout,   max: galaMax, color: '#fb923c', pct: pct(gala?.timeout, gala?.initiated) }),
+        )
+      ),
+
+      // Gameplay funnel
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Gameplay Funnel — 7 days (unique wallets)'),
+        React.createElement('div', { className: 'funnel' },
+          React.createElement(FunnelBar, { label: 'Wallet connected', count: game?.wallets_connected, max: gameMax, color: '#a78bfa', pct: 100 }),
+          React.createElement(FunnelBar, { label: 'Played a level',   count: game?.wallets_played,    max: gameMax, color: '#60a5fa', pct: pct(game?.wallets_played, game?.wallets_connected) }),
+          React.createElement(FunnelBar, { label: 'Completed level',  count: game?.wallets_completed, max: gameMax, color: '#4ade80', pct: pct(game?.wallets_completed, game?.wallets_connected) }),
+        ),
+        React.createElement('div', { style: { marginTop: 24 } },
+          React.createElement('div', { className: 'card-title' }, 'Shop Funnel — 7 days'),
+          React.createElement('div', { className: 'funnel' },
+            React.createElement(FunnelBar, { label: 'Shop opened',    count: shop?.shop_opened,      max: shopMax, color: '#a78bfa', pct: 100 }),
+            React.createElement(FunnelBar, { label: 'Hint denied',    count: shop?.hint_denied,      max: shopMax, color: '#f472b6', pct: pct(shop?.hint_denied, shop?.shop_opened) }),
+            React.createElement(FunnelBar, { label: 'Hint pack bought', count: shop?.hint_pack_bought, max: shopMax, color: '#4ade80', pct: pct(shop?.hint_pack_bought, shop?.shop_opened) }),
+          )
+        )
+      ),
+    ),
+
+    React.createElement('div', { className: 'chart-row' },
+      // Gem spend breakdown (pie)
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Gem Spend by Reason — 7 days'),
+        gems?.length
+          ? React.createElement(ResponsiveContainer, { width: '100%', height: 240 },
+              React.createElement(PieChart, null,
+                React.createElement(Pie, {
+                  data: gems, dataKey: 'total_gems', nameKey: 'reason',
+                  cx: '50%', cy: '50%', outerRadius: 90,
+                  label: ({ reason, percent }) => `${reason} ${(percent * 100).toFixed(0)}%`,
+                  labelLine: false,
+                },
+                  gems.map((_, i) => React.createElement(Cell, { key: i, fill: COLORS[i % COLORS.length] }))
+                ),
+                React.createElement(Tooltip)
+              )
+            )
+          : React.createElement('div', { className: 'loading' }, 'No gem spend data yet')
+      ),
+
+      // World popularity (bar)
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'World Popularity — 7 days'),
+        worlds?.length
+          ? React.createElement(ResponsiveContainer, { width: '100%', height: 240 },
+              React.createElement(BarChart, { data: worlds, layout: 'vertical' },
+                React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+                React.createElement(XAxis, { type: 'number', tick: { fill: '#475569', fontSize: 11 } }),
+                React.createElement(YAxis, { type: 'category', dataKey: 'world_id',
+                  tickFormatter: w => WORLD_LABELS[w] || w,
+                  tick: { fill: '#94a3b8', fontSize: 11 }, width: 90 }),
+                React.createElement(Tooltip, { content: React.createElement(Tip) }),
+                React.createElement(Bar, { dataKey: 'starts',      name: 'Starts',      fill: '#60a5fa', radius: [0,3,3,0] }),
+                React.createElement(Bar, { dataKey: 'completions', name: 'Completions', fill: '#4ade80', radius: [0,3,3,0] }),
+              )
+            )
+          : React.createElement('div', { className: 'loading' }, 'No world data yet')
+      ),
+    ),
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab]   = useState('overview');
+  const [asOf, setAsOf] = useState(null);
+  const [tick, setTick] = useState(0);  // bump to force re-fetch
+
+  const refresh = () => setTick(t => t + 1);
+
+  return React.createElement('div', null,
+    // Header
+    React.createElement('div', { className: 'header' },
+      React.createElement('div', null,
+        React.createElement('h1', null, '⬡ WordChain Analytics'),
+        React.createElement('div', { className: 'subtitle' }, 'Internal dashboard — data from analytics_events'),
+      ),
+      React.createElement('div', { className: 'spacer' }),
+      asOf && React.createElement('div', { className: 'as-of' }, 'Updated ' + new Date(asOf).toLocaleTimeString()),
+      React.createElement('button', { className: 'refresh-btn', onClick: refresh }, '↻ Refresh'),
+    ),
+
+    // Tabs
+    React.createElement('div', { className: 'tabs' },
+      ['overview', 'funnels'].map(t =>
+        React.createElement('div', {
+          key: t, className: 'tab' + (tab === t ? ' active' : ''),
+          onClick: () => setTab(t),
+        }, t === 'overview' ? 'Overview' : 'Funnels & Economy')
+      )
+    ),
+
+    // Content
+    React.createElement('div', { className: 'content' },
+      tab === 'overview'
+        ? React.createElement(OverviewTab, { key: tick, onAsOf: setAsOf })
+        : React.createElement(FunnelsTab,  { key: tick })
+    ),
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>

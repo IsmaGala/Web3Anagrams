@@ -29,6 +29,7 @@ import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'
 import { parseWalletAddress } from '../_lib/wallet.js'
 import { grantGems } from '../_lib/economy.js'
+import { track } from '../_lib/analytics.js'
 
 // Pack catalog — keep in sync with src/components/GemStore.tsx PACKS.
 // `gala` is the GALA quantity (integer string) the player pays. Server
@@ -54,7 +55,7 @@ const GATEWAY = NETWORK === 'mainnet'
   ? (process.env.GALACHAIN_GATEWAY_MAINNET
       ?? 'https://gateway-mainnet.galachain.com/api/asset/token-contract')
   : (process.env.GALACHAIN_GATEWAY_TESTNET
-      ?? 'https://gateway-mainnet.galachain.com/api/asset/token-contract')
+      ?? 'https://gateway-testnet.galachain.com/api/testnet01/gc-a9b8b472b035c0510508c248d1110d3162b7e5f4-GalaChainToken')
 
 // Required. The wallet that receives player GALA payments. MUST be in
 // gala form (`eth|<EIP55>`) — we compare it byte-for-byte against
@@ -209,6 +210,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       causeChain.push(part)
       cur = cur.cause
     }
+    track('gala_gateway_timeout', {
+      address:          authAddr,
+      pack_id:          packId,
+      url:              transferUrl,
+      hmac_auth_enabled: !!(GATEWAY_API_KEY && GATEWAY_SECRET),
+      timeout_ms:       20000,
+      error_detail:     e?.message ?? String(e),
+      network:          NETWORK,
+    })
     return res.status(502).json({
       error:  isTimeout
         ? 'GalaChain gateway timed out after 20s — testnet may be unhealthy, or gateway HMAC auth is required and not configured'
@@ -250,6 +260,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Chaincode rejected (bad signature, insufficient GALA, unregistered
     // wallet, …). Surface the chain's own message so the player sees
     // "insufficient balance" instead of a generic failure.
+    track('gala_purchase_failed', {
+      address:      authAddr,
+      pack_id:      packId,
+      gala_amount:  pack.gala,
+      error_detail: chainResult?.Error?.Message ?? chainResult?.Message ?? chainResult?.ErrorKey ?? 'unknown chaincode error',
+      error_code:   chainResult?.Error?.ErrorCode ?? null,
+      network:      NETWORK,
+    })
     return res.status(402).json({
       ok:      false,
       error:   'GalaChain transfer failed',
@@ -277,6 +295,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       chainTxData: chainResult?.Data ?? null,
       replay:      isReplaySuccess || undefined,
     },
+  })
+
+  track('gala_purchase_success', {
+    address:      authAddr,
+    pack_id:      packId,
+    gala_spent:   pack.gala,
+    gems_credited: pack.gems,
+    new_balance:  granted.newBalance,
+    chain_tx_id:  chainTxId,
+    network:      NETWORK,
+    replay:       isReplaySuccess || undefined,
   })
 
   return res.status(200).json({

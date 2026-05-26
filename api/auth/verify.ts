@@ -17,6 +17,7 @@ import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
 import { signSession } from '../_lib/jwt.js'
 import { parseWalletAddress } from '../_lib/wallet.js'
+import { track } from '../_lib/analytics.js'
 
 function isHex(s: unknown): s is string {
   return typeof s === 'string' && /^0x[a-fA-F0-9]+$/.test(s)
@@ -101,6 +102,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── Mint JWT ─────────────────────────────────────────────────────────────
   const jwt = await signSession(parsed.stored)
   const ttl = parseInt(process.env.JWT_TTL_SECONDS ?? '86400', 10)
+
+  // Detect first-ever login: no prior rows in play_rounds for this address.
+  // Used only for the analytics first_time flag — non-critical, safe to fail.
+  let firstTime = false
+  try {
+    const prior = await sql()`
+      SELECT 1 FROM play_rounds WHERE address = ${parsed.stored} LIMIT 1
+    ` as Array<unknown>
+    firstTime = prior.length === 0
+  } catch {}
+
+  track('wallet_connected', {
+    address:    parsed.stored,
+    method:     parsed.kind === 'eth' ? 'metamask_or_gala' : parsed.kind,
+    first_time: firstTime,
+  })
+
   return res.status(200).json({
     jwt,
     address:   parsed.stored,

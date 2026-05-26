@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useGameStore } from './store/gameStore'
+import { registerDisconnectHandler } from './store/walletStore'
+import { useGameStore, wipeEconomy } from './store/gameStore'
 import { useProgressStore } from './store/progressStore'
 import { useWalletStore } from './store/walletStore'
 import { useCosmeticsStore } from './store/cosmeticsStore'
@@ -15,8 +16,20 @@ import Wardrobe from './components/Wardrobe'
 import DebugMenu from './components/DebugMenu'
 import OnboardingOverlay, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingOverlay'
 import WorldRewardOverlay from './components/WorldRewardOverlay'
-import { pullAndApply, schedulePush, flushPush } from './utils/profileSync'
+import { pullAndApply, schedulePush, flushPush, cancelPendingPush } from './utils/profileSync'
 import './styles/global.css'
+
+// Register the disconnect handler once at module load.
+// The metagame walletStore calls this on disconnect; it receives the JWT
+// (still set) so we can flush any pending sync before wiping state.
+registerDisconnectHandler(async (_jwt) => {
+  try { await flushPush() } catch {}
+  cancelPendingPush()
+  useProgressStore.getState().reset()
+  wipeEconomy()
+  useGameStore.getState().goToSplash()
+  cancelPendingPush()  // belt-and-suspenders
+})
 
 export default function App() {
   const screen     = useGameStore(s => s.screen)

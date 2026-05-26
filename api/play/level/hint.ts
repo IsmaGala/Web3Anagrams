@@ -22,6 +22,7 @@ import { requireAuth } from '../../_lib/jwt.js'
 import { getLevel } from '../../_data/worldsServerData.js'
 import { validateLevel, slotForWord } from '../../_lib/play.js'
 import { loadRound, appendHintReveal, tryDecrementHints, type HintReveal } from '../../_lib/round.js'
+import { track } from '../../_lib/analytics.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (applyCors(req, res)) return
@@ -84,6 +85,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // player is broke; tell them to top up.
   const newBalance = await tryDecrementHints(address)
   if (newBalance === null) {
+    track('hint_denied_no_balance', {
+      address,
+      round_id:    roundId,
+      world_id:    round.world_id,
+      level_index: round.level_index,
+    })
     return res.status(402).json({ error: 'no-hints' })
   }
 

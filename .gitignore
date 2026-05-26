@@ -32,3 +32,7 @@ dist-ssr
 .env.*
 !.env.example
 .env/local
+
+# Standalone GalaChain TransferToken PoC — never commit. May contain
+# logs with private-key-derived data and is for local one-off testing only.
+gala-poc/

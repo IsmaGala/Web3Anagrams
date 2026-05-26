@@ -1,16 +1,29 @@
 // GET /api/profile
 // Headers: Authorization: Bearer <jwt>
-// Returns: { address, payload, updatedAt, balances, firstWalletBonusGranted? }
+// Returns: {
+//   address, payload, updatedAt, balances, inventory,
+//   firstWalletBonusGranted?,
+// }
 //
 // • address    — the JWT-verified wallet
 // • payload    — the JSONB blob the client uploaded most recently, or null
-//                if this wallet has never synced
+//                if this wallet has never synced. Owns level scores and
+//                completion flags; ownership of skins/premium/event entries
+//                no longer lives here (see `inventory`).
 // • updatedAt  — ISO timestamp of the last sync, or null
 // • balances   — authoritative gem + hint balance from player_balances
-// • firstWalletBonusGranted — when this is the wallet's first profile pull
-//                ever, the server grants the welcome bundle (gems + hints)
-//                and includes the granted amounts here. Subsequent calls
-//                omit the field.
+// • inventory  — authoritative ownership derived from balance_transactions:
+//                { ownedSkins, unlockedPremium, eventUnlocks }. The client
+//                should trust these over anything in `payload`.
+// • firstWalletBonusGranted — present only on the first profile pull ever
+//                for this wallet. Server granted the welcome bundle inside
+//                that same call; `balances` already reflects it.
+//
+// First-wallet bonus (since v5): used to be client-issued in App.tsx, which
+// meant a cheater could keep flipping `firstWalletBonusClaimed` in
+// localStorage and minting +15 gems / +5 hints on every reload. Now it's
+// server-issued exactly once per (address), with the audit row in
+// balance_transactions as the dedup guard.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { sql } from './_lib/db.js'
@@ -18,6 +31,7 @@ import { applyCors } from './_lib/cors.js'
 import { requireAuth } from './_lib/jwt.js'
 import { getBalances } from './_lib/round.js'
 import { grantGems, grantHints, hasReceivedGrant } from './_lib/economy.js'
+import { getInventory } from './_lib/inventory.js'
 import { FIRST_WALLET_BONUS } from './_data/worldsServerData.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -27,10 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // ── Diagnostic guard ─────────────────────────────────────────────────────
-  // Surface specific config errors instead of letting them collapse into
-  // Vercel's generic FUNCTION_INVOCATION_FAILED. The two env vars below are
-  // the most common deploy-time misses.
+  // Diagnostic guards.
   if (!process.env.DATABASE_URL) {
     return res.status(500).json({ error: 'DATABASE_URL is not configured on this deployment' })
   }
@@ -43,9 +54,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: 'Missing or invalid Authorization bearer token' })
   }
 
-  // Wrap the entire DB-touching section so any thrown error (missing table,
-  // SQL syntax mismatch, connection failure, etc.) comes back as a real
-  // 500-with-message rather than FUNCTION_INVOCATION_FAILED.
   try {
     // ── First-wallet welcome bundle ────────────────────────────────────────
     // Granted exactly once per address. The audit log is the source of truth
@@ -77,19 +85,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? (row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at)
       : null
 
-    // ── Authoritative balances ─────────────────────────────────────────────
-    const balances = await getBalances(address)
+    // ── Authoritative balances + inventory ─────────────────────────────────
+    // Both come straight from server-side tables. balances from
+    // player_balances; inventory derived from balance_transactions metadata.
+    // Reflects any grant we just made in the bonus branch above.
+    const balances  = await getBalances(address)
+    const inventory = await getInventory(address)
 
     return res.status(200).json({
       address,
       payload:   row?.payload ?? null,
       updatedAt,
       balances,
+      inventory,
       firstWalletBonusGranted,
     })
   } catch (e: any) {
-    // Surface the real error so we can see WHY in the browser network panel
-    // instead of getting Vercel's opaque FUNCTION_INVOCATION_FAILED.
     const msg = e?.message ?? String(e)
     const code = e?.code ?? e?.name ?? 'UNKNOWN'
     return res.status(500).json({

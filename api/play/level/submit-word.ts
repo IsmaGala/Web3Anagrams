@@ -34,6 +34,7 @@ import {
 } from '../../_lib/round.js'
 import { grantGems, grantHints, hasReceivedGrant } from '../../_lib/economy.js'
 import { sql } from '../../_lib/db.js'
+import { track } from '../../_lib/analytics.js'
 
 const MAX_WORD_LEN = 24
 const WORD_RE = /^[A-Z]{2,24}$/
@@ -83,6 +84,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // attempt legitimate" check, but it cuts noise from miss-counting.
   if (!canMakeWord(W, round.shuffled_letters)) {
     const misses = await incrementMisses(roundId)
+    track('word_rejected', {
+      address,
+      round_id:   roundId,
+      world_id:   round.world_id,
+      level_index: round.level_index,
+      reason:     'not-makeable',
+      miss_count: misses,
+    })
     return res.status(200).json({ result: 'rejected', reason: 'not-makeable', misses })
   }
 
@@ -116,6 +125,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
       await markCompleted(roundId, breakdown.final)
 
+      const timeElapsedS = Math.round((Date.now() - new Date(round.started_at).getTime()) / 1000)
+      track('level_completed', {
+        address,
+        round_id:          roundId,
+        world_id:          round.world_id,
+        level_index:       round.level_index,
+        mode:              round.mode,
+        final_score:       breakdown.final,
+        base_score:        breakdown.base,
+        miss_penalty:      breakdown.missPenalty   ?? null,
+        hint_penalty:      breakdown.hintPenalty   ?? null,
+        time_bonus:        breakdown.timeBonus     ?? null,
+        time_elapsed_s:    timeElapsedS,
+        bonus_words_found: round.found_bonus.length,
+        hints_used:        round.hints_revealed.length,
+        miss_count:        round.misses,
+      })
+
       // ── Daily-win reward ──────────────────────────────────────────────────
       // Hints granted server-side now (used to be client-asserted, which let
       // anyone refresh the page after a daily win to multiply the reward).
@@ -139,6 +166,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             metadata: { dateKey, worldId: round.world_id },
           })
           dailyWinGranted = { hints: DAILY_WIN_HINT_REWARD }
+          track('daily_win_reward_granted', {
+            address,
+            hints_granted: DAILY_WIN_HINT_REWARD,
+            date_key:      dateKey,
+            world_id:      round.world_id,
+            round_id:      roundId,
+          })
         }
       }
 
@@ -175,6 +209,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 metadata: { worldId: wid },
               })
               worldCompletionGranted = { amount: bounty, worldId: wid }
+              track('world_completion_bounty', {
+                address,
+                world_id:            wid,
+                gems_granted:        bounty,
+                distinct_levels_done: distinctDone,
+                round_id:            roundId,
+              })
             }
           }
         }
@@ -217,5 +258,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ── Miss ─────────────────────────────────────────────────────────────────
   const misses = await incrementMisses(roundId)
+  track('word_rejected', {
+    address,
+    round_id:    roundId,
+    world_id:    round.world_id,
+    level_index: round.level_index,
+    reason:      'not-in-chain',
+    miss_count:  misses,
+  })
   return res.status(200).json({ result: 'rejected', reason: 'not-in-chain', misses })
 }

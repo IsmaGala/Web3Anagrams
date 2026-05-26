@@ -1,0 +1,27 @@
+{
+  "name": "@gala-games/metagame",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./store/walletStore": "./src/store/walletStore.ts",
+    "./utils/apiClient": "./src/utils/apiClient.ts",
+    "./utils/wallet": "./src/utils/wallet.ts",
+    "./utils/sfxEngine": "./src/utils/sfxEngine.ts",
+    "./components/WalletConnectModal": "./src/components/WalletConnectModal.tsx",
+    "./types": "./src/types.ts"
+  },
+  "dependencies": {
+    "@gala-chain/api": "^2.7.1",
+    "ethers": "^6.13.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "zustand": "^5.0.13"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "~6.0.2"
+  }
+}

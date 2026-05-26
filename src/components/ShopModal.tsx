@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
 import type { HintPack } from '../types'
+import { track } from '../utils/analytics'
 
 const PACKS: HintPack[] = [
   { id:'starter', label:'STARTER',  icon:'💡', hints:5,   cost:100,  desc:'5 hints' },
@@ -12,6 +14,16 @@ export default function ShopModal() {
   const closeShop   = useGameStore(s => s.closeShop)
   const buyPack     = useGameStore(s => s.buyPack)
   const gemsBalance = useGameStore(s => s.gemsBalance)
+
+  // Fire shop_opened once each time the modal becomes visible.
+  useEffect(() => {
+    if (showShop) {
+      track('shop_opened', {
+        current_gems: gemsBalance,
+        entry_point:  'nav',   // ShopModal is opened via in-game nav/hint button
+      })
+    }
+  }, [showShop])  // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!showShop) return null
 

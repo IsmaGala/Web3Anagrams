@@ -15,6 +15,7 @@ import { requireAuth } from '../../_lib/jwt.js'
 import { getLevel } from '../../_data/worldsServerData.js'
 import { buildManifest } from '../../_lib/play.js'
 import { createRound, newRoundId, seedFromRoundId, getBalances } from '../../_lib/round.js'
+import { track } from '../../_lib/analytics.js'
 
 function isWorldId(s: unknown): s is string {
   return typeof s === 'string' && /^[a-z0-9_]{1,32}$/i.test(s)
@@ -74,6 +75,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   void createRound
 
   const balances = await getBalances(address)
+
+  track('level_started', {
+    address,
+    round_id:    roundId,
+    world_id:    worldId,
+    level_index: levelIndex,
+    mode,
+    difficulty:  level.difficulty ?? null,
+    slot_count:  manifest.slotLengths?.length ?? null,
+  })
 
   return res.status(200).json({
     roundId,
