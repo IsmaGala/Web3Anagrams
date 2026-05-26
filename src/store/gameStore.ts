@@ -9,6 +9,7 @@ import {
   computeScoreBreakdown,
   pickDailyWordMix,
   getDailyLevelIndex,
+  currentWeekId,
 } from '../utils/gameUtils'
 import { DAILY_POOL_SIZE } from '../data/dailyLevels'
 import { playSfx, isSfxMuted, setSfxMuted, unlockSfx } from '../utils/sfx'
@@ -205,6 +206,12 @@ interface GameStore extends GameState {
   // Daily retry
   payToRetryDaily: () => Promise<boolean>
 
+  // First-wallet welcome bonus popup
+  /** Non-null when the server just granted a first-wallet bonus for this
+   *  address. WelcomeBonusOverlay reads this and clears it on dismiss. */
+  pendingWelcomeBonus: { gems: number; hints: number } | null
+  setPendingWelcomeBonus: (bonus: { gems: number; hints: number } | null) => void
+
   // World-completion reward flow
   /** worldId currently waiting for the player to accept its completion
    *  bounty via WorldRewardOverlay. Null when nothing is pending. */
@@ -292,6 +299,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedWorldId:   'townstar',
   _worldId:          'townstar',
   sfxMuted:          isSfxMuted(),
+  pendingWelcomeBonus: null,
+  setPendingWelcomeBonus: (bonus) => set({ pendingWelcomeBonus: bonus }),
+
   pendingWorldRewardId: null,
 
   round:             null,
@@ -540,7 +550,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const resp = await apiSpendGems({
         amount:   cost,
         reason:   'unlock_event',
-        metadata: { worldId },
+        metadata: { worldId, weekId: currentWeekId() },
       })
       if (!resp.ok) {
         set({ gemsBalance: resp.newBalance })

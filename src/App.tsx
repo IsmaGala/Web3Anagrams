@@ -16,6 +16,7 @@ import Wardrobe from './components/Wardrobe'
 import DebugMenu from './components/DebugMenu'
 import OnboardingOverlay, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingOverlay'
 import WorldRewardOverlay from './components/WorldRewardOverlay'
+import WelcomeBonusOverlay from './components/WelcomeBonusOverlay'
 import { pullAndApply, schedulePush, flushPush, cancelPendingPush } from './utils/profileSync'
 import './styles/global.css'
 
@@ -141,6 +142,9 @@ export default function App() {
       {/* Globally mounted so a queued reward (live win or retroactive
           scan hit) surfaces on whatever screen the player happens to be on. */}
       <WorldRewardOverlay />
+      {/* First-wallet welcome bundle popup — shown once when a new wallet
+          connects and the server grants the initial Gems + Hints. */}
+      <WelcomeBonusOverlay />
       {showOnboarding && (
         <OnboardingOverlay onDone={() => { markOnboardingSeen(); setShowOnboarding(false) }} />
       )}

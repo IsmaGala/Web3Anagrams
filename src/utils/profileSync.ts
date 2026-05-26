@@ -458,7 +458,8 @@ export async function pullAndApply(): Promise<void> {
       // doesn't try to re-claim. Server is the real gate via the audit
       // table, but the flag keeps the legacy UI tidy.
       try { useProgressStore.getState().claimFirstWalletBonus() } catch {}
-      useGameStore.getState().showToast(`🎁 Welcome! +${gems} Gems · +${hints} hints`)
+      // Show a dedicated reward popup instead of a transient toast.
+      useGameStore.getState().setPendingWelcomeBonus({ gems, hints })
     }
     // Server-authoritative inventory — derived from balance_transactions on
     // the server. Always applied AFTER the JSONB merge so that a purchase
