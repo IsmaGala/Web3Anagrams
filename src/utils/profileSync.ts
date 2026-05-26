@@ -156,8 +156,11 @@ export function buildPayload(): PlayerStatePayload {
       claimed: progress.worldCompletionClaimed as any,
     },
     cosmetics: {
-      // Spread the Set into a plain array for JSON-serializability.
-      ownedSkins: [...cosmetics.ownedSkins],
+      // Only persist the equipped-skin preference. Ownership is derived
+      // server-side from balance_transactions and applied via resp.inventory
+      // in pullAndApply — storing ownedSkins in the JSONB creates a loop
+      // where wiped ownership can be restored from a stale payload.
+      ownedSkins: [],
       wheelSkin:  cosmetics.wheelSkin,
     },
     welcome: {
@@ -361,13 +364,12 @@ export function applyPayload(p: PlayerStatePayload): void {
     localStorage.setItem('wc_world_completion_claimed_v1',    JSON.stringify(completionClaimed))
     localStorage.setItem('wc_welcome_bonus_v1',               JSON.stringify(welcomeClaimed))
   } catch {}
-  // Apply cosmetics — the cosmetics store handles its own localStorage
-  // persistence inside setOwnedSkins / setWheelSkin, so we don't double-write.
+  // Apply cosmetics — only the equipped-skin preference from the JSONB.
+  // Ownership (ownedSkins) is NOT applied here; it is authoritative only
+  // from resp.inventory in pullAndApply (derived from balance_transactions).
+  // Applying ownedSkins from the JSONB would let a stale/tampered payload
+  // restore skin ownership that was legitimately wiped on the server.
   if (p.cosmetics) {
-    const owned = (p.cosmetics.ownedSkins ?? []).filter(
-      (id): id is WheelSkinId => typeof id === 'string' && id in WHEEL_SKINS,
-    )
-    useCosmeticsStore.getState().setOwnedSkins(owned)
     const equipped = p.cosmetics.wheelSkin
     if (typeof equipped === 'string' && equipped in WHEEL_SKINS) {
       useCosmeticsStore.getState().setWheelSkin(equipped as WheelSkinId)
@@ -461,18 +463,24 @@ export async function pullAndApply(): Promise<void> {
       // Show a dedicated reward popup instead of a transient toast.
       useGameStore.getState().setPendingWelcomeBonus({ gems, hints })
     }
-    // Server-authoritative inventory — derived from balance_transactions on
-    // the server. Always applied AFTER the JSONB merge so that a purchase
-    // that happened on another device (and wrote a balance_transactions row)
-    // is reflected even if the JSONB push was dropped. Additive only: we
-    // never remove something from a player's inventory via this path.
+    // Server-authoritative inventory — derived from balance_transactions.
+    // This is the source of truth for ownership. We apply it AFTER the JSONB
+    // merge and it REPLACES whatever the JSONB said about skins.
+    //
+    // Why authoritative (not additive): the JSONB is a sync cache that can
+    // drift — a DB wipe, a tampered payload, or a cross-device race can leave
+    // stale skin ownership in the JSONB. `balance_transactions` is the audit
+    // log and cannot lie. An empty `ownedSkins` here means zero purchased
+    // skins, and we must honour that (the cosmetics store always adds 'default'
+    // back in `setOwnedSkins`, so the player is never left with no skin).
     if (resp?.inventory) {
       const { ownedSkins, unlockedPremium, eventUnlocks } = resp.inventory
-      // Skins: union server ownership into the cosmetics store.
-      if (ownedSkins.length > 0) {
-        const cosmetics = useCosmeticsStore.getState()
-        const merged_skins = new Set([...cosmetics.ownedSkins, ...ownedSkins])
-        cosmetics.setOwnedSkins([...merged_skins] as WheelSkinId[])
+      // Skins: replace with server truth. setOwnedSkins always keeps 'default'.
+      const cosmetics = useCosmeticsStore.getState()
+      cosmetics.setOwnedSkins(ownedSkins as WheelSkinId[])
+      // If the currently-equipped skin is no longer owned, fall back to default.
+      if (!cosmetics.ownsSkin(cosmetics.wheelSkin)) {
+        cosmetics.setWheelSkin('default')
       }
       // Premium worlds + event week unlocks: reconcile into progressStore
       // without triggering level-wipe side effects.
