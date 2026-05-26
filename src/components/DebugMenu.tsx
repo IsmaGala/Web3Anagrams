@@ -215,6 +215,47 @@ export default function DebugMenu() {
     setTimeout(() => initLevel(), 0)
   }
 
+  // ─── Testnet gem / hint grant ────────────────────────────────────────
+  // Calls /api/admin/grant-gems — bypasses GalaChain entirely.
+  // Use when the fee payer wallet is empty or testnet GALA is unavailable.
+  const [grantGemsAmt,  setGrantGemsAmt]  = useState('1000')
+  const [grantHintsAmt, setGrantHintsAmt] = useState('0')
+  const [grantStatus,   setGrantStatus]   = useState<'idle' | 'busy' | 'done' | 'error'>('idle')
+  const [grantMsg,      setGrantMsg]      = useState('')
+
+  async function serverGrantBalance() {
+    if (grantStatus === 'busy') return
+    if (!adminSecret) { setGrantMsg('Enter ADMIN_SECRET first (see TESTNET RESET section above).'); setGrantStatus('error'); return }
+    if (!jwt)         { setGrantMsg('No JWT — connect a wallet first.'); setGrantStatus('error'); return }
+    const gems  = parseInt(grantGemsAmt,  10) || 0
+    const hints = parseInt(grantHintsAmt, 10) || 0
+    if (gems === 0 && hints === 0) { setGrantMsg('Set at least one amount > 0.'); setGrantStatus('error'); return }
+    setGrantStatus('busy')
+    setGrantMsg('Granting…')
+    try {
+      const r = await fetch('/api/admin/grant-gems', {
+        method:  'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'x-admin-secret': adminSecret,
+          'Authorization':  `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({ gems, hints }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setGrantMsg(`Error ${r.status}: ${j?.error ?? 'unknown'}`); setGrantStatus('error'); return }
+      // Apply new balances directly to the store so the UI updates instantly
+      // without needing a full pull (same pattern as pullAndApply balances override).
+      useGameStore.setState({ gemsBalance: j.newBalance.gems, hints: j.newBalance.hints } as any)
+      setGrantMsg(`✅ Done! Balance: ${j.newBalance.gems.toLocaleString()} gems · ${j.newBalance.hints} hints`)
+      setGrantStatus('done')
+      setTimeout(() => { setGrantStatus('idle'); setGrantMsg('') }, 4000)
+    } catch (e: any) {
+      setGrantMsg(`Network error: ${e?.message ?? String(e)}`)
+      setGrantStatus('error')
+    }
+  }
+
   // ─── Testnet full wipe ────────────────────────────────────────────────
   // 1. DELETE all server rows for this wallet via /api/admin/reset-player
   // 2. Clear every localStorage key the game owns
@@ -438,6 +479,41 @@ export default function DebugMenu() {
           <button key={i} style={btn} onClick={() => jumpToLevelInWorld(worldId, i)}>L{i+1}</button>
         ))}
       </div>
+
+      {/* ── SERVER GRANT (testnet GalaChain bypass) ──────────────────── */}
+      <div style={{ ...header, color: '#86efac', borderBottom: '1px solid rgba(134,239,172,0.3)' }}>
+        💎 SERVER GRANT (no GALA needed)
+      </div>
+      <div style={{ ...subtle, marginBottom: 4 }}>
+        Credits gems/hints directly on the server — bypasses GalaChain.
+        Requires ADMIN_SECRET + connected wallet.
+      </div>
+      <div className="flex gap-1 items-center mb-1">
+        <span style={subtle}>Gems</span>
+        <input style={{ ...input, width: 70 }} value={grantGemsAmt}
+          onChange={e => setGrantGemsAmt(e.target.value)} placeholder="1000" />
+        <span style={subtle}>Hints</span>
+        <input style={{ ...input, width: 50 }} value={grantHintsAmt}
+          onChange={e => setGrantHintsAmt(e.target.value)} placeholder="0" />
+        <button
+          style={{ ...btnAccent, opacity: grantStatus === 'busy' ? 0.6 : 1 }}
+          disabled={grantStatus === 'busy'}
+          onClick={serverGrantBalance}>
+          {grantStatus === 'busy' ? '⏳' : 'grant →server'}
+        </button>
+      </div>
+      {grantMsg && (
+        <div style={{
+          ...subtle, marginBottom: 4,
+          color: grantStatus === 'error' ? '#f87171' : grantStatus === 'done' ? '#86efac' : '#a5f3fc',
+        }}>
+          {grantMsg}
+          {grantStatus === 'error' && (
+            <button style={{ ...btn, marginLeft: 6 }}
+              onClick={() => { setGrantStatus('idle'); setGrantMsg('') }}>×</button>
+          )}
+        </div>
+      )}
 
       <div style={header}>ECONOMY · GEMS</div>
       <div className="flex flex-wrap gap-1 mb-1">
