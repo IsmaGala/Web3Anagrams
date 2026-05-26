@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
@@ -42,6 +42,8 @@ export default function Splash() {
   // tap on the pill is destructive-feeling. The confirmation modal makes the
   // action explicit and reassures the player their data is safe on the server.
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false)
+  // Action queued while wallet-connect modal is open — resumed on connect.
+  const pendingAction = useRef<'single' | 'daily' | null>(null)
   const [countdown, setCountdown] = useState(timeToMidnight())
   // Separate ticker for the event-phase countdown surfaced on the WEEKLY
   // EVENTS button caption. Same 1Hz cadence as the daily countdown.
@@ -55,6 +57,15 @@ export default function Splash() {
     }, 1000)
     return () => clearInterval(id)
   }, [])
+
+  // After wallet connects, replay whichever action the player originally tapped.
+  useEffect(() => {
+    if (!walletAddress) return
+    const queued = pendingAction.current
+    if (!queued) return
+    pendingAction.current = null
+    goToGame(queued)
+  }, [walletAddress, goToGame])
 
   // Dynamic caption for the Weekly Events button. Memoized against the
   // inputs that actually change — event scheduling + phase — so we don't
@@ -74,6 +85,14 @@ export default function Splash() {
     const verb = phase === 'active' ? 'ENDS' : 'STARTS'
     return `${event.name.toUpperCase()} · ${verb} IN ${formatCountdownShort(eventCountdown)}`
   }, [eventCountdown])
+
+  // Wallet gate for game entry points. If not connected, queue the action
+  // and open the connect modal; the useEffect above replays on connect.
+  function requireWalletForGame(mode: 'single' | 'daily') {
+    if (walletAddress) { goToGame(mode); return }
+    pendingAction.current = mode
+    setShowWalletModal(true)
+  }
 
   // Daily card state machine
   const dailyState: 'available' | 'won' | 'lost' = !todaysAttempt
@@ -181,7 +200,7 @@ export default function Splash() {
           </>
         )}
 
-        <button onClick={tap(() => goToGame('single'))} className="btn-3d w-full mb-3"
+        <button onClick={tap(() => requireWalletForGame('single'))} className="btn-3d w-full mb-3"
           style={{ background:'linear-gradient(160deg, #7c3aed, #6d28d9)',
             border:'4px solid #a78bfa', borderBottom:'4px solid #4c1d95',
             boxShadow:'0 8px 0 #3b0764, 0 0 30px rgba(124,58,237,0.4)',
@@ -213,7 +232,7 @@ export default function Splash() {
               border: '#fbbf24',
               bg: 'linear-gradient(160deg, #d97706, #b45309)',
               glow: 'rgba(217,119,6,0.4)',
-              onClick: () => goToGame('daily'),
+              onClick: () => requireWalletForGame('daily'),
               disabled: false,
               caption: countdown,
               showChevron: true,

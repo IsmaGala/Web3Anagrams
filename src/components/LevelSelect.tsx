@@ -1,36 +1,49 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
+import { useWalletStore } from '../store/walletStore'
 import { WORLDS } from '../data/worldData'
 import type { WorldId } from '../data/worlds'
 import { LeaderboardPanel } from './WeeklyEvents'
 import { playSfx } from '../utils/sfx'
 import { useScreenBackdrop } from '../utils/screenBackdrop'
+import WalletConnectModal from './WalletConnectModal'
 
 export default function LevelSelect() {
   const setScreen         = useGameStore(s => (s as any).setScreen)
   const worldId           = useGameStore(s => (s as any).selectedWorldId) as WorldId
   const loadWorldLevels   = useGameStore(s => s.loadWorldLevels)
+  const showToast         = useGameStore(s => s.showToast)
   const isLevelUnlocked   = useProgressStore(s => s.isLevelUnlocked)
   const getCompletedCount = useProgressStore(s => s.getCompletedCount)
   const getTotalScore     = useProgressStore(s => s.getTotalScore)
+  const walletAddress     = useWalletStore(s => s.address)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [showWalletModal, setShowWalletModal] = useState(false)
+  // Level index queued while wallet-connect modal is open — resumed on connect.
+  const pendingLevel = useRef<number | null>(null)
 
   const world = WORLDS.find(w => w.id === worldId)
   if (!world) return null
 
-  // Back button destination: events worlds → events hub, premium → premium,
-  // everything else → worldSelect.
   const backScreen = world.event ? 'events' : world.premium ? 'premium' : 'worldSelect'
   const backLabel  = world.event ? 'EVENTS' : world.premium ? 'PREMIUM' : 'WORLDS'
 
   const completed  = getCompletedCount(worldId)
   const totalScore = getTotalScore(worldId)
 
-  function handleLevelClick(levelIndex: number) {
+  // After wallet connects, replay the level the player originally tapped.
+  useEffect(() => {
+    if (!walletAddress) return
+    const queued = pendingLevel.current
+    if (queued === null) return
+    pendingLevel.current = null
+    showToast('✓ Wallet connected · starting level')
+    launchLevel(queued)
+  }, [walletAddress]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function launchLevel(levelIndex: number) {
     if (!world) return
-    const state = isLevelUnlocked(worldId, levelIndex)
-    if (state === 0) return
     loadWorldLevels(world.levels)
     useGameStore.setState({
       currentLevelIndex: levelIndex, score: 0,
@@ -38,6 +51,19 @@ export default function LevelSelect() {
       _worldId: worldId, selectedWorldId: worldId,
     } as any)
     setTimeout(() => useGameStore.getState().initLevel(), 0)
+  }
+
+  function handleLevelClick(levelIndex: number) {
+    if (!world) return
+    const state = isLevelUnlocked(worldId, levelIndex)
+    if (state === 0) return
+    playSfx('uiTap')
+    if (!walletAddress) {
+      pendingLevel.current = levelIndex
+      setShowWalletModal(true)
+      return
+    }
+    launchLevel(levelIndex)
   }
 
   return (
@@ -99,9 +125,6 @@ export default function LevelSelect() {
       {/* Level grid */}
       <div className="w-full max-w-sm grid grid-cols-4 gap-3">
         {world.levels.map((_level, i) => {
-          // `_level` is intentionally unused — post bundle-strip the Level
-          // object is an empty placeholder. We iterate it only to get the
-          // right count of tiles and the index `i` for the level label.
           const state       = isLevelUnlocked(worldId, i)
           const isCompleted = state === 2
           const isUnlocked  = state >= 1
@@ -138,15 +161,6 @@ export default function LevelSelect() {
                 style={{ color: isCompleted ? '#fff' : isUnlocked ? '#c4b5fd' : 'rgba(255,255,255,0.25)' }}>
                 {i + 1}
               </span>
-              {/*
-                The theme word was rendered here in pre-server-authoritative
-                builds (e.g. "VAULT", "CHAIN") but it is literally the long
-                answer for many levels — displaying it on the card-grid leaked
-                the answer before the player even tapped in. Removed as part
-                of the bundle-strip milestone. The card now shows only the
-                level number; the server returns a non-leaking displayTitle
-                ("Level N") for the in-game header.
-              */}
             </button>
           )
         })}
@@ -155,6 +169,15 @@ export default function LevelSelect() {
       <p className="mt-8 font-nunito font-bold text-sm" style={{ color:'rgba(255,255,255,0.2)', letterSpacing:'1px' }}>
         Complete a level to unlock the next
       </p>
+
+      {/* Wallet gate */}
+      <WalletConnectModal
+        open={showWalletModal}
+        onClose={() => {
+          if (!walletAddress) pendingLevel.current = null
+          setShowWalletModal(false)
+        }}
+      />
     </div>
   )
 }

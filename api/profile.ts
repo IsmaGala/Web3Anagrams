@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const balRows = await sql()`
         SELECT gems_balance, hints_balance FROM player_balances WHERE address = ${address}
       ` as Array<{ gems_balance: number; hints_balance: number }>
-      const bal = balRows[0] ?? { gems_balance: 0, hints_balance: 3 }
+      const bal = balRows[0] ?? { gems_balance: 0, hints_balance: 0 }
       sanitized.economy = {
         ...(sanitized.economy as object),
         gemsBalance: bal.gems_balance,

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getAddress } from 'ethers'
 import { useGameStore } from '../store/gameStore'
 import { useWalletStore } from '../store/walletStore'
@@ -7,30 +7,26 @@ import { playSfx } from '../utils/sfx'
 import { useScreenBackdrop } from '../utils/screenBackdrop'
 import { buildTransferGalaDto, signGalaDto } from '../utils/galaChain'
 import { track } from '../utils/analytics'
+import WalletConnectModal from './WalletConnectModal'
 
 // Gem Store — real GalaChain GALA payments.
 //
 // Flow:
-//   1. Player taps PAY · GALA on a pack.
-//   2. We build a TransferToken DTO transferring the pack's GALA price
-//      from the player's wallet to VITE_GAME_TREASURY_ADDRESS.
-//   3. The wallet (MetaMask or Gala Wallet) signs it via personal_sign.
-//   4. We POST the signed DTO to /api/store/purchase, which:
-//        a. Re-validates the fields match the catalog.
-//        b. Forwards the signed DTO to the GalaChain gateway.
-//        c. On Status:1, credits gems via the server-authoritative
-//           economy helper.
+//   1. Player taps a pack card's PAY button.
+//   2. If not connected, wallet-connect modal opens; on success the pack
+//      they tapped is resumed automatically.
+//   3. We build a TransferToken DTO and sign it via personal_sign.
+//   4. POST to /api/store/purchase — server re-validates, forwards to
+//      GalaChain, credits gems on Status:1.
 //
-// GUSDC is staged but disabled until the second pass.
 // See docs/galachain/TOKEN_OPS.md "Purchase Pattern (Server-Mediated)".
 
 interface Pack {
   id:    '1k' | '3k' | '10k'
   gems:  number
-  usd:   number
-  /** GALA quantity to transfer, integer decimal string. Keep this in
-   *  sync with PACK_CATALOG in api/store/purchase.ts — server is
-   *  authoritative on price and will refuse mismatches. */
+  /** GALA quantity to transfer, integer decimal string. Keep in sync
+   *  with PACK_CATALOG in api/store/purchase.ts — server is authoritative
+   *  on price and will refuse mismatches. */
   gala:  string
   label: string
   badge?: string
@@ -38,27 +34,22 @@ interface Pack {
 }
 
 const PACKS: Pack[] = [
-  { id: '1k',  gems: 1000,  usd: 2,  gala: '100', label: '1,000 GEMS',  glow: 'rgba(167,139,250,0.5)' },
-  { id: '3k',  gems: 3000,  usd: 5,  gala: '250', label: '3,000 GEMS',  badge: 'BEST VALUE', glow: 'rgba(34,211,238,0.5)' },
-  { id: '10k', gems: 10000, usd: 10, gala: '500', label: '10,000 GEMS', badge: 'BIGGEST',     glow: 'rgba(251,191,36,0.5)' },
+  { id: '1k',  gems: 1000,  gala: '100', label: '1,000 GEMS',  glow: 'rgba(167,139,250,0.5)' },
+  { id: '3k',  gems: 3000,  gala: '250', label: '3,000 GEMS',  badge: 'BEST VALUE', glow: 'rgba(34,211,238,0.5)' },
+  { id: '10k', gems: 10000, gala: '500', label: '10,000 GEMS', badge: 'BIGGEST',     glow: 'rgba(251,191,36,0.5)' },
 ]
 
-type PayMethod = 'GALA' | 'GUSDC'
-
 // Treasury wallet address (gala form: eth|<EIP55>). Set as
-// VITE_GAME_TREASURY_ADDRESS in your .env / Vercel env. Public info —
-// it's the address that appears in every TransferToken.to field.
+// VITE_GAME_TREASURY_ADDRESS in your .env / Vercel env.
 const TREASURY = ((import.meta as any).env?.VITE_GAME_TREASURY_ADDRESS ?? '') as string
 
-// Banner — surfaces which GalaChain network we're targeting so testers
-// don't accidentally think mainnet is live.
 const NETWORK_LABEL = (((import.meta as any).env?.VITE_GALACHAIN_NETWORK ?? 'testnet') as string).toUpperCase()
 
 interface PurchaseResponse {
-  ok:         boolean
-  packId:     string
+  ok:           boolean
+  packId:       string
   gemsCredited: number
-  newBalance: number
+  newBalance:   number
 }
 
 export default function GemStore() {
@@ -68,31 +59,33 @@ export default function GemStore() {
   const walletAddress = useWalletStore(s => s.address)
   const walletType    = useWalletStore(s => s.walletType)
   const jwt           = useWalletStore(s => s.jwt)
-  const [pendingPack, setPendingPack] = useState<Pack | null>(null)
-  const [pendingMethod, setPendingMethod] = useState<PayMethod | null>(null)
-  const [submitting,  setSubmitting]  = useState(false)
+  const [pendingPack, setPendingPack]     = useState<Pack | null>(null)
+  const [submitting,  setSubmitting]      = useState(false)
+  const [showWalletModal, setShowWalletModal] = useState(false)
+  // Pack queued while wallet-connect modal was open — resumed on connect.
+  const pendingAction = useRef<Pack | null>(null)
 
   const signedIn = !!walletAddress && !!jwt && !!walletType
 
-  // Track shop_opened once on mount — GemStore is a full screen, so mounting
-  // is equivalent to the player opening it.
   useEffect(() => {
-    track('shop_opened', {
-      current_gems: gemsBalance,
-      entry_point:  'gem_store',
-    })
+    track('shop_opened', { current_gems: gemsBalance, entry_point: 'gem_store' })
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  function openPurchase(pack: Pack, method: PayMethod) {
+  // After wallet connects, replay the pack the player originally tapped.
+  useEffect(() => {
+    if (!walletAddress) return
+    const queued = pendingAction.current
+    if (!queued) return
+    pendingAction.current = null
+    showToast('✓ Wallet connected')
+    setPendingPack(queued)
+  }, [walletAddress, showToast])
+
+  function openPurchase(pack: Pack) {
     playSfx('uiTap')
     if (!signedIn) {
-      showToast('Connect a wallet on the splash to buy Gems')
-      return
-    }
-    if (method === 'GUSDC') {
-      // Staged but not yet wired to a real GUSDC TransferToken DTO. The
-      // button stays visible (disabled) so users know it's coming.
-      showToast('GUSDC payments coming soon — use GALA for now')
+      pendingAction.current = pack
+      setShowWalletModal(true)
       return
     }
     if (!TREASURY) {
@@ -100,63 +93,34 @@ export default function GemStore() {
       return
     }
     track('gala_purchase_initiated', {
-      pack_id:      pack.id,
-      gala_amount:  pack.gala,
+      pack_id:        pack.id,
+      gala_amount:    pack.gala,
       gems_to_credit: pack.gems,
     })
     setPendingPack(pack)
-    setPendingMethod(method)
   }
 
   function closePurchase() {
     if (submitting) return
     setPendingPack(null)
-    setPendingMethod(null)
   }
 
   async function handleConfirmPurchase() {
-    if (!pendingPack || !pendingMethod || !walletAddress || !walletType) return
-    if (pendingMethod !== 'GALA') return  // GUSDC is gated above
+    if (!pendingPack || !walletAddress || !walletType) return
     setSubmitting(true)
     try {
-      // 1. Translate the wallet's storage form (lowercase 0x...) into the
-      //    gala form (eth|<EIP55>) that GalaChain expects on the wire.
-      //    EIP-55 checksumming is required — the gateway silently fails
-      //    on un-checksummed addresses (doc §10.1).
-      const fromGala = `eth|${getAddress(walletAddress).slice(2)}`
-
-      // 2. Build the unsigned TransferToken DTO. uniqueKey is generated
-      //    inside buildTransferGalaDto — 32 random bytes for replay
-      //    protection.
-      const dto = buildTransferGalaDto({
-        from:     fromGala,
-        to:       TREASURY,
-        quantity: pendingPack.gala,
-      })
-
-      // 3. Sign it. The wallet shows the deterministic JSON in its
-      //    prompt — not pretty, but verifiable. Both MetaMask and Gala
-      //    Wallet use personal_sign here; the chaincode reconstructs
-      //    the same hash from the `prefix` we attach.
+      const fromGala  = `eth|${getAddress(walletAddress).slice(2)}`
+      const dto       = buildTransferGalaDto({ from: fromGala, to: TREASURY, quantity: pendingPack.gala })
       const signedDto = await signGalaDto(walletType, walletAddress, dto)
-
-      // 4. Hand off to the server. It re-validates the DTO fields
-      //    against the pack catalog, forwards to the GalaChain gateway,
-      //    and credits gems only on Status:1.
       const resp = await api.post<PurchaseResponse>('/api/store/purchase', {
-        packId:    pendingPack.id,
-        signedDto,
+        packId: pendingPack.id, signedDto,
       })
-
-      // 5. Mirror the server-authoritative balance into local state.
-      //    profileSync.pullAndApply will reconcile any drift later.
       useGameStore.setState({ gemsBalance: resp.newBalance })
       playSfx('purchase')
       showToast(`✓ +${pendingPack.gems.toLocaleString()} Gems credited`)
-      setPendingPack(null); setPendingMethod(null)
+      setPendingPack(null)
     } catch (e: any) {
-      const msg = e?.message ?? 'Purchase failed'
-      showToast(`⚠ ${msg}`)
+      showToast(`⚠ ${e?.message ?? 'Purchase failed'}`)
     } finally {
       setSubmitting(false)
     }
@@ -183,11 +147,10 @@ export default function GemStore() {
       </h1>
       <p className="font-nunito font-bold text-sm mb-2"
         style={{ color:'rgba(196,181,253,0.5)', letterSpacing:'2px' }}>
-        BUY GEMS WITH GALA OR GUSDC
+        BUY GEMS WITH GALA
       </p>
 
-      {/* Network pill — surfaces which gateway we'll hit so testers don't
-          confuse testnet GALA with mainnet GALA. Defaults to TESTNET. */}
+      {/* Network pill */}
       <div className="px-3 py-1 rounded-full mb-4"
         style={{
           background: NETWORK_LABEL === 'MAINNET' ? 'rgba(34,197,94,0.15)' : 'rgba(251,191,36,0.15)',
@@ -206,17 +169,6 @@ export default function GemStore() {
         <span className="font-fredoka text-base" style={{ color:'#a78bfa' }}>{gemsBalance.toLocaleString()}</span>
         <span className="font-nunito font-bold text-xs" style={{ color:'rgba(196,181,253,0.4)' }}>GEMS</span>
       </div>
-
-      {/* Wallet sign-in nudge */}
-      {!signedIn && (
-        <div className="w-full max-w-sm mb-5 p-3 rounded-xl"
-          style={{ background:'rgba(127,29,29,0.18)', border:'1.5px solid rgba(248,113,113,0.35)' }}>
-          <p className="font-nunito font-bold text-xs text-center" style={{ color:'#fecaca', lineHeight:1.45 }}>
-            Connect a wallet on the splash to enable purchases.
-            The store needs your signature to verify the buyer.
-          </p>
-        </div>
-      )}
 
       {/* Pack cards */}
       <div className="w-full max-w-sm flex flex-col gap-4">
@@ -239,53 +191,27 @@ export default function GemStore() {
 
             <div className="flex items-center gap-4 mb-3">
               <span className="text-4xl" style={{ filter:`drop-shadow(0 4px 8px ${pack.glow})` }}>💎</span>
-              <div className="flex-1">
-                <div className="font-fredoka text-xl text-white">{pack.label}</div>
-                <div className="font-nunito font-bold text-sm" style={{ color:'rgba(196,181,253,0.55)' }}>
-                  ${pack.usd} value
-                </div>
-              </div>
+              <div className="font-fredoka text-xl text-white">{pack.label}</div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => openPurchase(pack, 'GALA')} disabled={!signedIn}
-                className="btn-3d py-3"
-                style={{
-                  background: signedIn
-                    ? 'linear-gradient(160deg,#c2410c,#9a3412)'
-                    : 'linear-gradient(160deg,#374151,#1f2937)',
-                  border: `3px solid ${signedIn ? '#f97316' : 'rgba(255,255,255,0.15)'}`,
-                  borderBottom: `3px solid ${signedIn ? '#7c2d12' : 'rgba(0,0,0,0.4)'}`,
-                  boxShadow: `0 4px 0 ${signedIn ? '#7c2d12' : 'rgba(0,0,0,0.4)'}`,
-                  borderRadius:'12px',
-                  color: signedIn ? '#fff' : 'rgba(255,255,255,0.5)',
-                  fontFamily:'Fredoka One,cursive', fontSize:'0.92rem', letterSpacing:'1px',
-                  cursor: signedIn ? 'pointer' : 'not-allowed',
-                }}>
-                {pack.gala} GALA
-              </button>
-              {/* GUSDC: visible but disabled — full DTO/SDK path lands in v2. */}
-              <button onClick={() => openPurchase(pack, 'GUSDC')} disabled
-                className="btn-3d py-3"
-                style={{
-                  background:'linear-gradient(160deg,#374151,#1f2937)',
-                  border:'3px solid rgba(255,255,255,0.15)',
-                  borderBottom:'3px solid rgba(0,0,0,0.4)',
-                  boxShadow:'0 4px 0 rgba(0,0,0,0.4)',
-                  borderRadius:'12px',
-                  color:'rgba(255,255,255,0.45)',
-                  fontFamily:'Fredoka One,cursive', fontSize:'0.92rem', letterSpacing:'1px',
-                  cursor:'not-allowed',
-                }}>
-                GUSDC · SOON
-              </button>
-            </div>
+            <button onClick={() => openPurchase(pack)} className="btn-3d w-full py-3"
+              style={{
+                background: 'linear-gradient(160deg,#c2410c,#9a3412)',
+                border: '3px solid #f97316',
+                borderBottom: '3px solid #7c2d12',
+                boxShadow: '0 4px 0 #7c2d12',
+                borderRadius:'12px',
+                color: '#fff',
+                fontFamily:'Fredoka One,cursive', fontSize:'1rem', letterSpacing:'1px',
+              }}>
+              {signedIn ? `${pack.gala} GALA` : `CONNECT WALLET · ${pack.gala} GALA`}
+            </button>
           </div>
         ))}
       </div>
 
-      {/* Confirm modal — appears after a Buy tap, drives the signing flow. */}
-      {pendingPack && pendingMethod && (
+      {/* Confirm modal */}
+      {pendingPack && (
         <div className="fixed inset-0 z-[300] flex flex-col items-center justify-center px-6"
           style={{ background:'rgba(0,0,0,0.85)', backdropFilter:'blur(14px)' }}>
           <div className="w-full max-w-xs text-center slide-up">
@@ -294,7 +220,7 @@ export default function GemStore() {
               BUY {pendingPack.label}?
             </h2>
             <p className="font-nunito font-bold mb-2 px-2" style={{ color:'rgba(255,255,255,0.65)', fontSize:'0.9rem' }}>
-              {pendingPack.gala} GALA · ${pendingPack.usd} value
+              {pendingPack.gala} GALA
             </p>
             <p className="font-nunito font-bold mb-6 px-2"
               style={{
@@ -335,6 +261,15 @@ export default function GemStore() {
           </div>
         </div>
       )}
+
+      {/* Wallet gate */}
+      <WalletConnectModal
+        open={showWalletModal}
+        onClose={() => {
+          if (!walletAddress) pendingAction.current = null
+          setShowWalletModal(false)
+        }}
+      />
     </div>
   )
 }

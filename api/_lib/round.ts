@@ -225,6 +225,6 @@ export async function getBalances(address: string): Promise<{ gems: number; hint
   const rows = await db`
     SELECT gems_balance, hints_balance FROM player_balances WHERE address = ${address} LIMIT 1
   ` as Array<{ gems_balance: number; hints_balance: number }>
-  if (rows.length === 0) return { gems: 0, hints: 3 }
+  if (rows.length === 0) return { gems: 0, hints: 0 }
   return { gems: rows[0].gems_balance, hints: rows[0].hints_balance }
 }
