@@ -228,7 +228,6 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
   const rawDays = parseInt((req.query.days as string) ?? '7', 10)
   const days = Math.min(Math.max(rawDays, 1), 90)
   const db = sql()
-  const since = db`NOW() - (${days} || ' days')::interval`
 
   const funnelResults = await Promise.all([
     db`SELECT
@@ -241,7 +240,7 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
        WHERE event IN (
          'gala_purchase_initiated','gala_transfer_submitted',
          'gala_purchase_success','gala_purchase_failed','gala_gateway_timeout'
-       ) AND received_at >= ${since}`,
+       ) AND received_at >= NOW() - (${days} || ' days')::interval`,
 
     db`SELECT
          COUNT(*) FILTER (WHERE event = 'shop_opened')                            AS shop_opened,
@@ -253,7 +252,7 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
        WHERE event IN (
          'shop_opened','hint_denied_no_balance','hint_pack_purchased',
          'gem_spent','gala_purchase_success'
-       ) AND received_at >= ${since}`,
+       ) AND received_at >= NOW() - (${days} || ' days')::interval`,
 
     db`SELECT
          COUNT(DISTINCT address) FILTER (WHERE event = 'wallet_connected') AS connected,
@@ -261,14 +260,15 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
          COUNT(DISTINCT address) FILTER (WHERE event = 'level_completed')  AS completed
        FROM analytics_events
        WHERE event IN ('wallet_connected','level_started','level_completed')
-         AND address IS NOT NULL AND received_at >= ${since}`,
+         AND address IS NOT NULL AND received_at >= NOW() - (${days} || ' days')::interval`,
 
     db`SELECT
          properties->>'reason'                           AS reason,
          COUNT(*)::int                                   AS count,
          COALESCE(SUM((properties->>'amount')::int), 0)  AS total_gems
        FROM analytics_events
-       WHERE event = 'gem_spent' AND received_at >= ${since}
+       WHERE event = 'gem_spent'
+         AND received_at >= NOW() - (${days} || ' days')::interval
        GROUP BY properties->>'reason'
        ORDER BY total_gems DESC`,
 
@@ -279,7 +279,7 @@ async function handleFunnel(req: VercelRequest, res: VercelResponse) {
        FROM analytics_events
        WHERE event IN ('level_started','level_completed')
          AND properties->>'world_id' IS NOT NULL
-         AND received_at >= ${since}
+         AND received_at >= NOW() - (${days} || ' days')::interval
        GROUP BY properties->>'world_id'
        ORDER BY starts DESC LIMIT 15`,
   ])
