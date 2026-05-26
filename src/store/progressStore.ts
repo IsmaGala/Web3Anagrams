@@ -108,6 +108,22 @@ interface ProgressState {
   // — this action just flips the persisted flag so subsequent
   // connections don't re-grant.
   claimFirstWalletBonus: () => void
+
+  /** Reconcile server-authoritative inventory into local state WITHOUT
+   *  triggering side effects (no level-wipe, no toasts). Called by
+   *  profileSync.pullAndApply after the JSONB merge so that ownership
+   *  derived from balance_transactions always wins over stale localStorage.
+   *
+   *  Rules (all additive / union — we never take something away):
+   *    • premiumWorldIds  → markPremiumUnlocked for each (idempotent)
+   *    • eventUnlocks     → set unlocked:true for each (worldId, weekId)
+   *                         WITHOUT wiping level progress (that only happens
+   *                         on a fresh week entry from the game UI)
+   */
+  reconcileInventory: (args: {
+    premiumWorldIds: string[]
+    eventUnlocks:    Array<{ worldId: string; weekId: number }>
+  }) => void
 }
 
 function emptyProgress(): Record<WorldId, WorldProgress> {
@@ -452,5 +468,52 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     if (get().firstWalletBonusClaimed) return
     saveWelcome(true)
     set({ firstWalletBonusClaimed: true })
+  },
+
+  // ── Server inventory reconciliation ────────────────────────────────────
+  // Called by profileSync.pullAndApply after the JSONB payload merge so
+  // that server-authoritative ownership (derived from balance_transactions)
+  // always wins over a stale localStorage blob.
+  //
+  // Intentionally additive: we never remove premium unlocks or event
+  // entries that came from balance_transactions, and we never wipe level
+  // progress here (that only happens when the player clicks "Enter" in the
+  // game UI for a fresh week, triggering unlockEventForWeek).
+  reconcileInventory: ({ premiumWorldIds, eventUnlocks }) => {
+    // ── Premium worlds ────────────────────────────────────────────────────
+    if (premiumWorldIds.length > 0) {
+      const next = { ...get().unlockedPremium }
+      for (const wid of premiumWorldIds) next[wid as WorldId] = true
+      savePremium(next)
+      set({ unlockedPremium: next })
+    }
+
+    // ── Event week unlocks ────────────────────────────────────────────────
+    if (eventUnlocks.length > 0) {
+      const current = { ...get().eventState }
+      let changed = false
+      for (const { worldId, weekId } of eventUnlocks) {
+        const wid = worldId as WorldId
+        const existing = current[wid] ?? { weeks: {} }
+        // Only set if not already recorded; don't overwrite a `claimed`
+        // flag that the JSONB merge already placed there.
+        if (!existing.weeks[weekId]?.unlocked) {
+          current[wid] = {
+            weeks: {
+              ...existing.weeks,
+              [weekId]: {
+                unlocked: true,
+                claimed:  existing.weeks[weekId]?.claimed ?? false,
+              },
+            },
+          }
+          changed = true
+        }
+      }
+      if (changed) {
+        saveEvents(current)
+        set({ eventState: current })
+      }
+    }
   },
 }))

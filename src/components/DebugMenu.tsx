@@ -2,10 +2,27 @@ import { useState } from 'react'
 import { useGameStore, wipeEconomy } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useCosmeticsStore } from '../store/cosmeticsStore'
+import { useWalletStore } from '../store/walletStore'
 import { WHEEL_SKIN_LIST, getWheelSkin } from '../skins'
 import { WORLDS } from '../data/worldData'
 import type { World, WorldId } from '../data/worlds'
 import { currentWeekId, startWeekIdFromDate } from '../utils/gameUtils'
+
+// ── All localStorage keys the game owns ─────────────────────────────────────
+// Keep in sync with any new keys added to the stores / sfx.ts.
+const ALL_LOCAL_KEYS = [
+  'wc_progress_v1',
+  'wc_premium_unlocks_v1',
+  'wc_event_state_v1',
+  'wc_daily_attempt_v1',
+  'wc_economy_v1',
+  'wc_world_completion_claimed_v1',
+  'wc_welcome_bonus_v1',
+  'wc_cosmetics_v2',
+  'wc_cosmetics_v1',   // legacy
+  'wc_sfx_muted',
+  'wc_onboarding_seen_v1',
+] as const
 
 // ── Event-schedule helper ────────────────────────────────────────────────
 // Walks every world flagged as `event:true`, parses its Monday startDate
@@ -70,7 +87,10 @@ function formatShortDate(d: Date): string {
 //   • Game     — when an active round is on screen, fast-forward to win or
 //     lose; for daily, trigger win/lose overlay.
 
+// Visible in local dev OR when VITE_ENABLE_DEBUG=true is set on the deployment.
+// Set it on the testnet Vercel project; never set it on production.
 const DEV = (import.meta as any).env?.DEV === true
+         || (import.meta as any).env?.VITE_ENABLE_DEBUG === 'true'
 
 export default function DebugMenu() {
   if (!DEV) return null
@@ -81,6 +101,10 @@ export default function DebugMenu() {
   // 30-day event schedule panel — collapsed by default to keep the menu
   // compact, expanded on demand so devs can verify the rotation.
   const [showSchedule, setShowSchedule] = useState(false)
+  // Testnet full-wipe state
+  const [resetStatus, setResetStatus]   = useState<'idle' | 'wiping' | 'done' | 'error'>('idle')
+  const [resetMsg, setResetMsg]         = useState('')
+  const [adminSecret, setAdminSecret]   = useState('')
 
   // Game store fields we surface
   const screen          = useGameStore(s => s.screen)
@@ -115,6 +139,11 @@ export default function DebugMenu() {
   // subscribed to skin changes so the active button highlight stays in sync.
   const wheelSkinId    = useCosmeticsStore(s => s.wheelSkin)
   const setWheelSkin   = useCosmeticsStore(s => s.setWheelSkin)
+
+  // Wallet — needed for the testnet full-wipe so we know which address to
+  // delete on the server.
+  const walletAddress  = useWalletStore(s => (s as any).address ?? (s as any).walletAddress ?? '') as string
+  const jwt            = useWalletStore(s => (s as any).jwt ?? '') as string
 
   // ─── Action helpers ────────────────────────────────────────────────────
   function addGala(n: number) {
@@ -184,6 +213,71 @@ export default function DebugMenu() {
       _worldId: id, selectedWorldId: id,
     } as any)
     setTimeout(() => initLevel(), 0)
+  }
+
+  // ─── Testnet full wipe ────────────────────────────────────────────────
+  // 1. DELETE all server rows for this wallet via /api/admin/reset-player
+  // 2. Clear every localStorage key the game owns
+  // 3. Hard-reload so all stores re-hydrate from scratch (blank state)
+  async function fullTestnetWipe() {
+    if (resetStatus === 'wiping') return
+    const addr = walletAddress || ''
+    if (!addr) {
+      setResetMsg('No wallet connected — connect a wallet first.')
+      setResetStatus('error')
+      return
+    }
+    if (!adminSecret) {
+      setResetMsg('Enter ADMIN_SECRET first.')
+      setResetStatus('error')
+      return
+    }
+    const confirmed = window.confirm(
+      `⚠️ FULL TESTNET WIPE\n\nThis will permanently delete ALL server data for:\n${addr}\n\nAnd clear all localStorage for this browser.\n\nThis cannot be undone. Continue?`
+    )
+    if (!confirmed) return
+
+    setResetStatus('wiping')
+    setResetMsg('Deleting server data…')
+
+    try {
+      const resp = await fetch('/api/admin/reset-player', {
+        method: 'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'x-admin-secret': adminSecret,
+          ...(jwt ? { 'Authorization': `Bearer ${jwt}` } : {}),
+        },
+        body: JSON.stringify({ address: addr }),
+      })
+      const json = await resp.json().catch(() => ({}))
+      if (!resp.ok) {
+        setResetMsg(`Server error ${resp.status}: ${json?.error ?? 'unknown'}`)
+        setResetStatus('error')
+        return
+      }
+
+      // Server cleared — now wipe localStorage
+      setResetMsg('Clearing localStorage…')
+      for (const key of ALL_LOCAL_KEYS) {
+        try { localStorage.removeItem(key) } catch {}
+      }
+
+      const d = json.deleted ?? {}
+      setResetMsg(
+        `✅ Done! Deleted: ${d.player_state ?? 0} profile, ` +
+        `${d.player_balances ?? 0} balance, ` +
+        `${d.balance_transactions ?? 0} txns, ` +
+        `${d.scores ?? 0} scores. ` +
+        `Reloading in 2s…`
+      )
+      setResetStatus('done')
+      setTimeout(() => window.location.reload(), 2000)
+
+    } catch (e: any) {
+      setResetMsg(`Network error: ${e?.message ?? String(e)}`)
+      setResetStatus('error')
+    }
   }
 
   // ─── Render ────────────────────────────────────────────────────────────
@@ -257,6 +351,72 @@ export default function DebugMenu() {
       <div style={subtle}>
         GEMS <b style={{color:'#fbbf24'}}>{gemsBalance.toLocaleString()}</b> · hints <b style={{color:'#a78bfa'}}>{hints}</b>
       </div>
+      <div style={{ ...subtle, wordBreak:'break-all' }}>
+        wallet: <b style={{color: walletAddress ? '#86efac' : '#f87171'}}>
+          {walletAddress || 'not connected'}
+        </b>
+      </div>
+
+      {/* ── TESTNET FULL WIPE ─────────────────────────────────────── */}
+      <div style={{
+        ...header,
+        color: '#f87171',
+        borderBottom: '1px solid rgba(248,113,113,0.3)',
+      }}>
+        ⚠️ TESTNET RESET
+      </div>
+      <div style={{ ...subtle, marginBottom: 4 }}>
+        Wipes ALL server + localStorage data for the connected wallet.
+        Requires <code style={{color:'#fbbf24'}}>ADMIN_SECRET</code>.
+      </div>
+      <div className="flex gap-1 items-center mb-1">
+        <input
+          type="password"
+          placeholder="ADMIN_SECRET"
+          value={adminSecret}
+          onChange={e => setAdminSecret(e.target.value)}
+          style={{
+            ...input,
+            flex: 1,
+            borderColor: adminSecret ? '#475569' : '#7f1d1d',
+          }}
+        />
+      </div>
+      <button
+        style={{
+          ...btnDanger,
+          width: '100%',
+          opacity: resetStatus === 'wiping' ? 0.6 : 1,
+          background: resetStatus === 'wiping'
+            ? 'linear-gradient(160deg,#7f1d1d,#450a0a)'
+            : 'linear-gradient(160deg,#dc2626,#7f1d1d)',
+          border: '2px solid #ef4444',
+          borderBottom: '2px solid #7f1d1d',
+          boxShadow: '0 2px 0 #7f1d1d, 0 0 10px rgba(239,68,68,0.4)',
+          letterSpacing: '1px',
+        }}
+        disabled={resetStatus === 'wiping' || resetStatus === 'done'}
+        onClick={fullTestnetWipe}
+      >
+        {resetStatus === 'wiping' ? '⏳ wiping…'
+          : resetStatus === 'done' ? '✅ done — reloading'
+          : '🗑️ FULL WIPE (server + local)'}
+      </button>
+      {resetMsg && (
+        <div style={{
+          ...subtle,
+          marginTop: 4,
+          color: resetStatus === 'error' ? '#f87171' : resetStatus === 'done' ? '#86efac' : '#a5f3fc',
+          wordBreak: 'break-word',
+        }}>
+          {resetMsg}
+        </div>
+      )}
+      {resetStatus === 'error' && (
+        <button style={{ ...btn, marginTop: 4 }} onClick={() => { setResetStatus('idle'); setResetMsg('') }}>
+          dismiss
+        </button>
+      )}
 
       <div style={header}>NAV</div>
       <div className="flex flex-wrap gap-1">

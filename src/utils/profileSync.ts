@@ -21,6 +21,8 @@
 //                         {unlockedWeek, claimedWeek} entries are folded in
 //                         via normalizeEventEntry before merging.
 //   • economy           → MAX(gemsBalance), MAX(hints) (friendly to player)
+//   • settings          → local preferred (player's current device wins;
+//                         falls back to remote if local is missing)
 //
 // Future work: gems are server-authoritative as of v4 (the store credits
 // player_state.payload.economy.gemsBalance directly on purchase). The MAX
@@ -32,6 +34,7 @@ import { useGameStore } from '../store/gameStore'
 import { useProgressStore } from '../store/progressStore'
 import { useWalletStore } from '../store/walletStore'
 import { useCosmeticsStore } from '../store/cosmeticsStore'
+import { isSfxMuted, setSfxMuted } from './sfx'
 import { WHEEL_SKINS, type WheelSkinId } from '../skins'
 import type { WorldId } from '../data/worlds'
 
@@ -78,6 +81,11 @@ export interface PlayerStatePayload {
    *  some device, so no device will grant it again. Optional for
    *  backward compatibility with pre-rollout payloads. */
   welcome?: { firstWalletBonusClaimed: boolean }
+  /** Device preferences that should follow the player across devices.
+   *  Optional for backward compatibility with payloads written before
+   *  this field existed (older payloads simply omit it; local preference
+   *  stays on those devices). */
+  settings?: { sfxMuted: boolean }
 }
 
 /** Read the gems balance from a payload, tolerating the legacy field name.
@@ -102,6 +110,15 @@ interface ServerResponse {
    *  granted the welcome bundle (gems + hints) inside that same call;
    *  `balances` already reflects it. Use to fire the welcome toast. */
   firstWalletBonusGranted?: { gems: number; hints: number }
+  /** Server-authoritative ownership derived from balance_transactions.
+   *  Always prefer these over the JSONB payload's cosmetics / premium /
+   *  event fields — the transactions table is the source of truth for
+   *  anything the player paid for. */
+  inventory?: {
+    ownedSkins:      string[]
+    unlockedPremium: string[]
+    eventUnlocks:    Array<{ worldId: string; weekId: number }>
+  }
 }
 
 // ── Build a payload from the current client state ───────────────────────────
@@ -145,6 +162,9 @@ export function buildPayload(): PlayerStatePayload {
     },
     welcome: {
       firstWalletBonusClaimed: progress.firstWalletBonusClaimed,
+    },
+    settings: {
+      sfxMuted: isSfxMuted(),
     },
   }
 }
@@ -300,6 +320,12 @@ export function mergePayloads(local: PlayerStatePayload, server: PlayerStatePayl
         !!(local.welcome?.firstWalletBonusClaimed
           || server.welcome?.firstWalletBonusClaimed),
     },
+    settings: {
+      // Local preference wins (player's current device is most recent intent).
+      // Falls back to remote if local is missing (e.g. first login on new device).
+      // Tolerant of payloads written before `settings` existed (both may be undefined).
+      sfxMuted: local.settings?.sfxMuted ?? server.settings?.sfxMuted ?? false,
+    },
   }
 }
 
@@ -335,9 +361,8 @@ export function applyPayload(p: PlayerStatePayload): void {
     localStorage.setItem('wc_world_completion_claimed_v1',    JSON.stringify(completionClaimed))
     localStorage.setItem('wc_welcome_bonus_v1',               JSON.stringify(welcomeClaimed))
   } catch {}
-  // Apply cosmetics last so the wheel re-renders with the synced skin.
-  // The cosmetics store handles its own localStorage persistence inside
-  // setOwnedSkins / setWheelSkin, so we don't double-write here.
+  // Apply cosmetics — the cosmetics store handles its own localStorage
+  // persistence inside setOwnedSkins / setWheelSkin, so we don't double-write.
   if (p.cosmetics) {
     const owned = (p.cosmetics.ownedSkins ?? []).filter(
       (id): id is WheelSkinId => typeof id === 'string' && id in WHEEL_SKINS,
@@ -347,6 +372,13 @@ export function applyPayload(p: PlayerStatePayload): void {
     if (typeof equipped === 'string' && equipped in WHEEL_SKINS) {
       useCosmeticsStore.getState().setWheelSkin(equipped as WheelSkinId)
     }
+  }
+  // Apply settings — sfxMuted is a device preference but we sync it so a
+  // player who muted on one device doesn't get blasted on the next. We
+  // only apply when the field is actually present in the payload (undefined
+  // means this is a pre-settings legacy blob, not that mute is off).
+  if (p.settings !== undefined) {
+    setSfxMuted(p.settings.sfxMuted)
   }
 }
 
@@ -427,6 +459,28 @@ export async function pullAndApply(): Promise<void> {
       // table, but the flag keeps the legacy UI tidy.
       try { useProgressStore.getState().claimFirstWalletBonus() } catch {}
       useGameStore.getState().showToast(`🎁 Welcome! +${gems} Gems · +${hints} hints`)
+    }
+    // Server-authoritative inventory — derived from balance_transactions on
+    // the server. Always applied AFTER the JSONB merge so that a purchase
+    // that happened on another device (and wrote a balance_transactions row)
+    // is reflected even if the JSONB push was dropped. Additive only: we
+    // never remove something from a player's inventory via this path.
+    if (resp?.inventory) {
+      const { ownedSkins, unlockedPremium, eventUnlocks } = resp.inventory
+      // Skins: union server ownership into the cosmetics store.
+      if (ownedSkins.length > 0) {
+        const cosmetics = useCosmeticsStore.getState()
+        const merged_skins = new Set([...cosmetics.ownedSkins, ...ownedSkins])
+        cosmetics.setOwnedSkins([...merged_skins] as WheelSkinId[])
+      }
+      // Premium worlds + event week unlocks: reconcile into progressStore
+      // without triggering level-wipe side effects.
+      if (unlockedPremium.length > 0 || eventUnlocks.length > 0) {
+        useProgressStore.getState().reconcileInventory({
+          premiumWorldIds: unlockedPremium,
+          eventUnlocks,
+        })
+      }
     }
     // Push the merged result so the server has the union too.
     setStatus('pushing')
