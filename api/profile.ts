@@ -107,9 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updatedAt, balances, inventory, firstWalletBonusGranted,
     })
   } catch (e: any) {
-    return res.status(500).json({
-      error: 'profile handler threw', detail: e?.message ?? String(e),
-      code:  e?.code ?? e?.name ?? 'UNKNOWN',
-    })
+    console.error('[profile] unhandled error:', e)
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }

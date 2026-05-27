@@ -24,6 +24,25 @@ function route(req: VercelRequest): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Admin secret guard — protects internal dashboard routes (overview, daily,
+// funnel). Returns true and sends a 401/500 if the request should be blocked.
+// Same pattern as api/admin/[action].ts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function requireAdminSecret(req: VercelRequest, res: VercelResponse): boolean {
+  const adminSecret = process.env.ADMIN_SECRET
+  if (!adminSecret) {
+    res.status(500).json({ error: 'ADMIN_SECRET is not configured on this deployment' })
+    return true
+  }
+  if (req.headers['x-admin-secret'] !== adminSecret) {
+    res.status(401).json({ error: 'Invalid or missing x-admin-secret header' })
+    return true
+  }
+  return false
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/analytics/track
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -83,7 +102,8 @@ async function handleTrack(req: VercelRequest, res: VercelResponse) {
 // template literals) so the bundler doesn't emit a bare `as` identifier.
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function handleOverview(_req: VercelRequest, res: VercelResponse) {
+async function handleOverview(req: VercelRequest, res: VercelResponse) {
+  if (requireAdminSecret(req, res)) return
   const db = sql()
 
   const results = await Promise.all([
@@ -147,6 +167,7 @@ async function handleOverview(_req: VercelRequest, res: VercelResponse) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleDaily(req: VercelRequest, res: VercelResponse) {
+  if (requireAdminSecret(req, res)) return
   const rawDays = parseInt((req.query.days as string) ?? '30', 10)
   const days = Math.min(Math.max(rawDays, 1), 90)
   const db = sql()
@@ -225,6 +246,7 @@ async function handleDaily(req: VercelRequest, res: VercelResponse) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function handleFunnel(req: VercelRequest, res: VercelResponse) {
+  if (requireAdminSecret(req, res)) return
   const rawDays = parseInt((req.query.days as string) ?? '7', 10)
   const days = Math.min(Math.max(rawDays, 1), 90)
   const db = sql()
@@ -344,6 +366,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (err: any) {
     console.error('[analytics] unhandled crash:', err)
-    return res.status(500).json({ error: err?.message ?? String(err), route: route(req), url: req.url })
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }
