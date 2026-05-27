@@ -13,7 +13,9 @@ import {
 import { shortAddress } from '../utils/wallet'
 import { playSfx } from '../utils/sfx'
 import SfxToggle from './SfxToggle'
+import BgmToggle from './BgmToggle'
 import WalletConnectModal from './WalletConnectModal'
+import { startBgm } from '../utils/bgm'
 
 // Wraps a click handler with the menu-confirm tap SFX. Keeps every button's
 // onClick site short.
@@ -56,6 +58,17 @@ export default function Splash() {
       setEventCountdown(timeToNextPhaseChange())
     }, 1000)
     return () => clearInterval(id)
+  }, [])
+
+  // Start BGM on the first pointer interaction — satisfies browser autoplay
+  // policy. startBgm() is idempotent so the listener can fire only once.
+  useEffect(() => {
+    function onFirstGesture() {
+      startBgm()
+      window.removeEventListener('pointerdown', onFirstGesture)
+    }
+    window.addEventListener('pointerdown', onFirstGesture)
+    return () => window.removeEventListener('pointerdown', onFirstGesture)
   }, [])
 
   // After wallet connects, replay whichever action the player originally tapped.
@@ -114,7 +127,8 @@ export default function Splash() {
         WebkitOverflowScrolling: 'touch',
       }}>
 
-      <div className="absolute z-20" style={{ top: 16, right: 16 }}>
+      <div className="absolute z-20 flex gap-2" style={{ top: 16, right: 16 }}>
+        <BgmToggle variant="splash" />
         <SfxToggle variant="splash" />
       </div>
 

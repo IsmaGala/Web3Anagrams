@@ -137,6 +137,9 @@ export interface GameState {
 
   // SFX
   sfxMuted:    boolean
+
+  // BGM
+  bgmMuted:    boolean
 }
 
 // ── Shop Pack ─────────────────────────────────────────────────────────────────

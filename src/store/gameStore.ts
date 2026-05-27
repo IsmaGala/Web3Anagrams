@@ -13,6 +13,7 @@ import {
 } from '../utils/gameUtils'
 import { DAILY_POOL_SIZE } from '../data/dailyLevels'
 import { playSfx, isSfxMuted, setSfxMuted, unlockSfx } from '../utils/sfx'
+import { startBgm, isBgmMuted, setBgmMuted } from '../utils/bgm'
 import { useProgressStore } from './progressStore'
 import { useCosmeticsStore } from './cosmeticsStore'
 import type { WheelSkinId } from '../skins'
@@ -268,6 +269,9 @@ interface GameStore extends GameState {
 
   // SFX
   toggleSfxMuted: () => void
+
+  // BGM
+  toggleBgmMuted: () => void
 }
 
 // ── Store ──────────────────────────────────────────────────────────────────────
@@ -303,6 +307,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedWorldId:   'townstar',
   _worldId:          'townstar',
   sfxMuted:          isSfxMuted(),
+  bgmMuted:          isBgmMuted(),
   pendingWelcomeBonus: null,
   setPendingWelcomeBonus: (bonus) => set({ pendingWelcomeBonus: bonus }),
 
@@ -1257,6 +1262,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ sfxMuted: next })
     // Touching audio on the same user-gesture tick keeps autoplay policy happy.
     if (!next) unlockSfx()
+  },
+
+  // ── BGM ───────────────────────────────────────────────────────────────────
+  toggleBgmMuted: () => {
+    const next = !get().bgmMuted
+    setBgmMuted(next)
+    set({ bgmMuted: next })
+    // If the user unmutes and BGM hasn't started yet (autoplay was blocked),
+    // this gesture unlocks it — startBgm is idempotent so safe to call here.
+    if (!next) startBgm()
   },
 }))
 

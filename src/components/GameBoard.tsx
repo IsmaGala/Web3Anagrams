@@ -6,6 +6,7 @@ import DailyTimer from './DailyTimer'
 import { DailyWinOverlay, DailyLoseOverlay, DailyQuitConfirmOverlay } from './DailyOverlays'
 import LevelCompleteOverlay from './LevelCompleteOverlay'
 import SfxToggle from './SfxToggle'
+import BgmToggle from './BgmToggle'
 import Toast from './Toast'
 import { playSfx } from '../utils/sfx'
 import { useScreenBackdrop } from '../utils/screenBackdrop'
@@ -93,7 +94,8 @@ export default function GameBoard() {
           <span className="text-sm text-white">{score}</span>
         </div>
 
-        {/* SFX mute toggle */}
+        {/* Audio toggles */}
+        <BgmToggle variant={isDaily ? 'daily' : 'single'} size="sm" />
         <SfxToggle variant={isDaily ? 'daily' : 'single'} size="sm" />
       </div>
 
