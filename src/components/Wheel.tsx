@@ -3,6 +3,7 @@ import { useGameStore, selectActiveLetters } from '../store/gameStore'
 import { useCosmeticsStore } from '../store/cosmeticsStore'
 import { getWheelSkin, resolveRing, resolveConnector } from '../skins'
 import { letterPosition } from '../utils/gameUtils'
+import { playSfx } from '../utils/sfx'
 
 const CANVAS_SIZE = 260
 
@@ -17,6 +18,7 @@ export default function Wheel() {
   const startSelect    = useGameStore(s => s.startSelect)
   const continueSelect = useGameStore(s => s.continueSelect)
   const endSelect      = useGameStore(s => s.endSelect)
+  const shuffleLetters = useGameStore(s => s.shuffleLetters)
 
   // Cosmetics: pull the active skin id (a primitive string) so this
   // component re-renders on skin change without subscribing to the entire
@@ -151,6 +153,53 @@ export default function Wheel() {
 
       <canvas ref={canvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE}
         className="absolute inset-0 pointer-events-none" />
+
+      {/* Shuffle button — centered in the ring. Fisher-Yates reshuffles the
+          letter positions so the player can break out of a stuck arrangement.
+          Visual-only — the underlying solution words are unchanged. */}
+      {letters.length > 0 && (
+        <button
+          aria-label="Shuffle letters"
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
+          onPointerDown={e => e.stopPropagation()}
+          onClick={() => { playSfx('uiTap'); shuffleLetters() }}
+          style={{
+            position:     'absolute',
+            left: '50%',  top: '50%',
+            transform:    'translate(-50%, -50%)',
+            width: 38,    height: 38,
+            borderRadius: '50%',
+            background:   'rgba(76,29,149,0.30)',
+            border:       '2px solid rgba(167,139,250,0.30)',
+            boxShadow:    '0 2px 10px rgba(0,0,0,0.35)',
+            display:      'flex',
+            alignItems:   'center',
+            justifyContent: 'center',
+            cursor:       'pointer',
+            zIndex:       10,
+            touchAction:  'auto',
+            transition:   'background 0.12s, box-shadow 0.12s',
+          }}
+          onPointerEnter={e => {
+            e.currentTarget.style.background = 'rgba(124,58,237,0.50)'
+            e.currentTarget.style.boxShadow  = '0 2px 14px rgba(124,58,237,0.4)'
+          }}
+          onPointerLeave={e => {
+            e.currentTarget.style.background = 'rgba(76,29,149,0.30)'
+            e.currentTarget.style.boxShadow  = '0 2px 10px rgba(0,0,0,0.35)'
+          }}
+        >
+          {/* Two-arc circular arrows (clockwise + counter) */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="rgba(196,181,253,0.85)" strokeWidth="2.2"
+            strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="1 4 1 10 7 10" />
+            <polyline points="23 20 23 14 17 14" />
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10" />
+            <path d="M3.51 15a9 9 0 0 0 14.85 3.36L23 14" />
+          </svg>
+        </button>
+      )}
 
       {letters.map((ch, i) => {
         // Scale positions to match 260 canvas

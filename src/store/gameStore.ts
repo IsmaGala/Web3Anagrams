@@ -234,6 +234,10 @@ interface GameStore extends GameState {
   startSelect:    (index: number) => void
   continueSelect: (index: number) => void
   endSelect:      () => void
+  /** Locally shuffle the wheel letter order so the player can un-jam combos.
+   *  Visual-only — solution words unchanged. Resets on every new level/round. */
+  shuffleLetters:  () => void
+  shuffledLetters: string[] | null
 
   // Internal helpers (declared in interface so get() can call them)
   _updateCurrentWord: (sel: number[]) => void
@@ -305,6 +309,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   pendingWorldRewardId: null,
 
   round:             null,
+  shuffledLetters:   null,
 
   setScreen:  (screen) => set({ screen } as any),
   setWorldId: (id) => set({ selectedWorldId: id, _worldId: id }),
@@ -360,6 +365,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dailyComplete:   false,
       dailyFailed:     false,
       round:           null,
+      shuffledLetters: null,
     })
 
     // ── Server-authoritative path ─────────────────────────────────────────
@@ -713,6 +719,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!get().dragging) return
     set({ dragging: false })
     get().submitWord()
+  },
+
+  shuffleLetters: () => {
+    const current = selectActiveLetters(get() as any)
+    if (!current.length) return
+    const arr = [...current]
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    set({ shuffledLetters: arr, selected: [], currentWord: '', wordDef: '' })
   },
 
   _updateCurrentWord: (sel) => {
@@ -1279,6 +1296,7 @@ export const selectCurrentLevel = (s: GameStore) =>
 const EMPTY_LETTERS: string[] = Object.freeze([]) as unknown as string[]
 
 export const selectActiveLetters = (s: GameStore): string[] => {
+  if (s.shuffledLetters) return s.shuffledLetters
   if (s.round) return s.round.manifest.letters
   const lvl = selectCurrentLevel(s)
   return lvl?.letters ?? EMPTY_LETTERS
@@ -1297,8 +1315,7 @@ export const selectActiveSlotCount = (s: GameStore): number => {
 export const selectActiveFoundCount = (s: GameStore): number => {
   if (s.round) return s.round.slots.filter(slot => !!slot.filled).length
   const lvl = selectCurrentLevel(s)
-  // Defensive: bundle-stripped placeholder Levels have no `words` array,
-  // so this can only return a real count in legacy mode.
+  // Defensive:  // so this can only return a real count in legacy mode.
   return lvl?.words ? lvl.words.filter(w => s.foundWords.has(w)).length : 0
 }
 
