@@ -330,100 +330,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
-  // ── Credit gems ────────────────────────────────────────────────────────
-  // Use the audit-logged grant helper so the server economy stays atomic
+  // ── Credit gems / grant skin ──────────────────────────────────────────
+  // Use the audit-logged grant helpers so the server economy stays atomic
   // and inspectable. The metadata captures the chain tx for support.
-  const granted = await grantGems({
-    address:  authAddr,
-    amount:   pack.gems,
-    reason:   'store_purchase',
-    metadata: {
-      packId,
-      gala:        pack.gala,
-      uniqueKey:   signedDto.uniqueKey,
-      network:     NETWORK,
-      chainTxId,
-      chainTxData: chainResult?.Data ?? null,
-      replay:      isReplaySuccess || undefined,
-    },
-  })
-
-  track('gala_purchase_success', {
-    address:      authAddr,
-    pack_id:      packId,
-    gala_spent:   pack.gala,
-    gems_credited: pack.gems,
-    new_balance:  granted.newBalance,
-    chain_tx_id:  chainTxId,
-    network:      NETWORK,
-    replay:       isReplaySuccess || undefined,
-  })
-
-  return res.status(200).json({
-    ok:           true,
-    packId,
-    gemsCredited: pack.gems,
-    newBalance:   granted.newBalance,
-  })
-}
-      hmacAuth:  GATEWAY_API_KEY && GATEWAY_SECRET ? 'enabled' : 'disabled',
-    })
-  }
-  // Canonical chain tx ID lives in the X-Transaction-Id header.
-  const chainTxId = gatewayResp.headers.get('x-transaction-id') ?? null
-
-  let chainResult: any
-  try {
-    chainResult = await gatewayResp.json()
-  } catch (e: any) {
-    return res.status(502).json({ error: 'GalaChain gateway returned non-JSON', detail: e?.message })
-  }
-
-  // ErrorCode 409 = "uniqueKey already processed" — payment IS on-chain.
-  const isReplaySuccess = chainResult?.Status !== 1
-    && chainResult?.Error?.ErrorCode === 409
-
-  if (chainResult?.Status !== 1 && !isReplaySuccess) {
-    track('gala_purchase_failed', {
-      address:      authAddr,
-      pack_id:      packId,
-      gala_amount:  pack.gala,
-      error_detail: chainResult?.Error?.Message ?? chainResult?.Message ?? chainResult?.ErrorKey ?? 'unknown chaincode error',
-      error_code:   chainResult?.Error?.ErrorCode ?? null,
-      network:      NETWORK,
-    })
-    return res.status(402).json({
-      ok:      false,
-      error:   'GalaChain transfer failed',
-      detail:  chainResult?.Error?.Message
-            ?? chainResult?.Message
-            ?? chainResult?.ErrorKey
-            ?? 'unknown chaincode error',
-      errorCode: chainResult?.Error?.ErrorCode ?? null,
-    })
-  }
-
-  // ── Event skin purchase ───────────────────────────────────────────────
   if (isEventSkin) {
     const result = await grantSkin({
       address: authAddr,
       skinId:  eventSkinId!,
       reason:  'cosmetic_skin',
       metadata: {
-        packId:     'event-skin',
-        gala:       EVENT_SKIN_GALA,
-        uniqueKey:  signedDto.uniqueKey,
-        network:    NETWORK,
+        packId:    'event-skin',
+        gala:      EVENT_SKIN_GALA,
+        uniqueKey: signedDto.uniqueKey,
+        network:   NETWORK,
         chainTxId,
-        replay:     isReplaySuccess || undefined,
+        replay:    isReplaySuccess || undefined,
       },
     })
     track('event_skin_purchased', {
-      address:    authAddr,
-      skin_id:    eventSkinId,
-      gala_spent: EVENT_SKIN_GALA,
+      address:       authAddr,
+      skin_id:       eventSkinId,
+      gala_spent:    EVENT_SKIN_GALA,
       already_owned: !result.ok,
-      network:    NETWORK,
+      network:       NETWORK,
     })
     return res.status(200).json({
       ok:      true,
@@ -433,7 +362,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
-  // ── Credit gems ───────────────────────────────────────────────────────
   const granted = await grantGems({
     address:  authAddr,
     amount:   pack.gems,
