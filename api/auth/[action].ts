@@ -44,7 +44,7 @@ async function handleNonce(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'client|<id> login is not yet supported on this endpoint' })
   }
 
-  const nonce = `NFT WordChain login\nnonce: ${randomBytes(16).toString('hex')}`
+  const nonce = `GWordChain login\nnonce: ${randomBytes(16).toString('hex')}`
   const expiresAt = new Date(Date.now() + TTL_MS).toISOString()
 
   await sql()`

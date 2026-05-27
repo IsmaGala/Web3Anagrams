@@ -365,7 +365,7 @@ export default function Splash() {
         </button>
 
         <p className="text-xs font-bold" style={{ color:'rgba(255,255,255,0.2)', letterSpacing:'2px' }}>
-          NFT WORDCHAIN v1.0
+          GWORDCHAIN v1.0
         </p>
       </div>
 

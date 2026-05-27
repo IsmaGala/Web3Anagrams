@@ -33,7 +33,7 @@ interface Card {
 const CARDS: Card[] = [
   {
     icon:     '⬡',
-    title:    'NFT WORDCHAIN',
+    title:    'GWORDCHAIN',
     subtitle: 'Word puzzles, anagram-style',
     body:     'Each level gives you a handful of letters and a target list of words to find. Drag through the wheel to spell. Find them all to clear the level and earn score.',
     accent:   '#a78bfa',
