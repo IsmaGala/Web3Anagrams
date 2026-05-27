@@ -773,7 +773,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // server mode), POST to /api/play/level/submit-word, and apply the
     // response. The server decides every outcome — including completion.
     if (round) {
-      const word = selected.map(i => round.manifest.letters[i]).join('').toUpperCase()
+      // Use selectActiveLetters so a player-triggered shuffle is respected —
+      // indices in `selected` always refer to whatever the wheel is displaying.
+      const activeLetters = selectActiveLetters(get() as any)
+      const word = selected.map(i => activeLetters[i]).join('').toUpperCase()
       set({ selected: [], currentWord: '', _currentWordState: '' } as any)
       if (word.length < 2) return
 
@@ -941,7 +944,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // to validate against anyway.
     if (!lvl.letters) { set({ selected: [], currentWord: '' } as any); return }
 
-    const word = selected.map(i => lvl.letters[i]).join('')
+    const activeLetters = selectActiveLetters(get() as any)
+    const word = selected.map(i => activeLetters[i]).join('')
     set({ selected: [], currentWord: '', _currentWordState: '' } as any)
     if (word.length < 2) return
 
