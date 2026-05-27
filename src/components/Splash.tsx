@@ -140,7 +140,7 @@ export default function Splash() {
         </div>
         <h1 className="font-fredoka text-center mb-1 shimmer-text"
           style={{ fontSize:'2.4rem', letterSpacing:'2px', lineHeight:1.1 }}>
-          NFT<br/>WORDCHAIN
+          GWORDCHAIN
         </h1>
         <p className="font-nunito font-bold text-sm tracking-widest mb-3 uppercase"
           style={{ color:'rgba(196,181,253,0.5)' }}>
