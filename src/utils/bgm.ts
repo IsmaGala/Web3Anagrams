@@ -16,7 +16,7 @@ const TRACKS = [
 ] as const
 
 const BGM_MUTE_KEY = 'wc_bgm_muted'
-const BGM_VOL      = 0.35   // sits comfortably below the SFX layer
+const BGM_VOL      = 0.5
 
 let audio:      HTMLAudioElement | null = null
 let muted:      boolean = false
