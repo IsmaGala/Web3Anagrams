@@ -60,23 +60,30 @@ export default function WalletConnectModal({ open, onClose }: { open: boolean; o
           </div>
         </button>
 
-        <button onClick={() => pick('gala')} disabled={busy || !present.gala}
+        {/* Gala Wallet — disabled until EIP-712 signing is implemented */}
+        <button disabled
           className="btn-3d w-full py-3 mb-4"
           style={{
-            background: present.gala
-              ? 'linear-gradient(160deg, #4c1d95, #3b0764)'
-              : 'linear-gradient(160deg, #374151, #1f2937)',
-            border: `4px solid ${present.gala ? '#a78bfa' : 'rgba(255,255,255,0.15)'}`,
-            borderBottom: `4px solid ${present.gala ? '#2e1065' : 'rgba(0,0,0,0.4)'}`,
-            boxShadow: `0 6px 0 ${present.gala ? '#1e0050' : 'rgba(0,0,0,0.4)'}`,
+            background:'linear-gradient(160deg, #374151, #1f2937)',
+            border:'4px solid rgba(255,255,255,0.15)',
+            borderBottom:'4px solid rgba(0,0,0,0.4)',
+            boxShadow:'0 6px 0 rgba(0,0,0,0.4)',
             borderRadius:'18px',
-            color: present.gala ? '#fff' : 'rgba(255,255,255,0.5)',
+            color:'rgba(255,255,255,0.35)',
             fontFamily:'Fredoka One,cursive', fontSize:'1.1rem',
-            cursor: present.gala ? 'pointer' : 'not-allowed',
+            cursor:'not-allowed',
+            position:'relative',
           }}>
           <div className="flex items-center justify-center gap-3">
-            <span className="text-2xl">🟣</span>
-            <span>{present.gala ? 'GALA WALLET' : 'GALA WALLET · NOT FOUND'}</span>
+            <span className="text-2xl" style={{ opacity:0.4 }}>🟣</span>
+            <span>GALA WALLET</span>
+            <span style={{
+              fontSize:'0.6rem', fontFamily:'Nunito,sans-serif', fontWeight:800,
+              letterSpacing:'0.08em', color:'#a78bfa',
+              background:'rgba(167,139,250,0.15)', border:'1.5px solid rgba(167,139,250,0.4)',
+              borderRadius:'6px', padding:'2px 7px',
+              verticalAlign:'middle',
+            }}>COMING SOON</span>
           </div>
         </button>
 
@@ -86,9 +93,9 @@ export default function WalletConnectModal({ open, onClose }: { open: boolean; o
             ⚠ {error}
           </p>
         )}
-        {!present.metamask && !present.gala && (
+        {!present.metamask && (
           <p className="font-nunito font-bold mb-3 text-xs" style={{ color:'rgba(255,255,255,0.4)' }}>
-            No wallet extensions detected. Install MetaMask or Gala Wallet to continue.
+            No wallet detected. Install MetaMask to continue.
           </p>
         )}
 
