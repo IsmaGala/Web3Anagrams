@@ -81,7 +81,7 @@ export default function Splash() {
     // SETTLED phase: the headline is whichever event is starting next.
     const targetWeek = phase === 'active' ? thisWeek : thisWeek + 1
     const event = WORLDS.find(w => w.event && w.startDate && startWeekIdFromDate(w.startDate) === targetWeek)
-    if (!event) return 'LEADERBOARD HINT-PACK REWARDS'
+    if (!event) return 'EXCLUSIVE SKINS · GEMS · HINTS'
     const verb = phase === 'active' ? 'ENDS' : 'STARTS'
     return `${event.name.toUpperCase()} · ${verb} IN ${formatCountdownShort(eventCountdown)}`
   }, [eventCountdown])
@@ -349,7 +349,7 @@ export default function Splash() {
             <div className="flex-1 text-left">
               <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>STORE</div>
               <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(196,181,253,0.7)' }}>
-                BUY WITH GALA OR GUSDC
+                BUY WITH GALA
               </div>
             </div>
             <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
