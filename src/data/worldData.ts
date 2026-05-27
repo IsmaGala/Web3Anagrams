@@ -120,7 +120,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-05-25',     // TESTING: set to current week — revert to '2026-06-01' after
+    startDate:   '2026-06-01',     // week of Jun 1 — event rotation restart
     eventReward: { firstPlaceSkin: 'deep-sea' },
     levels:      OCEAN_EVENT_LEVELS,
   },

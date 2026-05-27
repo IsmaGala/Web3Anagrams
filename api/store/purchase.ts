@@ -65,7 +65,7 @@ function startWeekIdFromDate(dateISO: string): number {
 // Events with their skin rewards — mirrors worldData.ts event entries.
 // Update startDate here whenever worldData.ts is updated.
 const EVENT_ROTATION: Array<{ worldId: string; startDate: string; skinId: string }> = [
-  { worldId: 'oceanevent',  startDate: '2026-05-25', skinId: 'deep-sea'   }, // TESTING — revert to '2026-06-01'
+  { worldId: 'oceanevent',  startDate: '2026-06-01', skinId: 'deep-sea'   },
   { worldId: 'blooddonor',  startDate: '2026-06-08', skinId: 'blood'      },
   { worldId: 'area515',     startDate: '2026-06-15', skinId: 'cybernetic' },
   { worldId: 'flags',       startDate: '2026-06-22', skinId: 'patriot'    },
