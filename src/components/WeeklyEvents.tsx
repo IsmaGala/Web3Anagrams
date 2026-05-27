@@ -100,6 +100,12 @@ export default function WeeklyEvents() {
   const phase = eventPhase()
   const thisWeek = currentWeekId()
 
+  // Derived after entries are built — see below for use in the countdown pill.
+  // Declared here so TypeScript sees it before the return statement, but
+  // entries is populated synchronously above so this is always up to date.
+  let hasActiveEvent = false
+  let hasUpcomingEvent = false
+
   // Build the list of cards to render. Each event world is scheduled to be
   // ACTIVE on exactly one week, controlled by its `startDate`. From the
   // events page's point of view, on any given day we may see:
@@ -140,6 +146,9 @@ export default function WeeklyEvents() {
       entries.push({ world, weekId: pw, kind: 'past' })
     }
   }
+
+  hasActiveEvent   = entries.some(e => e.kind === 'active')
+  hasUpcomingEvent = entries.some(e => e.kind === 'upcoming')
 
   // Gate guard — if no wallet is connected, queue the action and pop the
   // connect modal. The modal calls `connectAndLogin` under the hood; on
@@ -231,22 +240,23 @@ export default function WeeklyEvents() {
         ROTATING WORLDS · LEADERBOARD REWARDS
       </p>
 
-      {/* Phase-aware countdown. The label and color shift based on what the
-          countdown is pointing at: a brighter "ENDS IN" while the event is
-          running (urgency for last-minute climbers), a softer "NEXT EVENT IN"
-          during the post-competition claim window. */}
-      <div className="flex items-center gap-3 px-4 py-2 rounded-full mb-2"
-        style={{
-          background: phase === 'active' ? 'rgba(14,165,233,0.1)' : 'rgba(167,139,250,0.1)',
-          border:     phase === 'active' ? '2px solid rgba(14,165,233,0.3)' : '2px solid rgba(167,139,250,0.3)',
-        }}>
-        <span className="font-nunito font-bold text-xs" style={{ color: phase === 'active' ? 'rgba(186,230,253,0.5)' : 'rgba(196,181,253,0.55)' }}>
-          {phase === 'active' ? 'EVENT ENDS IN' : 'NEXT EVENT IN'}
-        </span>
-        <span className="font-fredoka text-base" style={{ color: phase === 'active' ? '#7dd3fc' : '#c4b5fd' }}>
-          {formatWeekCountdown(countdown)}
-        </span>
-      </div>
+      {/* Phase-aware countdown. Only shown when there is actually an active
+          or upcoming event — avoids a misleading "EVENT ENDS IN" timer
+          during weeks when no event is scheduled. */}
+      {(hasActiveEvent || hasUpcomingEvent) && (
+        <div className="flex items-center gap-3 px-4 py-2 rounded-full mb-2"
+          style={{
+            background: hasActiveEvent ? 'rgba(14,165,233,0.1)' : 'rgba(167,139,250,0.1)',
+            border:     hasActiveEvent ? '2px solid rgba(14,165,233,0.3)' : '2px solid rgba(167,139,250,0.3)',
+          }}>
+          <span className="font-nunito font-bold text-xs" style={{ color: hasActiveEvent ? 'rgba(186,230,253,0.5)' : 'rgba(196,181,253,0.55)' }}>
+            {hasActiveEvent ? 'EVENT ENDS IN' : 'NEXT EVENT IN'}
+          </span>
+          <span className="font-fredoka text-base" style={{ color: hasActiveEvent ? '#7dd3fc' : '#c4b5fd' }}>
+            {formatWeekCountdown(countdown)}
+          </span>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 px-4 py-2 rounded-full mb-7"
         style={{ background:'rgba(34,211,238,0.08)', border:'2px solid rgba(34,211,238,0.25)' }}>

@@ -200,16 +200,14 @@ export default function Splash() {
           </>
         )}
 
-        <button onClick={tap(() => requireWalletForGame('single'))} className="btn-3d w-full mb-3"
+        <button onClick={tap(() => requireWalletForGame('single'))} className="btn-3d w-full mb-3 flex items-center gap-2 px-4 py-2"
           style={{ background:'linear-gradient(160deg, #7c3aed, #6d28d9)',
-            border:'4px solid #a78bfa', borderBottom:'4px solid #4c1d95',
-            boxShadow:'0 8px 0 #3b0764, 0 0 30px rgba(124,58,237,0.4)',
-            borderRadius:'20px', padding:'16px 22px' }}>
-          <div className="flex items-center gap-4">
-            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>🎮</span>
-            <span className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>SINGLE PLAYER</span>
-            <span className="ml-auto text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
-          </div>
+            border:'2.5px solid #a78bfa', borderBottom:'2.5px solid #4c1d95',
+            boxShadow:'0 4px 0 #3b0764, 0 0 18px rgba(124,58,237,0.4)',
+            borderRadius:'14px', cursor:'pointer' }}>
+          <span className="text-xl" style={{ filter:'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}>🎮</span>
+          <span className="font-fredoka" style={{ color:'#fff', fontSize:'0.95rem', letterSpacing:'1.5px' }}>SINGLE PLAYER</span>
+          <span className="ml-auto font-fredoka" style={{ color:'rgba(255,255,255,0.5)', fontSize:'1.05rem', opacity:0.7 }}>›</span>
         </button>
 
         {/* Daily — compressed to a single-row pill. Three states share the
@@ -305,29 +303,7 @@ export default function Splash() {
           )
         })()}
 
-        <button onClick={tap(goToEvents)} className="btn-3d w-full mb-3"
-          style={{ background:'linear-gradient(160deg, #075985, #0c4a6e)',
-            border:'4px solid #0ea5e9', borderBottom:'4px solid #082f49',
-            boxShadow:'0 8px 0 #082f49, 0 0 30px rgba(14,165,233,0.4)',
-            borderRadius:'20px', padding:'16px 22px' }}>
-          <div className="flex items-center gap-4">
-            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>⭐</span>
-            <div className="flex-1 text-left">
-              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>WEEKLY EVENTS</div>
-              <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(186,230,253,0.7)' }}>
-                {eventCaption}
-              </div>
-            </div>
-            <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
-          </div>
-        </button>
-
-        {/* Wardrobe — cosmetic wheel skins. Slotted between Events
-            (the source of free skin unlocks) and Gem Store (the place to
-            buy more Gems), so the flow reads: play → win or buy skin →
-            top up Gems. Cyan accent so it visually pairs with the Patriot
-            release-month theme without competing with the violet
-            premium buttons above. */}
+        {/* Wardrobe — cosmetic wheel skins. */}
         <button onClick={tap(goToWardrobe)} className="btn-3d w-full mb-3"
           style={{ background:'linear-gradient(160deg, #0e7490, #155e75)',
             border:'4px solid #22d3ee', borderBottom:'4px solid #0c4a6e',
@@ -345,8 +321,24 @@ export default function Splash() {
           </div>
         </button>
 
-        {/* Gem Store — buy Gems with GALA or GUSDC tokens. Sits at the bottom
-            of the splash navigation, the natural place for a "shop" link. */}
+        <button onClick={tap(goToEvents)} className="btn-3d w-full mb-3"
+          style={{ background:'linear-gradient(160deg, #075985, #0c4a6e)',
+            border:'4px solid #0ea5e9', borderBottom:'4px solid #082f49',
+            boxShadow:'0 8px 0 #082f49, 0 0 30px rgba(14,165,233,0.4)',
+            borderRadius:'20px', padding:'16px 22px' }}>
+          <div className="flex items-center gap-4">
+            <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>⭐</span>
+            <div className="flex-1 text-left">
+              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>WEEKLY EVENTS</div>
+              <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(186,230,253,0.7)' }}>
+                {eventCaption}
+              </div>
+            </div>
+            <span className="text-2xl" style={{ color:'rgba(255,255,255,0.5)' }}>›</span>
+          </div>
+        </button>
+
+        {/* Store — buy Gems with GALA or GUSDC tokens. */}
         <button onClick={tap(goToStore)} className="btn-3d w-full mb-5"
           style={{ background:'linear-gradient(160deg, #4c1d95, #3b0764)',
             border:'4px solid #a78bfa', borderBottom:'4px solid #2e1065',
@@ -355,7 +347,7 @@ export default function Splash() {
           <div className="flex items-center gap-4">
             <span className="text-4xl" style={{ filter:'drop-shadow(0 3px 6px rgba(0,0,0,0.4))' }}>💎</span>
             <div className="flex-1 text-left">
-              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>GEM STORE</div>
+              <div className="font-fredoka text-xl text-white" style={{ letterSpacing:'1px' }}>STORE</div>
               <div className="font-nunito font-bold text-xs mt-0.5" style={{ color:'rgba(196,181,253,0.7)' }}>
                 BUY WITH GALA OR GUSDC
               </div>
