@@ -739,8 +739,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // we can only show the word being typed — no valid/invalid color hint.
     // (A future tweak could optionally ask the server for a "prefix-of-any-
     // valid-word" answer, but the round-trip cost outweighs the UX gain.)
+    // Always read from the displayed letter order — if the player shuffled,
+    // selectActiveLetters returns shuffledLetters, so indices stay consistent
+    // with what the wheel is actually showing.
+    const activeLetters = selectActiveLetters(get() as any)
+
     if (round) {
-      const word = sel.map(i => round.manifest.letters[i]).join('')
+      const word = sel.map(i => activeLetters[i]).join('')
       set({ currentWord: word, _currentWordState: '' } as any)
       return
     }
@@ -752,7 +757,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // whatever letters we have (none, in practice — wheel won't show
     // letters either) and skip the valid/invalid check.
     if (!lvl.letters) { set({ currentWord: '', _currentWordState: '' } as any); return }
-    const word      = sel.map(i => lvl.letters[i]).join('')
+    const word      = sel.map(i => activeLetters[i]).join('')
     const allWords  = lvl.words && lvl.bonus ? [...lvl.words, ...lvl.bonus] : []
     const wordState = word.length >= 2 && allWords.length > 0 ? (allWords.includes(word) ? 'valid' : 'invalid') : ''
     set({ currentWord: word, _currentWordState: wordState } as any)
@@ -1315,7 +1320,8 @@ export const selectActiveSlotCount = (s: GameStore): number => {
 export const selectActiveFoundCount = (s: GameStore): number => {
   if (s.round) return s.round.slots.filter(slot => !!slot.filled).length
   const lvl = selectCurrentLevel(s)
-  // Defensive:  // so this can only return a real count in legacy mode.
+  // Defensive: bundle-stripped placeholder Levels have no `words` array,
+  // so this can only return a real count in legacy mode.
   return lvl?.words ? lvl.words.filter(w => s.foundWords.has(w)).length : 0
 }
 
