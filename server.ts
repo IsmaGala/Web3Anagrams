@@ -61,9 +61,10 @@ app.all('/api/*', (_req, res) => {
 // In development, Vite dev server handles the frontend.
 // In production (DO), Express serves the built dist/.
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(join(__dirname, 'dist')))
+  // server.js is bundled into dist/, so static assets are in the same dir (__dirname)
+  app.use(express.static(__dirname))
   app.get('*', (_req: Request, res: Response) => {
-    res.sendFile(join(__dirname, 'dist', 'index.html'))
+    res.sendFile(join(__dirname, 'index.html'))
   })
 }
 
