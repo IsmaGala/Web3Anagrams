@@ -1,0 +1,39 @@
+# DigitalOcean App Platform spec — Wordchain
+# Docs: https://docs.digitalocean.com/products/app-platform/reference/app-spec/
+#
+# One service handles everything:
+#   - Builds the Vite frontend + bundles the Express server
+#   - Serves /api/* via Express handlers
+#   - Serves the React SPA for all other routes from dist/
+
+name: wordchain
+region: nyc
+
+services:
+  - name: web
+    github:
+      repo: IsmaGala/Web3Anagrams
+      branch: feat/do-migration
+      deploy_on_push: true
+    build_command: npm install && npm run build:do
+    run_command: node dist/server.js
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    routes:
+      - path: /
+    envs:
+      - key: NODE_ENV
+        value: production
+      # Add the rest via DO Console → Settings → Environment Variables
+      # (DATABASE_URL, JWT_SECRET, ALLOWED_ORIGINS, etc.)
+      # Mark secrets as ENCRYPTED there — do not put them in this file.
+
+databases:
+  - name: wordchain-db
+    engine: PG
+    version: "16"
+    size: db-s-1vcpu-1gb
+    num_nodes: 1
+    # DO auto-injects DATABASE_URL into the service above once linked.
+    # Link it in DO Console: app → Settings → Add Resource → wordchain-db

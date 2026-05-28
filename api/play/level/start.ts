@@ -9,7 +9,7 @@
 // complete). Without it the server has no way to associate actions with a
 // level, which is precisely what makes completion non-forgeable.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../../_lib/vercel-compat.js'
 import { applyCors } from '../../_lib/cors.js'
 import { requireAuth } from '../../_lib/jwt.js'
 import { getLevel } from '../../_data/worldsServerData.js'

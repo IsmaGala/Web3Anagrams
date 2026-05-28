@@ -18,7 +18,7 @@
 //     is filled, the server marks the round complete and computes the
 //     final score breakdown — the client only relays the result.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../../_lib/vercel-compat.js'
 import { applyCors } from '../../_lib/cors.js'
 import { requireAuth } from '../../_lib/jwt.js'
 import {

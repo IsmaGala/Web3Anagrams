@@ -24,7 +24,7 @@
 // pattern (client checks then spends) was racy enough that a player
 // could double-tap UNLOCK fast and pay twice.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
 import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'
 import { spendGems, grantHints, type SpendReason } from '../_lib/economy.js'

@@ -13,7 +13,7 @@
 //   Requires Authorization: Bearer <jwt> in addition to the admin secret.
 //   Body: { gems?: number, hints?: number }
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
 import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'

@@ -16,7 +16,7 @@
 // and we double-check server-side so a hand-crafted POST during daily can't
 // drain a free hint.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../../_lib/vercel-compat.js'
 import { applyCors } from '../../_lib/cors.js'
 import { requireAuth } from '../../_lib/jwt.js'
 import { getLevel } from '../../_data/worldsServerData.js'

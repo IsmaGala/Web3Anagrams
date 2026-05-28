@@ -8,7 +8,7 @@
 // address comes from the JWT — never from the request body — to prevent
 // spoofing.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
 import { sql } from '../_lib/db.js'
 import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'

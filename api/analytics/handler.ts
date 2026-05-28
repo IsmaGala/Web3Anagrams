@@ -7,7 +7,7 @@
 //   GET  /api/analytics/daily    — time-series (DAU, levels, GALA)
 //   GET  /api/analytics/funnel   — conversion funnels
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
 import { applyCors } from '../_lib/cors.js'
 import { sql } from '../_lib/db.js'
 import { requireAuth } from '../_lib/jwt.js'

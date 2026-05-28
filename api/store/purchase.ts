@@ -24,7 +24,7 @@
 //   docs/galachain/TOKEN_OPS.md "Purchase Pattern (Server-Mediated)"
 //   docs/galachain/WALLET_AUTH.md §8
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
 import { createHmac, createHash } from 'node:crypto'
 import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'

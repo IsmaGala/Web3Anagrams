@@ -8,7 +8,7 @@
 // .ts file with its default Node runtime and exposes the default export
 // as the handler.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from './_lib/vercel-compat.js'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   // Block anything other than GET/HEAD so this can't be abused as a CORS probe.

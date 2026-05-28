@@ -3,22 +3,24 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "workspaces": [
-    "packages/*",
-    "apps/*"
-  ],
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": "20.x" },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:server": "esbuild server.ts --bundle --platform=node --target=node20 --outfile=dist/server.js --format=esm --packages=external",
+    "build:do": "npm run build && npm run build:server",
+    "start": "node dist/server.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@gala-chain/api": "^2.7.1",
-    "@neondatabase/serverless": "^0.10.4",
     "@tailwindcss/vite": "^4.3.0",
     "ethers": "^6.13.4",
+    "express": "^4.21.2",
     "jose": "^5.9.6",
+    "postgres": "^3.4.5",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "tailwindcss": "^4.3.0",
@@ -26,11 +28,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.3",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vercel/node": "^5.1.10",
     "@vitejs/plugin-react": "^6.0.1",
+    "esbuild": "^0.25.5",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

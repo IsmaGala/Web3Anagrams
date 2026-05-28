@@ -4,7 +4,7 @@
 //   POST /api/auth/nonce   — issue a sign-in nonce
 //   POST /api/auth/verify  — verify signature, mint JWT
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
 import { randomBytes } from 'crypto'
 import { verifyMessage, keccak256, recoverAddress } from 'ethers'
 import { sql } from '../_lib/db.js'

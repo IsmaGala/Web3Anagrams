@@ -2,7 +2,7 @@
 // in production no CORS headers are needed. But local dev (vite on :5173
 // hitting vercel dev on :3000) and any future external clients need this.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from './vercel-compat.js'
 
 const DEFAULT_LOCAL_ORIGINS = new Set([
   'http://localhost:5173',

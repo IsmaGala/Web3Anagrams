@@ -11,7 +11,7 @@
 //   Economy fields in the payload are overwritten with authoritative values
 //   from player_balances before persisting — tampered balances are ignored.
 
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from './_lib/vercel-compat.js'
 import { sql } from './_lib/db.js'
 import { applyCors } from './_lib/cors.js'
 import { requireAuth } from './_lib/jwt.js'
