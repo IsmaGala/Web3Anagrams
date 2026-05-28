@@ -217,17 +217,6 @@ export default function GemStore() {
         BUY GEMS WITH GALA
       </p>
 
-      {/* Network pill */}
-      <div className="px-3 py-1 rounded-full mb-4"
-        style={{
-          background: NETWORK_LABEL === 'MAINNET' ? 'rgba(34,197,94,0.15)' : 'rgba(251,191,36,0.15)',
-          border:     NETWORK_LABEL === 'MAINNET' ? '1.5px solid rgba(34,197,94,0.4)' : '1.5px solid rgba(251,191,36,0.4)',
-        }}>
-        <span className="font-fredoka text-xs"
-          style={{ color: NETWORK_LABEL === 'MAINNET' ? '#22c55e' : '#fbbf24', letterSpacing:'1.5px' }}>
-          {NETWORK_LABEL === 'MAINNET' ? 'MAINNET · LIVE GALA' : 'TESTNET · USE TEST GALA'}
-        </span>
-      </div>
 
       {/* Gems balance chip */}
       <div className="flex items-center gap-2 px-4 py-2 rounded-full mb-6"
