@@ -80,7 +80,7 @@ export async function createRound(args: {
   await db`
     INSERT INTO play_rounds (round_id, address, world_id, level_index, mode, shuffled_letters)
     VALUES (${roundId}, ${args.address}, ${args.worldId}, ${args.levelIndex},
-            ${args.mode}, ${JSON.stringify(args.shuffledLetters)}::jsonb)
+            ${args.mode}, ${db.json(args.shuffledLetters)})
   `
   return {
     round_id:         roundId,
@@ -121,10 +121,10 @@ export async function loadRound(roundId: string, address: string): Promise<Round
     world_id:         r.world_id,
     level_index:      r.level_index,
     mode:             r.mode,
-    shuffled_letters: r.shuffled_letters,
-    found_words:      r.found_words,
-    found_bonus:      r.found_bonus,
-    hints_revealed:   r.hints_revealed,
+    shuffled_letters: Array.isArray(r.shuffled_letters) ? r.shuffled_letters : JSON.parse(r.shuffled_letters ?? '[]'),
+    found_words:      Array.isArray(r.found_words)      ? r.found_words      : JSON.parse(r.found_words      ?? '[]'),
+    found_bonus:      Array.isArray(r.found_bonus)      ? r.found_bonus      : JSON.parse(r.found_bonus      ?? '[]'),
+    hints_revealed:   Array.isArray(r.hints_revealed)   ? r.hints_revealed   : JSON.parse(r.hints_revealed   ?? '[]'),
     misses:           r.misses,
     started_at:       (r.started_at instanceof Date ? r.started_at.toISOString() : r.started_at),
     completed_at:     r.completed_at ? (r.completed_at instanceof Date ? r.completed_at.toISOString() : r.completed_at) : null,
@@ -141,9 +141,9 @@ export async function appendFoundWord(roundId: string, word: string): Promise<vo
   await db`
     UPDATE play_rounds
        SET found_words = (
-             CASE WHEN found_words @> ${JSON.stringify([word])}::jsonb
+             CASE WHEN found_words @> ${db.json([word])}
                   THEN found_words
-                  ELSE found_words || ${JSON.stringify([word])}::jsonb
+                  ELSE found_words || ${db.json([word])}
              END)
      WHERE round_id = ${roundId}
   `
@@ -154,9 +154,9 @@ export async function appendFoundBonus(roundId: string, word: string): Promise<v
   await db`
     UPDATE play_rounds
        SET found_bonus = (
-             CASE WHEN found_bonus @> ${JSON.stringify([word])}::jsonb
+             CASE WHEN found_bonus @> ${db.json([word])}
                   THEN found_bonus
-                  ELSE found_bonus || ${JSON.stringify([word])}::jsonb
+                  ELSE found_bonus || ${db.json([word])}
              END)
      WHERE round_id = ${roundId}
   `
@@ -175,7 +175,7 @@ export async function appendHintReveal(roundId: string, hint: HintReveal): Promi
   const db = sql()
   await db`
     UPDATE play_rounds
-       SET hints_revealed = hints_revealed || ${JSON.stringify([hint])}::jsonb
+       SET hints_revealed = hints_revealed || ${db.json([hint])}
      WHERE round_id = ${roundId}
   `
 }
