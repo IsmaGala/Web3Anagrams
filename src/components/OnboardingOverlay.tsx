@@ -33,7 +33,7 @@ interface Card {
 const CARDS: Card[] = [
   {
     icon:     '⬡',
-    title:    'GWORDCHAIN',
+    title:    'G WORDY',
     subtitle: 'Word puzzles, anagram-style',
     body:     'Each level gives you a handful of letters and a target list of words to find. Drag through the wheel to spell. Find them all to clear the level and earn score.',
     accent:   '#a78bfa',
@@ -51,7 +51,7 @@ const CARDS: Card[] = [
     icon:     '🏆',
     title:    'COMPETE & UNLOCK',
     subtitle: 'Premium worlds + weekly events',
-    body:     'Spend GEMS to unlock PREMIUM worlds — Area 51, Asimov Robotics, Peaks & Trails. Or pay into the WEEKLY EVENT for a leaderboard run: top 3 at the end of the week claim hint-pack rewards. Buy more Gems with GALA or GUSDC tokens from the STORE. Connect a wallet to sync progress across devices.',
+    body:     'Spend GEMS to unlock PREMIUM worlds — Area 51, Asimov Robotics, Peaks & Trails. Or pay into the WEEKLY EVENT for a leaderboard run: top 3 at the end of the week claim hint-pack rewards. Buy more Gems with GALA tokens from the STORE. Connect a wallet to sync progress across devices.',
     accent:   '#22d3ee',
     glow:     'rgba(34,211,238,0.55)',
   },

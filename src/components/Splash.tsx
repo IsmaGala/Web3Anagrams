@@ -154,7 +154,7 @@ export default function Splash() {
         </div>
         <h1 className="font-fredoka text-center mb-1 shimmer-text"
           style={{ fontSize:'2.4rem', letterSpacing:'2px', lineHeight:1.1 }}>
-          GWORDCHAIN
+          G WORDY
         </h1>
         <p className="font-nunito font-bold text-sm tracking-widest mb-3 uppercase"
           style={{ color:'rgba(196,181,253,0.5)' }}>
@@ -371,7 +371,7 @@ export default function Splash() {
         </button>
 
         <p className="text-xs font-bold" style={{ color:'rgba(255,255,255,0.2)', letterSpacing:'2px' }}>
-          GWORDCHAIN v1.0
+          G WORDY v1.0
         </p>
       </div>
 
