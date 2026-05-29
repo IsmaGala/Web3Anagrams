@@ -95,7 +95,7 @@ async function persistToDb(
     const db = sql()
     await db`
       INSERT INTO analytics_events (event, address, properties)
-      VALUES (${event}, ${address}, ${JSON.stringify(payload)}::jsonb)
+      VALUES (${event}, ${address}, ${db.json(payload)})
     `
   } catch (err: any) {
     // Non-fatal — DB might be unreachable in local dev without DATABASE_URL.

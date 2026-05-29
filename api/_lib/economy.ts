@@ -88,7 +88,7 @@ export async function spendGems(args: {
   // right tradeoff (the player has been billed, that's the important state).
   await db`
     INSERT INTO balance_transactions (address, gems_delta, hints_delta, reason, metadata)
-    VALUES (${args.address}, ${-args.amount}, 0, ${args.reason}, ${JSON.stringify(args.metadata ?? {})}::jsonb)
+    VALUES (${args.address}, ${-args.amount}, 0, ${args.reason}, ${db.json(args.metadata ?? {})})
   `
   return { ok: true, newBalance: rows[0].gems_balance }
 }
@@ -126,7 +126,7 @@ export async function grantGems(args: {
   ` as Array<{ gems_balance: number }>
   await db`
     INSERT INTO balance_transactions (address, gems_delta, hints_delta, reason, metadata)
-    VALUES (${args.address}, ${args.amount}, 0, ${args.reason}, ${JSON.stringify(args.metadata ?? {})}::jsonb)
+    VALUES (${args.address}, ${args.amount}, 0, ${args.reason}, ${db.json(args.metadata ?? {})})
   `
   return { newBalance: rows[0].gems_balance }
 }
@@ -153,7 +153,7 @@ export async function grantHints(args: {
   ` as Array<{ hints_balance: number }>
   await db`
     INSERT INTO balance_transactions (address, gems_delta, hints_delta, reason, metadata)
-    VALUES (${args.address}, 0, ${args.amount}, ${args.reason}, ${JSON.stringify(args.metadata ?? {})}::jsonb)
+    VALUES (${args.address}, 0, ${args.amount}, ${args.reason}, ${db.json(args.metadata ?? {})})
   `
   return { newBalance: rows[0].hints_balance }
 }
@@ -175,7 +175,7 @@ export async function hasReceivedGrant(args: {
       SELECT 1 FROM balance_transactions
        WHERE address = ${args.address}
          AND reason  = ${args.reason}
-         AND metadata @> ${JSON.stringify(args.metadataMatch)}::jsonb
+         AND metadata @> ${db.json(args.metadataMatch)}
        LIMIT 1
     ` as Array<{ '?column?': number }>
     return rows.length > 0
@@ -212,7 +212,7 @@ export async function grantSkin(args: {
     SELECT 1 FROM balance_transactions
      WHERE address  = ${args.address}
        AND reason   = 'cosmetic_skin'
-       AND metadata @> ${JSON.stringify({ skinId: args.skinId })}::jsonb
+       AND metadata @> ${db.json({ skinId: args.skinId })}
      LIMIT 1
   ` as Array<unknown>
   if (existing.length > 0) return { ok: false, skinId: args.skinId }
@@ -221,7 +221,7 @@ export async function grantSkin(args: {
     INSERT INTO balance_transactions (address, gems_delta, hints_delta, reason, metadata)
     VALUES (
       ${args.address}, 0, 0, 'cosmetic_skin',
-      ${JSON.stringify({ skinId: args.skinId, ...args.metadata })}::jsonb
+      ${db.json({ skinId: args.skinId, ...args.metadata })}
     )
   `
   return { ok: true, skinId: args.skinId }

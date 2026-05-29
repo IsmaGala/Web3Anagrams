@@ -101,7 +101,7 @@ export async function alreadyOwns(args: {
     SELECT 1 FROM balance_transactions
      WHERE address  = ${args.address}
        AND reason   = ${args.reason}
-       AND metadata @> ${JSON.stringify(args.match)}::jsonb
+       AND metadata @> ${db.json(args.match)}
      LIMIT 1
   ` as Array<{ '?column?': number }>
   return rows.length > 0

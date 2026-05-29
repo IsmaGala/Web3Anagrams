@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const now = new Date().toISOString()
     await sql()`
       INSERT INTO player_state (address, payload, updated_at)
-      VALUES (${address}, ${serialized}::jsonb, ${now})
+      VALUES (${address}, ${sql().json(sanitized)}, ${now})
       ON CONFLICT (address) DO UPDATE
         SET payload    = EXCLUDED.payload,
             updated_at = EXCLUDED.updated_at

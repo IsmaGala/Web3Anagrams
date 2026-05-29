@@ -68,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   await sql()`
     INSERT INTO play_rounds (round_id, address, world_id, level_index, mode, shuffled_letters)
     VALUES (${roundId}, ${address}, ${worldId}, ${levelIndex}, ${mode},
-            ${JSON.stringify(manifest.letters)}::jsonb)
+            ${sql().json(manifest.letters)})
   `
   // Suppress unused-import lint — createRound is exported for endpoints that
   // don't need a deterministic seed and can use the standard helper.
