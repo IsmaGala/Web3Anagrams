@@ -1,7 +1,7 @@
 {
   "name": "nft-wordchain",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "workspaces": ["packages/*", "apps/*"],
   "engines": { "node": "20.x" },
