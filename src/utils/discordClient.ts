@@ -2,7 +2,7 @@
 // discordClient — thin wrappers around /api/auth/discord
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { api } from './apiClient'
+import { api, apiFetch } from './apiClient'
 
 export interface DiscordLinkResult {
   discord_handle:     string
@@ -16,5 +16,5 @@ export async function linkDiscord(code: string): Promise<DiscordLinkResult> {
 
 /** Remove the Discord link for the current wallet. */
 export async function unlinkDiscord(): Promise<void> {
-  await api.delete('/api/auth/discord')
+  await apiFetch('/api/auth/discord', { method: 'DELETE' })
 }
