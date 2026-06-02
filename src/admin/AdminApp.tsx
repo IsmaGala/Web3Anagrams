@@ -136,15 +136,14 @@ function LoginScreen({ onLogin }: { onLogin: (secret: string) => void }) {
     e.preventDefault()
     setError('')
     try {
-      // Verify secret by doing a harmless lookup with a dummy address.
-      // We just need to confirm the secret is accepted (404 action is fine, 401 is not).
-      const res = await fetch('/api/admin/check', {
+      // Verify the secret by hitting lookup-player with a dummy address.
+      // 400 = secret accepted, address invalid — that's fine.
+      // 401 = wrong secret.
+      const res = await fetch('/api/admin/lookup-player', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-secret': value },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ address: '0x0' }),
       })
-      // 404 = secret accepted but unknown action — that's fine.
-      // 401 = wrong secret.
       if (res.status === 401) {
         setError('Wrong password.')
         return

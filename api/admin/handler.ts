@@ -78,7 +78,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!checkAdminSecret(req, res)) return
 
-  const action = req.query['action'] as string
+  // action comes from the Express route param (/api/admin/:action)
+  const action = (req.params as Record<string, string>)['action'] ?? (req.query['action'] as string)
   const body   = (req.body ?? {}) as Record<string, unknown>
   const db     = sql()
 
