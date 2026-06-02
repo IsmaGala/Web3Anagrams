@@ -498,7 +498,13 @@ export default function WeeklyEvents() {
 // Renders inside an event card when the leaderboard is toggled open. Also
 // exported so we can mount it inside LevelSelect later if needed.
 
-interface LeaderboardEntry { rank: number; address: string; score: number }
+interface LeaderboardEntry {
+  rank: number
+  address: string
+  score: number
+  discord_handle:    string | null
+  discord_avatar_url: string | null
+}
 interface LeaderboardResponse { event: string; week: number; top: LeaderboardEntry[]; you: LeaderboardEntry | null }
 
 function shortAddr(a: string): string {
@@ -737,6 +743,9 @@ export function LeaderboardPanel({ worldId, accent, weekId }: { worldId: WorldId
         <div className="flex flex-col gap-1 mb-3">
           {board.top.slice(0, 10).map(entry => {
             const isYou = !!walletAddress && entry.address.toLowerCase() === walletAddress.toLowerCase()
+            const displayName = isYou
+              ? 'YOU'
+              : entry.discord_handle ?? shortAddr(entry.address)
             return (
               <div key={entry.address + ':' + entry.rank}
                 className="flex items-center justify-between rounded-lg px-2 py-1.5"
@@ -749,9 +758,14 @@ export function LeaderboardPanel({ worldId, accent, weekId }: { worldId: WorldId
                     style={{ color: entry.rank <= 3 ? '#fde68a' : 'rgba(255,255,255,0.6)', minWidth: 24 }}>
                     #{entry.rank}
                   </span>
-                  <span className="font-nunito font-bold text-xs"
-                    style={{ color: isYou ? '#fff' : 'rgba(255,255,255,0.6)' }}>
-                    {isYou ? 'YOU' : shortAddr(entry.address)}
+                  {/* Discord avatar — shown when present and not "YOU" */}
+                  {!isYou && entry.discord_avatar_url && (
+                    <img src={entry.discord_avatar_url} alt=""
+                      style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0 }} />
+                  )}
+                  <span className="font-nunito font-bold text-xs truncate"
+                    style={{ color: isYou ? '#fff' : 'rgba(255,255,255,0.7)', maxWidth: 130 }}>
+                    {displayName}
                   </span>
                 </div>
                 <span className="font-fredoka text-xs" style={{ color: isYou ? accent : 'rgba(255,255,255,0.55)' }}>
