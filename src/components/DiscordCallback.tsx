@@ -13,7 +13,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from 'react'
-import { linkDiscord } from '../utils/discordClient'
 
 export default function DiscordCallback() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
@@ -35,19 +34,11 @@ export default function DiscordCallback() {
       return
     }
 
-    linkDiscord(code)
-      .then((result) => {
-        setStatus('success')
-        window.opener?.postMessage({ type: 'DISCORD_SUCCESS', payload: result }, window.location.origin)
-        setTimeout(() => window.close(), 1200)
-      })
-      .catch((err: any) => {
-        const msg = err?.message ?? 'Failed to link Discord account.'
-        setStatus('error')
-        setErrorMsg(msg)
-        window.opener?.postMessage({ type: 'DISCORD_ERROR', error: msg }, window.location.origin)
-        setTimeout(() => window.close(), 2500)
-      })
+    // Send the code to the parent window — the parent has the JWT and will
+    // call the API. The popup must not call the API itself (no JWT here).
+    setStatus('success')
+    window.opener?.postMessage({ type: 'DISCORD_CODE', code }, window.location.origin)
+    setTimeout(() => window.close(), 1200)
   }, [])
 
   return (

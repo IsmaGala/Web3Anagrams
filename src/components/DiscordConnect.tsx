@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useDiscordStore } from '../store/discordStore'
-import { unlinkDiscord } from '../utils/discordClient'
+import { linkDiscord, unlinkDiscord } from '../utils/discordClient'
 
 const DISCORD_PURPLE = '#5865F2'
 
@@ -40,18 +40,26 @@ export default function DiscordConnect() {
   const [confirmUnlink, setConfirmUnlink] = useState(false)
   const popupRef = useRef<Window | null>(null)
 
-  // Listen for postMessage from /discord-callback popup
+  // Listen for postMessage from /discord-callback popup.
+  // The popup sends the code here; we call the API with the JWT from this window.
   useEffect(() => {
     function onMessage(e: MessageEvent) {
       if (e.origin !== window.location.origin) return
 
-      if (e.data?.type === 'DISCORD_SUCCESS') {
-        const { discord_handle, discord_avatar_url } = e.data.payload
-        setDiscord(discord_handle, discord_avatar_url)
-        setLoading(false)
-        setError(null)
+      if (e.data?.type === 'DISCORD_CODE') {
+        const { code } = e.data
         popupRef.current?.close()
         popupRef.current = null
+        linkDiscord(code)
+          .then((result) => {
+            setDiscord(result.discord_handle, result.discord_avatar_url)
+            setLoading(false)
+            setError(null)
+          })
+          .catch((err: any) => {
+            setError(err?.message ?? 'Discord linking failed.')
+            setLoading(false)
+          })
       }
 
       if (e.data?.type === 'DISCORD_ERROR') {
