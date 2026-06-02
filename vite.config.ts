@@ -12,4 +12,12 @@ export default defineConfig({
       '@gala-games/metagame': path.resolve(__dirname, 'packages/metagame/src/index.ts'),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main:  path.resolve(__dirname, 'index.html'),
+        admin: path.resolve(__dirname, 'admin.html'),
+      },
+    },
+  },
 })

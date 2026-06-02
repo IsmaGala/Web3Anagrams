@@ -63,6 +63,10 @@ app.all('/api/*', (_req, res) => {
 if (process.env.NODE_ENV === 'production') {
   // server.js is bundled into dist/, so static assets are in the same dir (__dirname)
   app.use(express.static(__dirname))
+  // Serve the CM admin panel for /admin (and /admin/*) — all other routes get the game SPA.
+  app.get('/admin', (_req: Request, res: Response) => {
+    res.sendFile(join(__dirname, 'admin.html'))
+  })
   app.get('*', (_req: Request, res: Response) => {
     res.sendFile(join(__dirname, 'index.html'))
   })

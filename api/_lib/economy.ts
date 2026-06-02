@@ -20,6 +20,7 @@ export type SpendReason =
   | 'unlock_event'      // entering a weekly event world
   | 'daily_retry'       // paying to retry a failed daily
   | 'cosmetic_skin'     // buying a wheel skin from the wardrobe
+  | 'admin_deduction'   // manual ops deduction (take-gems / take-hints)
 
 export type GrantReason =
   | 'level_complete'             // per-level reward
@@ -225,4 +226,72 @@ export async function grantSkin(args: {
     )
   `
   return { ok: true, skinId: args.skinId }
+}
+
+// ── Spend (hints) ─────────────────────────────────────────────────────────────
+// Mirror of spendGems but for hints. Used by admin deductions only for now —
+// in-game hints are consumed server-side in api/play/level/hint.ts directly.
+
+export async function spendHints(args: {
+  address:   string
+  amount:    number
+  reason:    SpendReason
+  metadata?: Record<string, unknown>
+}): Promise<SpendResult> {
+  if (!Number.isFinite(args.amount) || args.amount <= 0 || !Number.isInteger(args.amount)) {
+    throw new Error('spendHints: amount must be a positive integer')
+  }
+  const db = sql()
+  await db`
+    INSERT INTO player_balances (address, gems_balance, hints_balance)
+    VALUES (${args.address}, 0, 3)
+    ON CONFLICT (address) DO NOTHING
+  `
+  const rows = await db`
+    UPDATE player_balances
+       SET hints_balance = hints_balance - ${args.amount},
+           updated_at    = NOW()
+     WHERE address = ${args.address} AND hints_balance >= ${args.amount}
+    RETURNING hints_balance
+  ` as Array<{ hints_balance: number }>
+
+  if (rows.length === 0) {
+    const cur = await db`
+      SELECT hints_balance FROM player_balances WHERE address = ${args.address}
+    ` as Array<{ hints_balance: number }>
+    return { ok: false, newBalance: cur[0]?.hints_balance ?? 0, reason: 'insufficient' }
+  }
+  await db`
+    INSERT INTO balance_transactions (address, gems_delta, hints_delta, reason, metadata)
+    VALUES (${args.address}, 0, ${-args.amount}, ${args.reason}, ${db.json(args.metadata ?? {})})
+  `
+  return { ok: true, newBalance: rows[0].hints_balance }
+}
+
+// ── Grant (world unlock) ──────────────────────────────────────────────────────
+// Records a premium world unlock without spending gems. Used by admin grants.
+
+export async function grantWorldUnlock(args: {
+  address:  string
+  worldId:  string
+  metadata?: Record<string, unknown>
+}): Promise<{ ok: boolean; worldId: string }> {
+  const db = sql()
+  const existing = await db`
+    SELECT 1 FROM balance_transactions
+     WHERE address  = ${args.address}
+       AND reason   = 'unlock_premium'
+       AND metadata @> ${db.json({ worldId: args.worldId })}
+     LIMIT 1
+  ` as Array<unknown>
+  if (existing.length > 0) return { ok: false, worldId: args.worldId }
+
+  await db`
+    INSERT INTO balance_transactions (address, gems_delta, hints_delta, reason, metadata)
+    VALUES (
+      ${args.address}, 0, 0, 'unlock_premium',
+      ${db.json({ worldId: args.worldId, ...args.metadata })}
+    )
+  `
+  return { ok: true, worldId: args.worldId }
 }
