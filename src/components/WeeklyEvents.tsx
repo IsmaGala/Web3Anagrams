@@ -38,9 +38,9 @@ interface RewardTier {
 function rewardsFor(world: World | undefined): RewardTier[] {
   const firstSkin = world?.eventReward?.firstPlaceSkin
   return [
-    { rank: 1, gems: 100, hints: 0, skin: firstSkin, icon: '🥇' },
-    { rank: 2, gems: 100, hints: 5,                  icon: '🥈' },
-    { rank: 3, gems: 60,  hints: 3,                  icon: '🥉' },
+    { rank: 1, gems: 500, hints: 0,  skin: firstSkin, icon: '🥇' },
+    { rank: 2, gems: 250, hints: 25,                 icon: '🥈' },
+    { rank: 3, gems: 150, hints: 15,                 icon: '🥉' },
   ]
 }
 

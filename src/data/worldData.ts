@@ -120,7 +120,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-06-01',     // week of Jun 1 — event rotation restart
+    startDate:   '2026-06-08',     // week of Jun 8 — first event at launch
     eventReward: { firstPlaceSkin: 'deep-sea' },
     levels:      OCEAN_EVENT_LEVELS,
   },
@@ -140,7 +140,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-06-08',     // week of Jun 8
+    startDate:   '2026-06-15',     // week of Jun 15
     eventReward: { firstPlaceSkin: 'blood' },
     levels:      BLOOD_DONOR_LEVELS,
   },
@@ -162,7 +162,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-06-15',     // week of Jun 15 — slot after Blood Donor Day
+    startDate:   '2026-06-22',     // week of Jun 22 — slot after Blood Donor Day
     eventReward: { firstPlaceSkin: 'cybernetic' },
     levels:      AREA515_LEVELS,
   },
@@ -184,7 +184,7 @@ export const WORLDS: World[] = [
     unlockAfter: 0,
     event:       true,
     cost:        5,
-    startDate:   '2026-06-22',     // week of Jun 22 — slot after Area 51.5
+    startDate:   '2026-06-29',     // week of Jun 29 — slot after Area 51.5
     eventReward: { firstPlaceSkin: 'patriot' },
     levels:      FLAGS_LEVELS,
   },
