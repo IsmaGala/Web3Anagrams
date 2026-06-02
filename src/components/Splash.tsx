@@ -15,6 +15,7 @@ import { playSfx } from '../utils/sfx'
 import SfxToggle from './SfxToggle'
 import BgmToggle from './BgmToggle'
 import WalletConnectModal from './WalletConnectModal'
+import DiscordConnect from './DiscordConnect'
 import { startBgm } from '../utils/bgm'
 
 // Wraps a click handler with the menu-confirm tap SFX. Keeps every button's
@@ -195,6 +196,10 @@ export default function Splash() {
               DISCONNECT
             </button>
           </div>
+
+          {/* Discord link — only shown when wallet is connected */}
+          <DiscordConnect />
+
         ) : (
           <>
             <button onClick={tap(() => setShowWalletModal(true))}

@@ -17,8 +17,17 @@ import DebugMenu from './components/DebugMenu'
 import OnboardingOverlay, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingOverlay'
 import WorldRewardOverlay from './components/WorldRewardOverlay'
 import WelcomeBonusOverlay from './components/WelcomeBonusOverlay'
+import DiscordCallback from './components/DiscordCallback'
 import { pullAndApply, schedulePush, flushPush, cancelPendingPush } from './utils/profileSync'
 import './styles/global.css'
+
+// Render the Discord OAuth callback page when Discord redirects here.
+if (window.location.pathname === '/discord-callback') {
+  const root = document.getElementById('root')!
+  import('react-dom/client').then(({ createRoot }) => {
+    createRoot(root).render(<DiscordCallback />)
+  })
+}
 
 // Register the disconnect handler once at module load.
 // The metagame walletStore calls this on disconnect; it receives the JWT
