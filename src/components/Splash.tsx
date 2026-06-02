@@ -183,23 +183,24 @@ export default function Splash() {
             microcaption explains what connecting does so a new player has
             a reason to tap. */}
         {walletAddress ? (
-          <div className="flex items-center gap-2 mb-5 px-4 py-2 rounded-full"
-            style={{ background:'rgba(124,58,237,0.15)', border:'2px solid rgba(167,139,250,0.4)' }}>
-            <span style={{ color:'#a78bfa' }}>◈</span>
-            <span className="font-nunito font-bold text-sm" style={{ color:'#c4b5fd', letterSpacing:'1px' }}>
-              {shortAddress(walletAddress)}
-            </span>
-            <button onClick={tap(() => setShowDisconnectConfirm(true))}
-              className="font-nunito font-bold text-xs ml-1 px-2 py-0.5 rounded-full"
-              style={{ background:'rgba(0,0,0,0.3)', color:'rgba(196,181,253,0.7)',
-                border:'1px solid rgba(167,139,250,0.3)' }}>
-              DISCONNECT
-            </button>
-          </div>
+          <>
+            <div className="flex items-center gap-2 mb-3 px-4 py-2 rounded-full"
+              style={{ background:'rgba(124,58,237,0.15)', border:'2px solid rgba(167,139,250,0.4)' }}>
+              <span style={{ color:'#a78bfa' }}>◈</span>
+              <span className="font-nunito font-bold text-sm" style={{ color:'#c4b5fd', letterSpacing:'1px' }}>
+                {shortAddress(walletAddress)}
+              </span>
+              <button onClick={tap(() => setShowDisconnectConfirm(true))}
+                className="font-nunito font-bold text-xs ml-1 px-2 py-0.5 rounded-full"
+                style={{ background:'rgba(0,0,0,0.3)', color:'rgba(196,181,253,0.7)',
+                  border:'1px solid rgba(167,139,250,0.3)' }}>
+                DISCONNECT
+              </button>
+            </div>
 
-          {/* Discord link — only shown when wallet is connected */}
-          <DiscordConnect />
-
+            {/* Discord link — only shown when wallet is connected */}
+            <DiscordConnect />
+          </>
         ) : (
           <>
             <button onClick={tap(() => setShowWalletModal(true))}
