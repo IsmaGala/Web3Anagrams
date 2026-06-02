@@ -31,7 +31,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const event = req.query.event
+  // event comes from the Express route param (/api/leaderboard/:event)
+  const rawEvent = (req.params as Record<string, string>)['event'] ?? req.query.event
+  const event = rawEvent
   const eventId = Array.isArray(event) ? event[0] : event
   if (!isAlnumId(eventId)) {
     return res.status(400).json({ error: 'Invalid event id' })
