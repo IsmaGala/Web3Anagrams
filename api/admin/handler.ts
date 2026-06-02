@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const address = requireAddress(body, res)
     if (!address) return
 
-    const [balances, inventory, txRows, stateRows] = await Promise.all([
+    const [balances, inventory, txRows, stateRows, discordRows] = await Promise.all([
       getBalances(address),
       getInventory(address),
       db`
@@ -102,7 +102,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       db`
         SELECT updated_at FROM player_state WHERE LOWER(address) = ${address} LIMIT 1
       ` as Promise<Array<{ updated_at: string | Date }>>,
+      db`
+        SELECT discord_handle, discord_avatar, discord_id, connected_at
+          FROM discord_connections
+         WHERE LOWER(address) = ${address}
+         LIMIT 1
+      ` as Promise<Array<{ discord_handle: string; discord_avatar: string | null; discord_id: string; connected_at: string }>>,
     ])
+
+    const dc = discordRows[0] ?? null
+    const discord = dc ? {
+      connected:   true,
+      handle:      dc.discord_handle,
+      avatar_url:  dc.discord_avatar
+        ? `https://cdn.discordapp.com/avatars/${dc.discord_id}/${dc.discord_avatar}.png`
+        : null,
+      connected_at: dc.connected_at,
+    } : { connected: false }
 
     return res.status(200).json({
       ok: true,
@@ -111,6 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       inventory,
       recentTransactions: txRows,
       lastSyncedAt: stateRows[0]?.updated_at ?? null,
+      discord,
     })
   }
 
@@ -241,15 +258,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const address = raw.trim()
 
     try {
-      const [playerState, playerBalances, balanceTx, scoreRows, playRounds, profiles, nonces] =
+      const [playerState, playerBalances, balanceTx, scoreRows, playRounds, profiles, nonces, discordConn] =
         await Promise.all([
-          db`DELETE FROM player_state        WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
-          db`DELETE FROM player_balances      WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
-          db`DELETE FROM balance_transactions WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
-          db`DELETE FROM scores               WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
-          db`DELETE FROM play_rounds          WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
-          db`DELETE FROM profiles             WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
-          db`DELETE FROM nonces               WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM player_state         WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM player_balances       WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM balance_transactions  WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM scores                WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM play_rounds           WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM profiles              WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM nonces                WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM discord_connections   WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
         ])
       const summary = {
         address,
@@ -261,6 +279,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           play_rounds:          playRounds.length,
           profiles:             profiles.length,
           nonces:               nonces.length,
+          discord_connections:  discordConn.length,
         },
       }
       console.log('[admin/reset-player]', JSON.stringify(summary))

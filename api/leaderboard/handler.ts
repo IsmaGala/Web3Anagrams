@@ -3,13 +3,14 @@
 //   {
 //     event:   "oceanevent",
 //     week:    2832,
-//     top:     [ { rank, address, score }, ... up to 100 ],
-//     you:     { rank, address, score } | null     // if Authorization header present
+//     top:     [ { rank, address, score, discord_handle?, discord_avatar_url? }, ... up to 100 ],
+//     you:     { rank, address, score, discord_handle?, discord_avatar_url? } | null
 //   }
 //
 // Auth header is OPTIONAL — anonymous viewers see the top 100 only. Sending
 // a valid Bearer JWT adds the `you` block with the caller's own rank.
 //
+// Discord fields are present only when the player has linked their Discord account.
 // Rank uses RANK() so ties share a position.
 
 import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
@@ -54,32 +55,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // to INT here keeps the value comfortably within JS number range and lets
   // the wire format come back as a real number, so strict-equality / arithmetic
   // on the client work without surprise coercions.
+  type LeaderboardRow = {
+    rank: number
+    address: string
+    score: number
+    discord_handle: string | null
+    discord_avatar_url: string | null
+  }
+
   const top = await db`
     SELECT
-      RANK() OVER (ORDER BY score DESC, updated_at ASC)::int AS rank,
-      address,
-      score
-    FROM scores
-    WHERE event_id = ${eventId} AND week_id = ${week}
+      RANK() OVER (ORDER BY s.score DESC, s.updated_at ASC)::int AS rank,
+      s.address,
+      s.score,
+      dc.discord_handle,
+      CASE
+        WHEN dc.discord_id IS NOT NULL AND dc.discord_avatar IS NOT NULL
+          THEN 'https://cdn.discordapp.com/avatars/' || dc.discord_id || '/' || dc.discord_avatar || '.png'
+        ELSE NULL
+      END AS discord_avatar_url
+    FROM scores s
+    LEFT JOIN discord_connections dc ON dc.address = s.address
+    WHERE s.event_id = ${eventId} AND s.week_id = ${week}
     ORDER BY rank
     LIMIT ${TOP_N}
-  ` as Array<{ rank: number; address: string; score: number }>
+  ` as LeaderboardRow[]
 
   // Caller's own row, if authenticated. Same INT cast applies.
-  let you: { rank: number; address: string; score: number } | null = null
+  let you: LeaderboardRow | null = null
   const authAddress = await requireAuth(req.headers.authorization)
   if (authAddress) {
     const youRows = await db`
       WITH ranked AS (
         SELECT
-          address,
-          score,
-          RANK() OVER (ORDER BY score DESC, updated_at ASC)::int AS rank
-        FROM scores
-        WHERE event_id = ${eventId} AND week_id = ${week}
+          s.address,
+          s.score,
+          RANK() OVER (ORDER BY s.score DESC, s.updated_at ASC)::int AS rank,
+          dc.discord_handle,
+          CASE
+            WHEN dc.discord_id IS NOT NULL AND dc.discord_avatar IS NOT NULL
+              THEN 'https://cdn.discordapp.com/avatars/' || dc.discord_id || '/' || dc.discord_avatar || '.png'
+            ELSE NULL
+          END AS discord_avatar_url
+        FROM scores s
+        LEFT JOIN discord_connections dc ON dc.address = s.address
+        WHERE s.event_id = ${eventId} AND s.week_id = ${week}
       )
-      SELECT rank, address, score FROM ranked WHERE address = ${authAddress} LIMIT 1
-    ` as Array<{ rank: number; address: string; score: number }>
+      SELECT rank, address, score, discord_handle, discord_avatar_url
+      FROM ranked
+      WHERE address = ${authAddress}
+      LIMIT 1
+    ` as LeaderboardRow[]
     you = youRows[0] ?? null
   }
 
