@@ -22,12 +22,20 @@ interface Transaction {
   created_at:  string
 }
 
+interface DiscordInfo {
+  connected:    boolean
+  handle?:      string
+  avatar_url?:  string | null
+  connected_at?: string
+}
+
 interface PlayerData {
   address:            string
   balances:           Balances
   inventory:          Inventory
   recentTransactions: Transaction[]
   lastSyncedAt:       string | null
+  discord:            DiscordInfo
 }
 
 // ── Skin / World catalogs (mirror of src/skins/index.ts + worldData.ts) ───────
@@ -290,6 +298,30 @@ export default function AdminApp() {
                   <p style={{ margin: 0, fontSize: 11, color: '#4b5563' }}>
                     Last sync: {new Date(player.lastSyncedAt).toLocaleString()}
                   </p>
+                )}
+              </Section>
+
+              <Section title="Discord">
+                {player.discord?.connected ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {player.discord.avatar_url && (
+                      <img src={player.discord.avatar_url} alt={player.discord.handle}
+                        style={{ width: 32, height: 32, borderRadius: '50%' }} />
+                    )}
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#a5b4fc' }}>
+                        {player.discord.handle}
+                      </div>
+                      {player.discord.connected_at && (
+                        <div style={{ fontSize: 11, color: '#4b5563' }}>
+                          Linked {new Date(player.discord.connected_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                    <Badge label="Connected" color="#4338ca" />
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>Not connected</span>
                 )}
               </Section>
 
