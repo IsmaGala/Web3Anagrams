@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDiscordStore } from '../store/discordStore'
 import { linkDiscord, unlinkDiscord } from '../utils/discordClient'
+import { track } from '../utils/analytics'
 
 const DISCORD_PURPLE = '#5865F2'
 
@@ -55,16 +56,21 @@ export default function DiscordConnect() {
             setDiscord(result.discord_handle, result.discord_avatar_url)
             setLoading(false)
             setError(null)
+            track('discord_connect_success')
           })
           .catch((err: any) => {
-            setError(err?.message ?? 'Discord linking failed.')
+            const reason = err?.message ?? 'Discord linking failed.'
+            setError(reason)
             setLoading(false)
+            track('discord_connect_failed', { reason })
           })
       }
 
       if (e.data?.type === 'DISCORD_ERROR') {
-        setError(e.data.error ?? 'Discord linking failed.')
+        const reason = e.data.error ?? 'Discord linking failed.'
+        setError(reason)
         setLoading(false)
+        track('discord_connect_failed', { reason, source: 'popup' })
         popupRef.current?.close()
         popupRef.current = null
       }
@@ -89,6 +95,7 @@ export default function DiscordConnect() {
   function openPopup() {
     setError(null)
     setLoading(true)
+    track('discord_connect_attempted')
     const url = buildOAuthUrl()
     const popup = window.open(
       url,
@@ -98,6 +105,7 @@ export default function DiscordConnect() {
     if (!popup) {
       setLoading(false)
       setError('Popup was blocked. Please allow popups for this site.')
+      track('discord_connect_failed', { reason: 'popup_blocked' })
       return
     }
     popupRef.current = popup
@@ -109,6 +117,7 @@ export default function DiscordConnect() {
     try {
       await unlinkDiscord()
       clearDiscord()
+      track('discord_unlinked')
     } catch (e: any) {
       setError(e?.message ?? 'Failed to unlink Discord.')
     } finally {
