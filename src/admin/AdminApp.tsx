@@ -22,6 +22,13 @@ interface Transaction {
   created_at:  string
 }
 
+interface AdminNote {
+  id:         number
+  note:       string
+  image_data: string | null
+  created_at: string
+}
+
 interface DiscordInfo {
   connected:    boolean
   handle?:      string
@@ -36,6 +43,7 @@ interface PlayerData {
   recentTransactions: Transaction[]
   lastSyncedAt:       string | null
   discord:            DiscordInfo
+  notes:              AdminNote[]
 }
 
 // ── Skin / World catalogs (mirror of src/skins/index.ts + worldData.ts) ───────
@@ -193,6 +201,208 @@ function LoginScreen({ onLogin }: { onLogin: (secret: string) => void }) {
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 
+// ── Notes section ─────────────────────────────────────────────────────────────
+
+function NotesSection({
+  notes, address, secret, onRefresh,
+}: {
+  notes: AdminNote[]
+  address: string
+  secret: string
+  onRefresh: () => void
+}) {
+  const [noteText, setNoteText]     = useState('')
+  const [imageData, setImageData]   = useState<string | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [saving, setSaving]         = useState(false)
+  const [expandedImg, setExpandedImg] = useState<string | null>(null)
+
+  function resizeAndEncode(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const MAX = 1200
+        let { width, height } = img
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+          else                { width  = Math.round(width  * MAX / height); height = MAX }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width; canvas.height = height
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height)
+        URL.revokeObjectURL(url)
+        resolve(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      img.onerror = reject
+      img.src = url
+    })
+  }
+
+  async function handleImageFile(file: File) {
+    if (!file.type.startsWith('image/')) return
+    const data = await resizeAndEncode(file)
+    setImageData(data)
+    setImagePreview(data)
+  }
+
+  function onPaste(e: React.ClipboardEvent) {
+    const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))
+    if (item) { e.preventDefault(); handleImageFile(item.getAsFile()!) }
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) handleImageFile(file)
+  }
+
+  async function submitNote() {
+    if (!noteText.trim() && !imageData) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/admin/add-note`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
+        body: JSON.stringify({ address, note: noteText.trim() || '(screenshot)', image_data: imageData }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`)
+      setNoteText('')
+      setImageData(null)
+      setImagePreview(null)
+      onRefresh()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteNote(id: number) {
+    if (!confirm('Delete this note?')) return
+    await fetch(`/api/admin/delete-note`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
+      body: JSON.stringify({ note_id: id }),
+    })
+    onRefresh()
+  }
+
+  return (
+    <div style={{ background: '#1f2937', borderRadius: 10, padding: 20, marginTop: 20 }}>
+      <h3 style={{ margin: '0 0 14px', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af' }}>
+        CM Notes
+      </h3>
+
+      {/* Existing notes */}
+      {notes.length === 0 && (
+        <p style={{ fontSize: 12, color: '#4b5563', marginBottom: 16 }}>No notes yet.</p>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: notes.length ? 16 : 0 }}>
+        {notes.map(n => (
+          <div key={n.id} style={{
+            background: '#111827', borderRadius: 8, padding: '10px 12px',
+            border: '1px solid #374151', position: 'relative',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+              <p style={{ margin: 0, fontSize: 13, color: '#e5e7eb', whiteSpace: 'pre-wrap', flex: 1 }}>{n.note}</p>
+              <button
+                onClick={() => deleteNote(n.id)}
+                title="Delete note"
+                style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 16, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>
+                ×
+              </button>
+            </div>
+            {n.image_data && (
+              <img
+                src={n.image_data}
+                alt="screenshot"
+                onClick={() => setExpandedImg(n.image_data!)}
+                style={{ marginTop: 8, maxWidth: '100%', maxHeight: 180, borderRadius: 6, cursor: 'zoom-in', objectFit: 'contain' }}
+              />
+            )}
+            <p style={{ margin: '6px 0 0', fontSize: 11, color: '#4b5563' }}>
+              {new Date(n.created_at).toLocaleString()}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Add note form */}
+      <div
+        onPaste={onPaste}
+        onDrop={onDrop}
+        onDragOver={e => e.preventDefault()}
+        style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+      >
+        <textarea
+          placeholder="Add a note… (paste or drop a screenshot below)"
+          value={noteText}
+          onChange={e => setNoteText(e.target.value)}
+          rows={3}
+          style={{
+            ...inputStyle, width: '100%', boxSizing: 'border-box', resize: 'vertical',
+            fontFamily: 'system-ui, sans-serif', lineHeight: 1.5,
+          }}
+        />
+
+        {/* Screenshot drop zone */}
+        <div
+          onPaste={onPaste}
+          onDrop={onDrop}
+          onDragOver={e => e.preventDefault()}
+          style={{
+            border: '2px dashed #374151', borderRadius: 8, padding: '10px 14px',
+            textAlign: 'center', cursor: 'pointer', position: 'relative',
+          }}
+          onClick={() => document.getElementById('note-file-input')?.click()}
+        >
+          <input
+            id="note-file-input"
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f) }}
+          />
+          {imagePreview ? (
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <img src={imagePreview} alt="preview" style={{ maxHeight: 140, maxWidth: '100%', borderRadius: 6, objectFit: 'contain' }} />
+              <button
+                onClick={e => { e.stopPropagation(); setImageData(null); setImagePreview(null) }}
+                style={{ position: 'absolute', top: -8, right: -8, background: '#ef4444', border: 'none', color: '#fff', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 12, lineHeight: '20px', padding: 0 }}>
+                ×
+              </button>
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: '#4b5563' }}>
+              Paste screenshot (Ctrl+V) · drag & drop · or click to upload
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={submitNote}
+          disabled={saving || (!noteText.trim() && !imageData)}
+          style={{ ...btnStyle('#2563eb'), alignSelf: 'flex-end', opacity: saving || (!noteText.trim() && !imageData) ? 0.5 : 1 }}>
+          {saving ? 'Saving…' : 'Add Note'}
+        </button>
+      </div>
+
+      {/* Lightbox */}
+      {expandedImg && (
+        <div
+          onClick={() => setExpandedImg(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out',
+          }}>
+          <img src={expandedImg} alt="screenshot" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8, objectFit: 'contain' }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main panel ────────────────────────────────────────────────────────────────
+
 export default function AdminApp() {
   const [secret, setSecret] = useState<string | null>(() => sessionStorage.getItem('cm_secret'))
   const [searchAddr, setSearchAddr] = useState('')
@@ -285,8 +495,9 @@ export default function AdminApp() {
 
       {/* Player Card */}
       {player && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           {/* Left: Info + Inventory */}
           <div>
             <div style={{ background: '#1f2937', borderRadius: 10, padding: 20, marginBottom: 20 }}>
@@ -390,7 +601,7 @@ export default function AdminApp() {
           </div>
 
           {/* Right: Actions */}
-          <div style={{ background: '#1f2937', borderRadius: 10, padding: 20 }}>
+          <div style={{ background: '#1f2937', borderRadius: 10, padding: 20, gridColumn: '2' }}>
             <Section title="Grant Resources">
               <ActionRow
                 label="Grant Gems"
@@ -486,7 +697,19 @@ export default function AdminApp() {
             </div>
           </div>
         </div>
-      )}
+
+        {/* Notes — full width below the two columns */}
+        <NotesSection
+          notes={player.notes ?? []}
+          address={player.address}
+          secret={secret!}
+          onRefresh={async () => {
+            const refreshed = await adminPost(secret!, 'lookup-player', { address: player.address })
+            setPlayer(refreshed)
+          }}
+        />
+      </div>
+      }
     </div>
   )
 }

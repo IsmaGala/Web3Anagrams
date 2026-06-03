@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const address = requireAddress(body, res)
     if (!address) return
 
-    const [balances, inventory, txRows, stateRows, discordRows] = await Promise.all([
+    const [balances, inventory, txRows, stateRows, discordRows, noteRows] = await Promise.all([
       getBalances(address),
       getInventory(address),
       db`
@@ -108,6 +108,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
          WHERE LOWER(address) = ${address}
          LIMIT 1
       ` as Promise<Array<{ discord_handle: string; discord_avatar: string | null; discord_id: string; connected_at: string }>>,
+      db`
+        SELECT id, note, image_data, created_at
+          FROM admin_notes
+         WHERE LOWER(address) = ${address}
+         ORDER BY created_at DESC
+      ` as Promise<Array<{ id: number; note: string; image_data: string | null; created_at: string }>>,
     ])
 
     const dc = discordRows[0] ?? null
@@ -128,6 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       recentTransactions: txRows,
       lastSyncedAt: stateRows[0]?.updated_at ?? null,
       discord,
+      notes: noteRows,
     })
   }
 
@@ -258,7 +265,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const address = raw.trim()
 
     try {
-      const [playerState, playerBalances, balanceTx, scoreRows, playRounds, profiles, nonces, discordConn] =
+      const [playerState, playerBalances, balanceTx, scoreRows, playRounds, profiles, nonces, discordConn, adminNotes] =
         await Promise.all([
           db`DELETE FROM player_state         WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
           db`DELETE FROM player_balances       WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
@@ -268,6 +275,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           db`DELETE FROM profiles              WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
           db`DELETE FROM nonces                WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
           db`DELETE FROM discord_connections   WHERE LOWER(address) = LOWER(${address}) RETURNING address` as Promise<Array<Record<string,unknown>>>,
+          db`DELETE FROM admin_notes           WHERE LOWER(address) = LOWER(${address}) RETURNING id`     as Promise<Array<Record<string,unknown>>>,
         ])
       const summary = {
         address,
@@ -280,6 +288,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           profiles:             profiles.length,
           nonces:               nonces.length,
           discord_connections:  discordConn.length,
+          admin_notes:          adminNotes.length,
         },
       }
       console.log('[admin/reset-player]', JSON.stringify(summary))
@@ -290,7 +299,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // ── add-note ──────────────────────────────────────────────────────────────
+
+  if (action === 'add-note') {
+    const address = requireAddress(body, res)
+    if (!address) return
+
+    const note = typeof body.note === 'string' ? body.note.trim() : ''
+    if (!note) return res.status(400).json({ error: 'body.note is required' })
+
+    const imageData = typeof body.image_data === 'string' ? body.image_data : null
+
+    const [row] = await db`
+      INSERT INTO admin_notes (address, note, image_data)
+      VALUES (${address}, ${note}, ${imageData})
+      RETURNING id, note, image_data, created_at
+    ` as Array<{ id: number; note: string; image_data: string | null; created_at: string }>
+
+    console.log(`[admin/add-note] ${address} note_id=${row.id}`)
+    return res.status(200).json({ ok: true, note: row })
+  }
+
+  // ── delete-note ───────────────────────────────────────────────────────────
+
+  if (action === 'delete-note') {
+    const noteId = typeof body.note_id === 'number' ? body.note_id : parseInt(String(body.note_id), 10)
+    if (!noteId || isNaN(noteId)) return res.status(400).json({ error: 'body.note_id is required' })
+
+    await db`DELETE FROM admin_notes WHERE id = ${noteId}`
+    console.log(`[admin/delete-note] note_id=${noteId}`)
+    return res.status(200).json({ ok: true })
+  }
+
   return res.status(404).json({
-    error: `Unknown admin action: "${action}". Valid: lookup-player, grant-gems, take-gems, grant-skin, unlock-world, complete-level, recent-activity, reset-player`,
+    error: `Unknown admin action: "${action}". Valid: lookup-player, grant-gems, take-gems, grant-skin, unlock-world, complete-level, recent-activity, reset-player, add-note, delete-note`,
   })
 }
