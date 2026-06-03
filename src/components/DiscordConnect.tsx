@@ -225,6 +225,10 @@ export default function DiscordConnect() {
         style={{ color: 'rgba(196,181,253,0.4)', fontSize: '0.7rem' }}>
         Show your Discord name on the leaderboard
       </p>
+      <p className="font-nunito font-bold text-center mt-0.5 px-2"
+        style={{ color: 'rgba(251,191,36,0.75)', fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+        🎁 First connection reward: 15 ◈ gems + 5 💡 hints
+      </p>
     </div>
   )
 }

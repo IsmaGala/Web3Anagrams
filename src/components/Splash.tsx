@@ -213,9 +213,13 @@ export default function Splash() {
               </span>
               <span className="text-xs">›</span>
             </button>
-            <p className="font-nunito text-center mb-4 px-2"
+            <p className="font-nunito text-center mb-1 px-2"
               style={{ color:'rgba(196,181,253,0.45)', fontSize:'0.72rem', lineHeight:1.4 }}>
               Save progress across devices · Compete for weekly rewards
+            </p>
+            <p className="font-nunito font-bold text-center mb-4 px-2"
+              style={{ color:'rgba(251,191,36,0.75)', fontSize:'0.7rem', letterSpacing:'0.5px' }}>
+              🎁 First connection reward: 15 ◈ gems + 5 💡 hints
             </p>
           </>
         )}
