@@ -709,7 +709,7 @@ export default function AdminApp() {
           }}
         />
       </div>
-      }
+      )}
     </div>
   )
 }
