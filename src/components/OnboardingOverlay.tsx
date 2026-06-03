@@ -43,7 +43,7 @@ const CARDS: Card[] = [
     icon:     '🎮',
     title:    'PLAY EVERY DAY',
     subtitle: 'Story levels + daily challenge',
-    body:     'SINGLE PLAYER works through worlds — Town Star, Mirandus, Galaswap and more — with words themed to each. The DAILY challenge is one tough 5-minute round per day. Win it to build a streak; lose it and pay 1 GEM to retry.',
+    body:     'SINGLE PLAYER works through worlds — Town Star, Mirandus, Galaswap and more — with words themed to each. The DAILY challenge is one tough 5-minute round per day.',
     accent:   '#fbbf24',
     glow:     'rgba(251,191,36,0.55)',
   },
