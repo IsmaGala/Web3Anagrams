@@ -5,8 +5,9 @@
 import { api, apiFetch } from './apiClient'
 
 export interface DiscordLinkResult {
-  discord_handle:     string
-  discord_avatar_url: string | null
+  discord_handle:           string
+  discord_avatar_url:       string | null
+  firstDiscordBonusGranted?: { gems: number; hints: number }
 }
 
 /** Exchange an OAuth2 code for a linked Discord identity. */

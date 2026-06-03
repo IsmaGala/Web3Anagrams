@@ -14,9 +14,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { VercelRequest, VercelResponse } from '../_lib/vercel-compat.js'
-import { applyCors }  from '../_lib/cors.js'
-import { requireAuth } from '../_lib/jwt.js'
-import { sql }         from '../_lib/db.js'
+import { applyCors }   from '../_lib/cors.js'
+import { requireAuth }  from '../_lib/jwt.js'
+import { sql }          from '../_lib/db.js'
+import { grantGems, grantHints, hasReceivedGrant } from '../_lib/economy.js'
+import { FIRST_WALLET_BONUS } from '../_data/worldsServerData.js'
 
 // ── Config helpers ────────────────────────────────────────────────────────────
 
@@ -123,6 +125,13 @@ async function handleLink(req: VercelRequest, res: VercelResponse) {
   const avatarHash = discordUser.avatar
 
   const db = sql()
+
+  // Check if this wallet already had a Discord connection (re-link = no bonus)
+  const existing = await db`
+    SELECT address FROM discord_connections WHERE address = ${address} LIMIT 1
+  ` as Array<{ address: string }>
+  const isFirstLink = existing.length === 0
+
   await db`
     INSERT INTO discord_connections (address, discord_id, discord_handle, discord_avatar)
     VALUES (${address}, ${discordUser.id}, ${handle}, ${avatarHash})
@@ -133,9 +142,21 @@ async function handleLink(req: VercelRequest, res: VercelResponse) {
           connected_at   = NOW()
   `
 
+  // First-time Discord bonus — same amount as the wallet welcome bonus, granted once.
+  let firstDiscordBonusGranted: { gems: number; hints: number } | undefined
+  if (isFirstLink) {
+    const alreadyBonused = await hasReceivedGrant({ address, reason: 'first_discord_bonus' })
+    if (!alreadyBonused) {
+      await grantGems ({ address, amount: FIRST_WALLET_BONUS.gems,  reason: 'first_discord_bonus' })
+      await grantHints({ address, amount: FIRST_WALLET_BONUS.hints, reason: 'first_discord_bonus' })
+      firstDiscordBonusGranted = { gems: FIRST_WALLET_BONUS.gems, hints: FIRST_WALLET_BONUS.hints }
+    }
+  }
+
   return res.status(200).json({
-    discord_handle:    handle,
-    discord_avatar_url: avatarUrl(discordUser),
+    discord_handle:      handle,
+    discord_avatar_url:  avatarUrl(discordUser),
+    firstDiscordBonusGranted,
   })
 }
 

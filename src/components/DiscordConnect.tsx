@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useDiscordStore } from '../store/discordStore'
 import { linkDiscord, unlinkDiscord } from '../utils/discordClient'
 import { track } from '../utils/analytics'
+import { useGameStore } from '../store/gameStore'
 
 const DISCORD_PURPLE = '#5865F2'
 
@@ -36,6 +37,7 @@ function buildOAuthUrl(): string {
 
 export default function DiscordConnect() {
   const { connected, handle, avatarUrl, setDiscord, clearDiscord } = useDiscordStore()
+  const setPendingWelcomeBonus = useGameStore(s => s.setPendingWelcomeBonus)
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [confirmUnlink, setConfirmUnlink] = useState(false)
@@ -57,6 +59,9 @@ export default function DiscordConnect() {
             setLoading(false)
             setError(null)
             track('discord_connect_success')
+            if (result.firstDiscordBonusGranted) {
+              setPendingWelcomeBonus(result.firstDiscordBonusGranted)
+            }
           })
           .catch((err: any) => {
             const reason = err?.message ?? 'Discord linking failed.'
