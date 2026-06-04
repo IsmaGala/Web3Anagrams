@@ -256,10 +256,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
+    // ── sessions ────────────────────────────────────────────────────────────
+    // Body: { days?: number }  (default 30, max 90)
+    // Returns daily session counts + avg session length (if session_ended is tracked).
+
+    if (action === 'sessions') {
+      const rawDays = typeof body.days === 'number' ? body.days : 30
+      const days    = Math.min(Math.max(Math.floor(rawDays), 1), 90)
+
+      const rows = await db`
+        WITH date_series AS (
+          SELECT generate_series(
+            (NOW() - (${days} || ' days')::interval)::date,
+            NOW()::date,
+            '1 day'::interval
+          )::date AS day
+        ),
+        daily AS (
+          SELECT
+            received_at::date                                             AS day,
+            COUNT(*) FILTER (WHERE event = 'session_started')::int        AS sessions,
+            COUNT(DISTINCT address) FILTER (
+              WHERE event = 'session_started' AND address IS NOT NULL)::int AS unique_users,
+            ROUND(AVG(
+              CASE WHEN event = 'session_ended'
+              THEN (properties->>'duration_ms')::numeric ELSE NULL END
+            ) / 1000, 1)                                                  AS avg_duration_s
+          FROM analytics_events
+          WHERE received_at >= (NOW() - (${days} || ' days')::interval)::date
+          GROUP BY received_at::date
+        )
+        SELECT
+          d.day::text                                   AS date,
+          COALESCE(e.sessions,      0)::int             AS sessions,
+          COALESCE(e.unique_users,  0)::int             AS "uniqueUsers",
+          e.avg_duration_s::float                       AS "avgDurationSeconds"
+        FROM date_series d
+        LEFT JOIN daily e ON e.day = d.day
+        ORDER BY d.day ASC
+      ` as Array<{
+        date: string; sessions: number; uniqueUsers: number; avgDurationSeconds: number | null
+      }>
+
+      return res.status(200).json({ ok: true, days, series: rows })
+    }
+
     // ── unknown action ──────────────────────────────────────────────────────
 
     return res.status(404).json({
-      error: `Unknown action: "${action}". Valid: overview, daily, retention`,
+      error: `Unknown action: "${action}". Valid: overview, daily, retention, sessions`,
     })
 
   } catch (e: any) {
