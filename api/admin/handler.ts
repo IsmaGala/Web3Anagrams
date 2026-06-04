@@ -83,6 +83,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body   = (req.body ?? {}) as Record<string, unknown>
   const db     = sql()
 
+  try {
+
   // ── lookup-player ──────────────────────────────────────────────────────────
 
   if (action === 'lookup-player') {
@@ -334,4 +336,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(404).json({
     error: `Unknown admin action: "${action}". Valid: lookup-player, grant-gems, take-gems, grant-skin, unlock-world, complete-level, recent-activity, reset-player, add-note, delete-note`,
   })
+
+  } catch (e: any) {
+    console.error(`[admin/${action}] unhandled error:`, e?.message ?? e)
+    return res.status(500).json({ error: 'Internal server error', detail: e?.message ?? String(e) })
+  }
 }
