@@ -20,6 +20,7 @@ import profileHandler       from './api/profile.js'
 import authHandler          from './api/auth/handler.js'
 import discordAuthHandler   from './api/auth/discord.js'
 import adminHandler         from './api/admin/handler.js'
+import adminAnalyticsHandler from './api/admin/analytics.js'
 import analyticsHandler     from './api/analytics/handler.js'
 import economySpendHandler  from './api/economy/spend.js'
 import leaderboardHandler   from './api/leaderboard/handler.js'
@@ -44,6 +45,7 @@ app.all('/api/health',                (req, res) => healthHandler(req as any, re
 app.all('/api/profile',               (req, res) => profileHandler(req as any, res as any))
 app.all('/api/auth/discord',          (req, res) => discordAuthHandler(req as any, res as any))
 app.all('/api/auth/:action',          (req, res) => authHandler(req as any, res as any))
+app.all('/api/admin/analytics/:action',(req, res) => adminAnalyticsHandler(req as any, res as any))
 app.all('/api/admin/:action',         (req, res) => adminHandler(req as any, res as any))
 app.all('/api/analytics/*',           (req, res) => analyticsHandler(req as any, res as any))
 app.all('/api/economy/spend',         (req, res) => economySpendHandler(req as any, res as any))
