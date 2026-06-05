@@ -49,7 +49,6 @@ const PACKS: Pack[] = [
 // VITE_GAME_TREASURY_ADDRESS in your .env / Vercel env.
 const TREASURY = ((import.meta as any).env?.VITE_GAME_TREASURY_ADDRESS ?? '') as string
 
-const NETWORK_LABEL = (((import.meta as any).env?.VITE_GALACHAIN_NETWORK ?? 'testnet') as string).toUpperCase()
 
 interface PurchaseResponse {
   ok:           boolean
@@ -80,6 +79,7 @@ export default function GemStore() {
   const [pendingPack, setPendingPack]     = useState<Pack | null>(null)
   const [submitting,  setSubmitting]      = useState(false)
   const [showWalletModal, setShowWalletModal] = useState(false)
+  const [purchaseError, setPurchaseError] = useState<'insufficient_funds' | 'generic' | null>(null)
   // Countdown to next event phase change (skin rotation).
   const [skinCountdown, setSkinCountdown] = useState(timeToNextPhaseChange())
   // Pack queued while wallet-connect modal was open — resumed on connect.
@@ -187,7 +187,14 @@ export default function GemStore() {
       showToast(`✓ +${pendingPack.gems.toLocaleString()} Gems credited`)
       setPendingPack(null)
     } catch (e: any) {
-      showToast(`⚠ ${e?.message ?? 'Purchase failed'}`)
+      const msg = (e?.message ?? '').toLowerCase()
+      const isInsufficientFunds =
+        msg.includes('insufficient') ||
+        msg.includes('not enough') ||
+        msg.includes('balance') ||
+        msg.includes('funds')
+      setPendingPack(null)
+      setPurchaseError(isInsufficientFunds ? 'insufficient_funds' : 'generic')
     } finally {
       setSubmitting(false)
     }
@@ -356,16 +363,6 @@ export default function GemStore() {
             <p className="font-nunito font-bold mb-2 px-2" style={{ color:'rgba(255,255,255,0.65)', fontSize:'0.9rem' }}>
               {pendingPack.gala} GALA
             </p>
-            <p className="font-nunito font-bold mb-6 px-2"
-              style={{
-                color: NETWORK_LABEL === 'MAINNET' ? 'rgba(34,197,94,0.85)' : 'rgba(251,191,36,0.85)',
-                fontSize:'0.78rem', lineHeight:1.4,
-              }}>
-              {NETWORK_LABEL === 'MAINNET'
-                ? 'Your wallet will sign a real GALA transfer to the game treasury. Gems credit after the transfer confirms on-chain.'
-                : 'TESTNET — sign with testnet GALA only. Gems credit after the chain confirms the transfer.'}
-            </p>
-
             <button onClick={handleConfirmPurchase} disabled={submitting} className="btn-3d w-full py-3 mb-3"
               style={{
                 background: submitting
@@ -391,6 +388,39 @@ export default function GemStore() {
                 cursor: submitting ? 'not-allowed' : 'pointer',
               }}>
               CANCEL
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase error overlay */}
+      {purchaseError && (
+        <div className="fixed inset-0 z-[300] flex flex-col items-center justify-center px-6"
+          style={{ background:'rgba(0,0,0,0.88)', backdropFilter:'blur(14px)' }}>
+          <div className="w-full max-w-xs text-center slide-up">
+            <div className="text-7xl mb-4">
+              {purchaseError === 'insufficient_funds' ? '💸' : '⚠️'}
+            </div>
+            <h2 className="font-fredoka text-3xl mb-3"
+              style={{ color: purchaseError === 'insufficient_funds' ? '#fbbf24' : '#f87171' }}>
+              {purchaseError === 'insufficient_funds' ? 'NOT ENOUGH GALA' : 'PURCHASE FAILED'}
+            </h2>
+            <p className="font-nunito font-bold mb-6 px-2"
+              style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.9rem', lineHeight:1.5 }}>
+              {purchaseError === 'insufficient_funds'
+                ? "Your wallet doesn't have enough GALA to complete this purchase. Top up your wallet and try again."
+                : 'Something went wrong while processing your payment. No GALA was charged. Please try again.'}
+            </p>
+            <button
+              onClick={() => setPurchaseError(null)}
+              className="btn-3d w-full py-3"
+              style={{
+                background:'linear-gradient(160deg,#1e293b,#0f172a)',
+                border:'3px solid #475569', borderBottom:'3px solid #0f172a',
+                boxShadow:'0 5px 0 #0f172a', borderRadius:'14px',
+                color:'#cbd5e1', fontFamily:'Fredoka One,cursive', fontSize:'1rem',
+              }}>
+              DISMISS
             </button>
           </div>
         </div>
