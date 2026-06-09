@@ -66,7 +66,10 @@ function load(): PersistedWallet | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const obj = JSON.parse(raw) as Partial<PersistedWallet>
-    if (!obj.address) return null
+    // Require both address and jwt — an entry with no jwt means the player
+    // never completed the sign-in flow (e.g. refreshed during the MetaMask
+    // popup). Treat it as disconnected so the UI doesn't show a stale address.
+    if (!obj.address || !obj.jwt) return null
     return {
       address:    normalizeStored(obj.address),
       walletType: obj.walletType ?? walletKindFromAddress(obj.address),
@@ -126,7 +129,9 @@ export const useWalletStore = create<WalletState>((set, get) => {
       try {
         const result: ConnectedWallet = await connectProvider(type)
         const next: PersistedWallet = { ...result, jwt: null }
-        save(next)
+        // Do NOT save() here — persist only after login() completes with a JWT.
+        // Saving address without a JWT would make a mid-flow page refresh look
+        // "connected" in the UI even though the player is not authenticated.
         set({ ...next, connecting: false, error: null })
         attachListeners(type)
         return true

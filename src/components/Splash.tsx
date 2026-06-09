@@ -39,6 +39,11 @@ export default function Splash() {
   const todaysAttempt  = useProgressStore(s => s.getTodaysDailyAttempt)()
 
   const walletAddress  = useWalletStore(s => s.address)
+  const walletJwt      = useWalletStore(s => s.jwt)
+  // Only treat the wallet as fully connected when we have both an address and a
+  // valid JWT. Having an address without a JWT means the player started the
+  // connect flow but hasn't completed sign-in (e.g. page refreshed mid-popup).
+  const walletConnected = !!walletAddress && !!walletJwt
   const walletDisconnect = useWalletStore(s => s.disconnect)
   const [showWalletModal, setShowWalletModal] = useState(false)
   // Disconnect now wipes local state (progress, premium, economy) so a stray
@@ -72,14 +77,16 @@ export default function Splash() {
     return () => window.removeEventListener('pointerdown', onFirstGesture)
   }, [])
 
-  // After wallet connects, replay whichever action the player originally tapped.
+  // After wallet connects *and* login completes, replay the queued action.
+  // Guard on walletConnected (address + jwt) so a mid-flow refresh doesn't
+  // fire goToGame with an unauthenticated state.
   useEffect(() => {
-    if (!walletAddress) return
+    if (!walletConnected) return
     const queued = pendingAction.current
     if (!queued) return
     pendingAction.current = null
     goToGame(queued)
-  }, [walletAddress, goToGame])
+  }, [walletConnected, goToGame])
 
   // Dynamic caption for the Weekly Events button. Memoized against the
   // inputs that actually change — event scheduling + phase — so we don't
@@ -103,7 +110,7 @@ export default function Splash() {
   // Wallet gate for game entry points. If not connected, queue the action
   // and open the connect modal; the useEffect above replays on connect.
   function requireWalletForGame(mode: 'single' | 'daily') {
-    if (walletAddress) { goToGame(mode); return }
+    if (walletConnected) { goToGame(mode); return }
     pendingAction.current = mode
     setShowWalletModal(true)
   }
@@ -182,7 +189,7 @@ export default function Splash() {
             disconnect when connected. When disconnected, a value-prop
             microcaption explains what connecting does so a new player has
             a reason to tap. */}
-        {walletAddress ? (
+        {walletConnected ? (
           <>
             <div className="flex items-center gap-2 mb-3 px-4 py-2 rounded-full"
               style={{ background:'rgba(124,58,237,0.15)', border:'2px solid rgba(167,139,250,0.4)' }}>
