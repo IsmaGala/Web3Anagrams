@@ -9,7 +9,7 @@ export const TOWNSTAR_LEVELS: Level[] = [
       OIL:  'A liquid fuel or lubricant — refined in Town Star\'s Refinery',
       OILS: 'Plural of oil; various liquid fuels',
       SILO: 'A tall cylindrical structure in Town Star used to store harvested crops like wheat and corn',
-      SOIL: 'The ground material in which crops grow — also the currency in Common Ground World',
+      SOIL: 'The ground material in which crops grow — essential for farming in Town Star',
     }
   },
   {
