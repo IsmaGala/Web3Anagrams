@@ -140,8 +140,10 @@ export default function WeeklyEvents() {
     if (isNextWeeksEvent) {
       entries.push({ world, weekId: startWid, kind: 'upcoming' })
     }
-    // Past stacked claims, regardless of scheduling.
-    const pendingPast = getPendingClaimWeeks(world.id).filter(w => w < thisWeek)
+    // Past stacked claims — only for weeks on or after the world's official
+    // startDate week. Any entry before that is a pre-launch test artifact and
+    // should not surface as a card in production.
+    const pendingPast = getPendingClaimWeeks(world.id).filter(w => w < thisWeek && w >= startWid)
     for (const pw of pendingPast) {
       entries.push({ world, weekId: pw, kind: 'past' })
     }
