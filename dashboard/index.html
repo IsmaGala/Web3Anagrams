@@ -12,16 +12,12 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f1a;
-      color: #e2e8f0;
-      min-height: 100vh;
+      background: #0f0f1a; color: #e2e8f0; min-height: 100vh;
     }
-    /* ── Layout ── */
     .header {
       display: flex; align-items: center; gap: 16px;
       padding: 18px 28px;
-      background: #1a1a2e;
-      border-bottom: 1px solid rgba(167,139,250,0.2);
+      background: #1a1a2e; border-bottom: 1px solid rgba(167,139,250,0.2);
     }
     .header h1 { font-size: 1.3rem; font-weight: 700; color: #a78bfa; }
     .header .subtitle { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
@@ -35,119 +31,143 @@
     .refresh-btn:hover { background: rgba(167,139,250,0.2); }
     .refresh-btn:disabled { opacity: 0.4; cursor: wait; }
     .tabs {
-      display: flex; gap: 4px;
-      padding: 12px 28px 0;
+      display: flex; gap: 4px; padding: 12px 28px 0;
       border-bottom: 1px solid rgba(255,255,255,0.06);
-      background: #1a1a2e;
+      background: #1a1a2e; flex-wrap: wrap;
     }
     .tab {
       padding: 8px 18px; border-radius: 8px 8px 0 0; cursor: pointer;
       font-size: 0.82rem; font-weight: 600; color: #64748b;
-      border: 1px solid transparent; border-bottom: none;
-      transition: all 0.15s;
+      border: 1px solid transparent; border-bottom: none; transition: all 0.15s;
     }
-    .tab.active {
-      background: #0f0f1a; color: #a78bfa;
-      border-color: rgba(167,139,250,0.25);
-    }
+    .tab.active { background: #0f0f1a; color: #a78bfa; border-color: rgba(167,139,250,0.25); }
     .tab:hover:not(.active) { color: #94a3b8; }
     .content { padding: 24px 28px; max-width: 1400px; }
 
-    /* ── KPI cards ── */
+    /* KPI cards */
     .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
-    .kpi-card {
-      background: #1a1a2e; border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 12px; padding: 16px 18px;
-    }
+    .kpi-card { background: #1a1a2e; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 16px 18px; }
     .kpi-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
     .kpi-value { font-size: 1.7rem; font-weight: 700; color: #f1f5f9; }
     .kpi-sub   { font-size: 0.72rem; color: #475569; margin-top: 4px; }
-    .kpi-up    { color: #4ade80; }
-    .kpi-down  { color: #f87171; }
-    .kpi-neutral { color: #94a3b8; }
 
-    /* ── Charts ── */
+    /* Charts */
     .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
     .chart-row.single { grid-template-columns: 1fr; }
     .chart-row.thirds { grid-template-columns: 2fr 1fr; }
-    .card {
-      background: #1a1a2e; border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 12px; padding: 20px;
-    }
+    .card { background: #1a1a2e; border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 20px; }
     .card-title { font-size: 0.8rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
 
-    /* ── Funnel bars ── */
+    /* Funnel */
     .funnel { display: flex; flex-direction: column; gap: 10px; }
     .funnel-step { display: flex; align-items: center; gap: 12px; }
-    .funnel-label { font-size: 0.78rem; color: #94a3b8; width: 130px; flex-shrink: 0; }
+    .funnel-label { font-size: 0.78rem; color: #94a3b8; width: 140px; flex-shrink: 0; }
     .funnel-track { flex: 1; height: 26px; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; }
     .funnel-fill  { height: 100%; border-radius: 6px; transition: width 0.6s ease; display: flex; align-items: center; padding-left: 10px; }
     .funnel-count { font-size: 0.75rem; font-weight: 700; color: #fff; }
     .funnel-pct   { font-size: 0.7rem; color: #94a3b8; width: 44px; text-align: right; flex-shrink: 0; }
 
-    /* ── Error / loading ── */
+    /* Leaderboard table */
+    .lb-table { width: 100%; border-collapse: collapse; }
+    .lb-table th { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.8px; color: #475569; padding: 6px 10px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .lb-table td { font-size: 0.8rem; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #cbd5e1; }
+    .lb-table tr:hover td { background: rgba(255,255,255,0.03); }
+    .lb-table .rank { color: #64748b; font-size: 0.72rem; width: 32px; }
+    .lb-table .addr { font-family: monospace; font-size: 0.76rem; color: #a78bfa; }
+    .lb-table .num  { text-align: right; font-weight: 600; color: #f1f5f9; }
+    .lb-table .sub  { font-size: 0.7rem; color: #475569; }
+
+    /* Retention grid */
+    .ret-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .ret-cell { background: rgba(167,139,250,0.06); border: 1px solid rgba(167,139,250,0.15); border-radius: 10px; padding: 16px 12px; text-align: center; }
+    .ret-day  { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .ret-rate { font-size: 2rem; font-weight: 700; }
+    .ret-sub  { font-size: 0.68rem; color: #475569; margin-top: 4px; }
+
+    /* Loading / error */
     .loading { display: flex; align-items: center; justify-content: center; height: 120px; color: #475569; font-size: 0.85rem; }
     .error-msg { color: #f87171; font-size: 0.8rem; padding: 12px; background: rgba(248,113,113,0.08); border-radius: 8px; }
 
-    /* ── Custom tooltip ── */
+    /* Tooltip */
     .recharts-tooltip-wrapper .custom-tooltip {
       background: #1e293b; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
       padding: 10px 14px; font-size: 0.78rem;
     }
     .custom-tooltip .label { color: #94a3b8; margin-bottom: 6px; }
     .custom-tooltip .item  { color: #f1f5f9; }
+
+    .empty-state { text-align: center; padding: 32px; color: #475569; font-size: 0.85rem; }
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script>
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useMemo } = React;
 const {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar,
-  PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend
+  LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } = Recharts;
 
-// ── Config ────────────────────────────────────────────────────────────────────
-// If the dashboard is served from a different origin than the API,
-// set DASHBOARD_API_ORIGIN in the build. Otherwise same-origin works.
-const API = (window.DASHBOARD_API_ORIGIN || '');
-
+const API    = (window.DASHBOARD_API_ORIGIN || '');
+const SECRET = (window.DASHBOARD_ADMIN_SECRET || '');
 const COLORS = ['#a78bfa','#34d399','#60a5fa','#f472b6','#fbbf24','#fb923c'];
-const WORLD_LABELS = {
-  area51:'Area 51', area515:'Area 51.5', asimov:'Asimov',
-  blood_donor:'Blood Donor', daily:'Daily', eternal_night:'Eternal Night',
-  flags:'Flags', galaswap:'GalaSwap', miranda:'Miranda',
-  nature:'Nature', ocean_event:'Ocean Event', townstar:'Town Star',
-};
 
-// ── Fetch helper ──────────────────────────────────────────────────────────────
-function useFetch(url, deps = []) {
-  const [data,  setData]  = useState(null);
-  const [error, setError] = useState(null);
+// ── Fetch helpers ─────────────────────────────────────────────────────────────
+
+function useGet(path, deps = []) {
+  const [data,    setData]    = useState(null);
+  const [error,   setError]   = useState(null);
   const [loading, setLoading] = useState(true);
-
   const load = useCallback(() => {
     setLoading(true); setError(null);
     const ctrl = new AbortController();
-    const tid  = setTimeout(() => ctrl.abort(), 8000);
-    fetch(API + url, { signal: ctrl.signal })
+    const tid  = setTimeout(() => ctrl.abort(), 10000);
+    fetch(API + path, { signal: ctrl.signal })
       .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(d => { setData(d); setLoading(false); })
+      .then(d  => { setData(d);  setLoading(false); })
       .catch(e => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false); } })
       .finally(() => clearTimeout(tid));
     return () => { clearTimeout(tid); ctrl.abort(); };
-  }, [url]);
+  }, [path]);
+  useEffect(() => load(), [load, ...deps]);
+  return { data, error, loading, reload: load };
+}
 
-  useEffect(() => { return load(); }, [load, ...deps]);
+function useAdminPost(action, body, deps = []) {
+  const [data,    setData]    = useState(null);
+  const [error,   setError]   = useState(null);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(() => {
+    setLoading(true); setError(null);
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 12000);
+    fetch(API + '/api/admin/analytics/' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-secret': SECRET },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(d  => { setData(d);  setLoading(false); })
+      .catch(e => { if (e.name !== 'AbortError') { setError(e.message); setLoading(false); } })
+      .finally(() => clearTimeout(tid));
+    return () => { clearTimeout(tid); ctrl.abort(); };
+  }, [action, JSON.stringify(body)]);
+  useEffect(() => load(), [load, ...deps]);
   return { data, error, loading, reload: load };
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-const fmt  = n => n == null ? '—' : n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n);
-const fmtD = s => s ? s.slice(5) : '';  // "YYYY-MM-DD" → "MM-DD"
+const fmt   = n => n == null ? '—' : n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n);
+const fmtD  = s => s ? s.slice(5) : '';
+const fmtS  = s => s ? s.slice(5,10) : '';  // "YYYY-MM-DD" → "MM-DD"
+const addr  = a => a ? a.slice(0,8)+'…'+a.slice(-6) : '—';
+const fmtSec = s => s == null ? '—' : s >= 60 ? (s/60).toFixed(1)+'m' : s.toFixed(0)+'s';
+const rateColor = r => r >= 30 ? '#4ade80' : r >= 10 ? '#fbbf24' : '#f87171';
 
-// ── KPI Card ──────────────────────────────────────────────────────────────────
+// ── Shared components ─────────────────────────────────────────────────────────
+
 function KPICard({ label, value, sub, accent }) {
   return React.createElement('div', { className: 'kpi-card' },
     React.createElement('div', { className: 'kpi-label' }, label),
@@ -156,38 +176,60 @@ function KPICard({ label, value, sub, accent }) {
   );
 }
 
-// ── Custom tooltip ────────────────────────────────────────────────────────────
 function Tip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return React.createElement('div', { className: 'custom-tooltip' },
     React.createElement('div', { className: 'label' }, label),
     payload.map((p, i) =>
       React.createElement('div', { key: i, className: 'item', style: { color: p.color } },
-        `${p.name}: ${p.value}`
-      )
+        `${p.name}: ${p.value ?? 0}`)
     )
   );
 }
 
-// ── Funnel bar ────────────────────────────────────────────────────────────────
 function FunnelBar({ label, count, max, color, pct }) {
-  const w = max > 0 ? Math.round((count / max) * 100) : 0;
+  const w = max > 0 ? Math.round(((count||0) / max) * 100) : 0;
   return React.createElement('div', { className: 'funnel-step' },
     React.createElement('div', { className: 'funnel-label' }, label),
     React.createElement('div', { className: 'funnel-track' },
       React.createElement('div', { className: 'funnel-fill', style: { width: w + '%', background: color } },
-        React.createElement('span', { className: 'funnel-count' }, count)
+        React.createElement('span', { className: 'funnel-count' }, count||0)
       )
     ),
     React.createElement('div', { className: 'funnel-pct' }, pct != null ? pct + '%' : '')
   );
 }
 
-// ── Overview tab ──────────────────────────────────────────────────────────────
-function OverviewTab({ onAsOf }) {
-  const ov = useFetch('/api/analytics/overview');
-  const dy = useFetch('/api/analytics/daily?days=30');
+function LeaderboardTable({ rows, columns }) {
+  if (!rows || rows.length === 0)
+    return React.createElement('div', { className: 'empty-state' }, 'No data yet — metrics will appear as players use the feature.');
+  return React.createElement('table', { className: 'lb-table' },
+    React.createElement('thead', null,
+      React.createElement('tr', null,
+        React.createElement('th', { className: 'rank' }, '#'),
+        ...columns.map(c => React.createElement('th', { key: c.key, style: c.right ? { textAlign:'right' } : {} }, c.label))
+      )
+    ),
+    React.createElement('tbody', null,
+      rows.map((row, i) =>
+        React.createElement('tr', { key: i },
+          React.createElement('td', { className: 'rank' }, i + 1),
+          ...columns.map(c =>
+            React.createElement('td', { key: c.key,
+              className: c.addr ? 'addr' : c.right ? 'num' : '',
+              style: c.right ? { textAlign:'right' } : {},
+            }, c.render ? c.render(row[c.key], row) : row[c.key])
+          )
+        )
+      )
+    )
+  );
+}
 
+// ── Overview tab ──────────────────────────────────────────────────────────────
+function OverviewTab({ tick, onAsOf }) {
+  const ov = useGet('/api/analytics/overview', [tick]);
+  const dy = useGet('/api/analytics/daily?days=30', [tick]);
   useEffect(() => { if (ov.data?.as_of) onAsOf(ov.data.as_of); }, [ov.data]);
 
   if (ov.error || dy.error)
@@ -197,20 +239,17 @@ function OverviewTab({ onAsOf }) {
   const series = dy.data?.series || [];
 
   return React.createElement('div', null,
-    // KPI row
     React.createElement('div', { className: 'kpi-row' },
-      React.createElement(KPICard, { label: 'DAU (today)',       value: fmt(d.dau),              sub: 'active wallets' }),
-      React.createElement(KPICard, { label: 'MAU (30d)',         value: fmt(d.mau),              sub: 'active wallets' }),
-      React.createElement(KPICard, { label: 'New wallets today', value: fmt(d.new_wallets_today), sub: 'first connect' }),
-      React.createElement(KPICard, { label: 'Levels today',      value: fmt(d.levels_started_today), sub: `${fmt(d.levels_completed_today)} completed` }),
-      React.createElement(KPICard, { label: 'Completion rate',   value: d.completion_rate_7d_pct != null ? d.completion_rate_7d_pct + '%' : '—', sub: '7-day rolling', accent: d.completion_rate_7d_pct >= 60 ? '#4ade80' : '#fbbf24' }),
-      React.createElement(KPICard, { label: 'GALA purchases',    value: fmt(d.gala_purchases_7d), sub: `${d.gala_total_7d || 0} GALA (7d)`, accent: '#fbbf24' }),
+      React.createElement(KPICard, { label: 'DAU',              value: fmt(d.dau),              sub: 'active wallets today' }),
+      React.createElement(KPICard, { label: 'MAU (30d)',        value: fmt(d.mau),              sub: 'active wallets' }),
+      React.createElement(KPICard, { label: 'New wallets today',value: fmt(d.new_wallets_today),sub: 'first connect' }),
+      React.createElement(KPICard, { label: 'Levels today',     value: fmt(d.levels_started_today), sub: `${fmt(d.levels_completed_today)} completed` }),
+      React.createElement(KPICard, { label: 'Completion rate',  value: d.completion_rate_7d_pct != null ? d.completion_rate_7d_pct + '%' : '—', sub: '7-day rolling', accent: d.completion_rate_7d_pct >= 60 ? '#4ade80' : '#fbbf24' }),
+      React.createElement(KPICard, { label: 'GALA purchases',   value: fmt(d.gala_purchases_7d), sub: `${d.gala_total_7d || 0} GALA (7d)`, accent: '#fbbf24' }),
     ),
-
-    // DAU time-series
     React.createElement('div', { className: 'chart-row single' },
       React.createElement('div', { className: 'card' },
-        React.createElement('div', { className: 'card-title' }, 'Daily Active Wallets — 30 days'),
+        React.createElement('div', { className: 'card-title' }, 'DAU & New Wallets — 30 days'),
         ov.loading
           ? React.createElement('div', { className: 'loading' }, 'Loading…')
           : React.createElement(ResponsiveContainer, { width: '100%', height: 240 },
@@ -219,17 +258,16 @@ function OverviewTab({ onAsOf }) {
                 React.createElement(XAxis, { dataKey: 'date', tickFormatter: fmtD, tick: { fill: '#475569', fontSize: 11 } }),
                 React.createElement(YAxis, { tick: { fill: '#475569', fontSize: 11 } }),
                 React.createElement(Tooltip, { content: React.createElement(Tip) }),
-                React.createElement(Area, { type: 'monotone', dataKey: 'dau', name: 'DAU', stroke: '#a78bfa', fill: 'rgba(167,139,250,0.15)' }),
+                React.createElement(Legend, { wrapperStyle: { fontSize: '0.75rem' } }),
+                React.createElement(Area, { type: 'monotone', dataKey: 'dau',         name: 'DAU',         stroke: '#a78bfa', fill: 'rgba(167,139,250,0.15)' }),
                 React.createElement(Area, { type: 'monotone', dataKey: 'new_wallets', name: 'New wallets', stroke: '#34d399', fill: 'rgba(52,211,153,0.1)' }),
               )
             )
       )
     ),
-
-    // Levels + completion rate
     React.createElement('div', { className: 'chart-row' },
       React.createElement('div', { className: 'card' },
-        React.createElement('div', { className: 'card-title' }, 'Levels per Day'),
+        React.createElement('div', { className: 'card-title' }, 'Levels Started vs Completed — 30 days'),
         React.createElement(ResponsiveContainer, { width: '100%', height: 220 },
           React.createElement(BarChart, { data: series },
             React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
@@ -258,63 +296,308 @@ function OverviewTab({ onAsOf }) {
   );
 }
 
+// ── Retention tab ─────────────────────────────────────────────────────────────
+function RetentionTab({ tick }) {
+  const ret = useAdminPost('retention', {}, [tick]);
+  if (ret.error)   return React.createElement('div', { className: 'error-msg' }, '⚠ ' + ret.error);
+  if (ret.loading) return React.createElement('div', { className: 'loading' }, 'Loading…');
+
+  const { retention = [] } = ret.data || {};
+
+  const chartData = retention.map(r => ({
+    name: 'D' + r.day,
+    rate: r.rate,
+    returned: r.returned,
+    cohort: r.cohortSize,
+  }));
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'kpi-row' },
+      retention.map(r =>
+        React.createElement(KPICard, {
+          key: r.day,
+          label: 'D' + r.day + ' Retention',
+          value: r.cohortSize > 0 ? r.rate + '%' : '—',
+          sub: r.cohortSize > 0
+            ? `${r.returned} / ${r.cohortSize} returned`
+            : 'Not enough history yet',
+          accent: r.cohortSize > 0 ? rateColor(r.rate) : undefined,
+        })
+      )
+    ),
+
+    React.createElement('div', { className: 'chart-row single' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Rolling Retention by Day'),
+        React.createElement('p', { style: { fontSize: '0.75rem', color: '#475569', marginBottom: 16 } },
+          'Each window uses its own cohort (players old enough for that interval). D1 populates from day 2 of launch; D30 needs 30+ day old users.'
+        ),
+        React.createElement(ResponsiveContainer, { width: '100%', height: 260 },
+          React.createElement(BarChart, { data: chartData },
+            React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+            React.createElement(XAxis, { dataKey: 'name', tick: { fill: '#94a3b8', fontSize: 12 } }),
+            React.createElement(YAxis, { tickFormatter: v => v + '%', domain: [0, 100], tick: { fill: '#475569', fontSize: 11 } }),
+            React.createElement(Tooltip, { formatter: (v, n) => [v + (n === 'rate' ? '%' : ''), n], content: React.createElement(Tip) }),
+            React.createElement(Legend, { wrapperStyle: { fontSize: '0.75rem' } }),
+            React.createElement(Bar, { dataKey: 'rate', name: 'Retention %', fill: '#a78bfa', radius: [4,4,0,0] }),
+          )
+        )
+      )
+    ),
+
+    React.createElement('div', { className: 'chart-row single' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Cohort Size per Window'),
+        React.createElement('p', { style: { fontSize: '0.75rem', color: '#475569', marginBottom: 16 } },
+          'How many players each retention window is measuring against. Smaller cohort = fewer players old enough for that interval.'
+        ),
+        React.createElement(ResponsiveContainer, { width: '100%', height: 180 },
+          React.createElement(BarChart, { data: chartData },
+            React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+            React.createElement(XAxis, { dataKey: 'name', tick: { fill: '#94a3b8', fontSize: 12 } }),
+            React.createElement(YAxis, { tick: { fill: '#475569', fontSize: 11 } }),
+            React.createElement(Tooltip, { content: React.createElement(Tip) }),
+            React.createElement(Bar, { dataKey: 'cohort', name: 'Cohort size', fill: '#60a5fa', radius: [4,4,0,0] }),
+          )
+        )
+      )
+    ),
+  );
+}
+
+// ── Sessions tab ──────────────────────────────────────────────────────────────
+function SessionsTab({ tick }) {
+  const ss  = useAdminPost('session-stats', { days: 30 }, [tick]);
+  const dy  = useGet('/api/analytics/daily?days=30', [tick]);
+
+  if (ss.error)  return React.createElement('div', { className: 'error-msg' }, '⚠ ' + ss.error);
+
+  const s      = ss.data?.stats || {};
+  const series = (dy.data?.series || []).map(r => ({ ...r, date: fmtS(r.date) }));
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'kpi-row' },
+      React.createElement(KPICard, { label: 'Total sessions (30d)',    value: fmt(s.total_sessions),    sub: 'session_started events' }),
+      React.createElement(KPICard, { label: 'Unique users (30d)',      value: fmt(s.unique_users),      sub: 'distinct wallets' }),
+      React.createElement(KPICard, { label: 'Avg sessions / user',     value: s.avg_sessions_per_user || '—', sub: '30-day rolling' }),
+      React.createElement(KPICard, { label: 'Avg session length',      value: fmtSec(s.avg_duration_seconds),    sub: 'session_ended duration', accent: '#34d399' }),
+      React.createElement(KPICard, { label: 'Median session length',   value: fmtSec(s.median_duration_seconds), sub: 'p50',                    accent: '#60a5fa' }),
+    ),
+    React.createElement('div', { className: 'chart-row single' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Daily Sessions — 30 days'),
+        dy.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : React.createElement(ResponsiveContainer, { width: '100%', height: 240 },
+              React.createElement(AreaChart, { data: series },
+                React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+                React.createElement(XAxis, { dataKey: 'date', tick: { fill: '#475569', fontSize: 11 } }),
+                React.createElement(YAxis, { tick: { fill: '#475569', fontSize: 11 } }),
+                React.createElement(Tooltip, { content: React.createElement(Tip) }),
+                React.createElement(Legend, { wrapperStyle: { fontSize: '0.75rem' } }),
+                React.createElement(Area, { type: 'monotone', dataKey: 'dau',          name: 'Unique users', stroke: '#a78bfa', fill: 'rgba(167,139,250,0.12)' }),
+              )
+            )
+      )
+    ),
+    ss.data?.stats?.avg_duration_seconds == null &&
+      React.createElement('div', { className: 'card', style: { marginBottom: 16 } },
+        React.createElement('p', { style: { fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '20px 0' } },
+          '⏱ Session duration data will appear here once session_ended events are collected (requires the latest deploy).'
+        )
+      ),
+  );
+}
+
+// ── Players tab ───────────────────────────────────────────────────────────────
+function PlayersTab({ tick }) {
+  const tp  = useAdminPost('top-players',      { days: 30, limit: 25 }, [tick]);
+  const tg  = useAdminPost('top-gem-spenders', { days: 30, limit: 25 }, [tick]);
+  const tga = useAdminPost('top-gala-spenders',{ days: 30, limit: 25 }, [tick]);
+
+  return React.createElement('div', null,
+    React.createElement('div', { className: 'chart-row single' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Top Gamers — 30 days (by levels completed)'),
+        tp.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : tp.error
+            ? React.createElement('div', { className: 'error-msg' }, '⚠ ' + tp.error)
+            : React.createElement(LeaderboardTable, {
+                rows: tp.data?.players || [],
+                columns: [
+                  { key: 'address',          label: 'Wallet',             addr: true,  render: v => addr(v) },
+                  { key: 'levels_completed', label: 'Completed',          right: true  },
+                  { key: 'levels_started',   label: 'Started',            right: true  },
+                  { key: 'total_score',      label: 'Total Score',        right: true, render: v => v?.toLocaleString() },
+                ],
+              })
+      )
+    ),
+    React.createElement('div', { className: 'chart-row' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Top Gem Spenders — 30 days'),
+        tg.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : tg.error
+            ? React.createElement('div', { className: 'error-msg' }, '⚠ ' + tg.error)
+            : React.createElement(LeaderboardTable, {
+                rows: tg.data?.spenders || [],
+                columns: [
+                  { key: 'address',          label: 'Wallet',         addr: true, render: v => addr(v) },
+                  { key: 'total_gems_spent', label: 'Gems Spent',     right: true },
+                  { key: 'spend_events',     label: 'Transactions',   right: true },
+                ],
+              })
+      ),
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Top GALA Spenders — 30 days'),
+        tga.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : tga.error
+            ? React.createElement('div', { className: 'error-msg' }, '⚠ ' + tga.error)
+            : React.createElement(LeaderboardTable, {
+                rows: tga.data?.spenders || [],
+                columns: [
+                  { key: 'address',          label: 'Wallet',         addr: true, render: v => addr(v) },
+                  { key: 'total_gala_spent', label: 'GALA Spent',     right: true, render: v => Number(v).toFixed(2) },
+                  { key: 'purchases',        label: 'Purchases',      right: true },
+                ],
+              })
+      ),
+    ),
+  );
+}
+
+// ── Engagement tab ────────────────────────────────────────────────────────────
+function EngagementTab({ tick }) {
+  const hints = useAdminPost('player-hints',    { days: 30, limit: 25 }, [tick]);
+  const daily = useAdminPost('daily-challenges',{ days: 30, limit: 25 }, [tick]);
+  const fn    = useGet('/api/analytics/funnel?days=7', [tick]);
+
+  const hs = hints.data?.stats   || {};
+  const dailySeries = (daily.data?.series || []).map(r => ({ ...r, date: fmtS(r.date) }));
+
+  return React.createElement('div', null,
+    // Hint stats row
+    React.createElement('div', { className: 'kpi-row' },
+      React.createElement(KPICard, { label: 'Hints used (30d)',        value: fmt(hs.total_hints_used),     sub: 'successful uses' }),
+      React.createElement(KPICard, { label: 'Hint users (30d)',        value: fmt(hs.unique_users),         sub: 'distinct wallets' }),
+      React.createElement(KPICard, { label: 'Avg hints / player',     value: hs.avg_hints_per_player || '—', sub: '30-day rolling', accent: '#a78bfa' }),
+      React.createElement(KPICard, { label: 'Hints denied (30d)',     value: fmt(hs.hints_denied),         sub: 'insufficient balance', accent: hs.hints_denied > 0 ? '#f87171' : '#4ade80' }),
+    ),
+
+    React.createElement('div', { className: 'chart-row' },
+      // Top hint users
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Top Hint Users — 30 days'),
+        hints.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : hints.error
+            ? React.createElement('div', { className: 'error-msg' }, '⚠ ' + hints.error)
+            : React.createElement(LeaderboardTable, {
+                rows: hints.data?.top_users || [],
+                columns: [
+                  { key: 'address',    label: 'Wallet',      addr: true, render: v => addr(v) },
+                  { key: 'hints_used', label: 'Hints Used',  right: true },
+                ],
+              })
+      ),
+
+      // Daily challenge chart
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Daily Challenge Wins — 30 days'),
+        daily.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : React.createElement(ResponsiveContainer, { width: '100%', height: 220 },
+              React.createElement(BarChart, { data: dailySeries },
+                React.createElement(CartesianGrid, { strokeDasharray: '3 3', stroke: 'rgba(255,255,255,0.05)' }),
+                React.createElement(XAxis, { dataKey: 'date', tick: { fill: '#475569', fontSize: 10 }, interval: 4 }),
+                React.createElement(YAxis, { tick: { fill: '#475569', fontSize: 11 } }),
+                React.createElement(Tooltip, { content: React.createElement(Tip) }),
+                React.createElement(Legend, { wrapperStyle: { fontSize: '0.75rem' } }),
+                React.createElement(Bar, { dataKey: 'completions',    name: 'Wins',           fill: '#fbbf24', radius: [3,3,0,0] }),
+                React.createElement(Bar, { dataKey: 'unique_players', name: 'Unique players', fill: '#f472b6', radius: [3,3,0,0] }),
+              )
+            )
+      ),
+    ),
+
+    // Daily challenge top winners
+    React.createElement('div', { className: 'chart-row single' },
+      React.createElement('div', { className: 'card' },
+        React.createElement('div', { className: 'card-title' }, 'Daily Challenge Top Winners — 30 days'),
+        daily.loading
+          ? React.createElement('div', { className: 'loading' }, 'Loading…')
+          : React.createElement(LeaderboardTable, {
+              rows: daily.data?.top_players || [],
+              columns: [
+                { key: 'address',    label: 'Wallet',    addr: true, render: v => addr(v) },
+                { key: 'daily_wins', label: 'Daily Wins', right: true },
+              ],
+            })
+      )
+    ),
+  );
+}
+
 // ── Funnels tab ───────────────────────────────────────────────────────────────
-function FunnelsTab() {
-  const fn = useFetch('/api/analytics/funnel?days=7');
-  if (fn.error) return React.createElement('div', { className: 'error-msg' }, '⚠ ' + fn.error);
+function FunnelsTab({ tick }) {
+  const fn = useGet('/api/analytics/funnel?days=7', [tick]);
+  if (fn.error)   return React.createElement('div', { className: 'error-msg' }, '⚠ ' + fn.error);
   if (fn.loading) return React.createElement('div', { className: 'loading' }, 'Loading…');
 
   const { gala_purchase_funnel: gala, shop_funnel: shop, gameplay_funnel: game,
           gem_spend_by_reason: gems, world_popularity: worlds } = fn.data || {};
 
-  const galaMax  = gala?.initiated || 1;
-  const shopMax  = shop?.shop_opened || 1;
-  const gameMax  = game?.wallets_connected || 1;
+  const galaMax = gala?.initiated || 1;
+  const shopMax = shop?.shop_opened || 1;
+  const gameMax = game?.wallets_connected || 1;
+  const pct = (n, d) => d > 0 ? Math.round((n||0) / d * 100) : 0;
 
-  const pct = (n, d) => d > 0 ? Math.round(n / d * 100) : 0;
+  const WORLD_LABELS = {
+    area51:'Area 51', area515:'Area 51.5', asimov:'Asimov',
+    blooddonor:'Blood Donor', daily:'Daily', eternalnight:'Eternal Night',
+    flags:'Flags', galaswap:'GalaSwap', mirandus:'Mirandus',
+    nature:'Nature', oceanevent:'Deep Sea', townstar:'Town Star',
+  };
 
   return React.createElement('div', null,
     React.createElement('div', { className: 'kpi-row', style: { marginBottom: 24 } },
-      React.createElement(KPICard, { label: 'Gameplay funnel', value: pct(game?.wallets_completed, game?.wallets_connected) + '%', sub: 'connected → completed (7d)' }),
-      React.createElement(KPICard, { label: 'GALA conversion', value: pct(gala?.success, gala?.initiated) + '%', sub: 'initiated → success (7d)', accent: '#fbbf24' }),
-      React.createElement(KPICard, { label: 'Shop → hint buy', value: pct(shop?.hint_pack_bought, shop?.hint_denied) + '%', sub: 'denied → bought (7d)' }),
-      React.createElement(KPICard, { label: 'Gateway errors', value: ((gala?.failed || 0) + (gala?.timeout || 0)).toString(), sub: 'failed + timeouts (7d)', accent: (gala?.failed + gala?.timeout) > 0 ? '#f87171' : '#4ade80' }),
+      React.createElement(KPICard, { label: 'Gameplay funnel',  value: pct(game?.wallets_completed, game?.wallets_connected) + '%', sub: 'connected → completed (7d)' }),
+      React.createElement(KPICard, { label: 'GALA conversion',  value: pct(gala?.success, gala?.initiated) + '%',                  sub: 'initiated → success (7d)', accent: '#fbbf24' }),
+      React.createElement(KPICard, { label: 'Shop → hint buy',  value: pct(shop?.hint_pack_bought, shop?.hint_denied) + '%',       sub: 'denied → bought (7d)' }),
+      React.createElement(KPICard, { label: 'Gateway errors',   value: ((gala?.failed||0)+(gala?.timeout||0)).toString(),          sub: 'failed + timeouts (7d)', accent: (gala?.failed+gala?.timeout) > 0 ? '#f87171' : '#4ade80' }),
     ),
-
     React.createElement('div', { className: 'chart-row' },
-      // GALA purchase funnel
       React.createElement('div', { className: 'card' },
         React.createElement('div', { className: 'card-title' }, 'GALA Purchase Funnel — 7 days'),
         React.createElement('div', { className: 'funnel' },
-          React.createElement(FunnelBar, { label: 'Initiated',  count: gala?.initiated, max: galaMax, color: '#a78bfa', pct: 100 }),
-          React.createElement(FunnelBar, { label: 'Submitted',  count: gala?.submitted, max: galaMax, color: '#60a5fa', pct: pct(gala?.submitted, gala?.initiated) }),
-          React.createElement(FunnelBar, { label: '✓ Success',  count: gala?.success,   max: galaMax, color: '#4ade80', pct: pct(gala?.success, gala?.initiated) }),
-          React.createElement(FunnelBar, { label: '✗ Failed',   count: gala?.failed,    max: galaMax, color: '#f87171', pct: pct(gala?.failed, gala?.initiated) }),
-          React.createElement(FunnelBar, { label: '⏱ Timeout', count: gala?.timeout,   max: galaMax, color: '#fb923c', pct: pct(gala?.timeout, gala?.initiated) }),
+          React.createElement(FunnelBar, { label: 'Initiated',   count: gala?.initiated, max: galaMax, color: '#a78bfa', pct: 100 }),
+          React.createElement(FunnelBar, { label: 'Submitted',   count: gala?.submitted, max: galaMax, color: '#60a5fa', pct: pct(gala?.submitted, gala?.initiated) }),
+          React.createElement(FunnelBar, { label: '✓ Success',   count: gala?.success,   max: galaMax, color: '#4ade80', pct: pct(gala?.success, gala?.initiated) }),
+          React.createElement(FunnelBar, { label: '✗ Failed',    count: gala?.failed,    max: galaMax, color: '#f87171', pct: pct(gala?.failed, gala?.initiated) }),
+          React.createElement(FunnelBar, { label: '⏱ Timeout',  count: gala?.timeout,   max: galaMax, color: '#fb923c', pct: pct(gala?.timeout, gala?.initiated) }),
         )
       ),
-
-      // Gameplay funnel
       React.createElement('div', { className: 'card' },
-        React.createElement('div', { className: 'card-title' }, 'Gameplay Funnel — 7 days (unique wallets)'),
+        React.createElement('div', { className: 'card-title' }, 'Gameplay Funnel — 7 days'),
         React.createElement('div', { className: 'funnel' },
-          React.createElement(FunnelBar, { label: 'Wallet connected', count: game?.wallets_connected, max: gameMax, color: '#a78bfa', pct: 100 }),
-          React.createElement(FunnelBar, { label: 'Played a level',   count: game?.wallets_played,    max: gameMax, color: '#60a5fa', pct: pct(game?.wallets_played, game?.wallets_connected) }),
-          React.createElement(FunnelBar, { label: 'Completed level',  count: game?.wallets_completed, max: gameMax, color: '#4ade80', pct: pct(game?.wallets_completed, game?.wallets_connected) }),
+          React.createElement(FunnelBar, { label: 'Wallet connected',  count: game?.wallets_connected, max: gameMax, color: '#a78bfa', pct: 100 }),
+          React.createElement(FunnelBar, { label: 'Played a level',    count: game?.wallets_played,    max: gameMax, color: '#60a5fa', pct: pct(game?.wallets_played, game?.wallets_connected) }),
+          React.createElement(FunnelBar, { label: 'Completed level',   count: game?.wallets_completed, max: gameMax, color: '#4ade80', pct: pct(game?.wallets_completed, game?.wallets_connected) }),
         ),
         React.createElement('div', { style: { marginTop: 24 } },
           React.createElement('div', { className: 'card-title' }, 'Shop Funnel — 7 days'),
           React.createElement('div', { className: 'funnel' },
-            React.createElement(FunnelBar, { label: 'Shop opened',    count: shop?.shop_opened,      max: shopMax, color: '#a78bfa', pct: 100 }),
-            React.createElement(FunnelBar, { label: 'Hint denied',    count: shop?.hint_denied,      max: shopMax, color: '#f472b6', pct: pct(shop?.hint_denied, shop?.shop_opened) }),
-            React.createElement(FunnelBar, { label: 'Hint pack bought', count: shop?.hint_pack_bought, max: shopMax, color: '#4ade80', pct: pct(shop?.hint_pack_bought, shop?.shop_opened) }),
+            React.createElement(FunnelBar, { label: 'Shop opened',      count: shop?.shop_opened,       max: shopMax, color: '#a78bfa', pct: 100 }),
+            React.createElement(FunnelBar, { label: 'Hint denied',      count: shop?.hint_denied,       max: shopMax, color: '#f472b6', pct: pct(shop?.hint_denied, shop?.shop_opened) }),
+            React.createElement(FunnelBar, { label: 'Hint pack bought', count: shop?.hint_pack_bought,  max: shopMax, color: '#4ade80', pct: pct(shop?.hint_pack_bought, shop?.shop_opened) }),
           )
         )
       ),
     ),
-
     React.createElement('div', { className: 'chart-row' },
-      // Gem spend breakdown (pie)
       React.createElement('div', { className: 'card' },
         React.createElement('div', { className: 'card-title' }, 'Gem Spend by Reason — 7 days'),
         gems?.length
@@ -323,7 +606,7 @@ function FunnelsTab() {
                 React.createElement(Pie, {
                   data: gems, dataKey: 'total_gems', nameKey: 'reason',
                   cx: '50%', cy: '50%', outerRadius: 90,
-                  label: ({ reason, percent }) => `${reason} ${(percent * 100).toFixed(0)}%`,
+                  label: ({ reason, percent }) => `${reason} ${(percent*100).toFixed(0)}%`,
                   labelLine: false,
                 },
                   gems.map((_, i) => React.createElement(Cell, { key: i, fill: COLORS[i % COLORS.length] }))
@@ -331,10 +614,8 @@ function FunnelsTab() {
                 React.createElement(Tooltip)
               )
             )
-          : React.createElement('div', { className: 'loading' }, 'No gem spend data yet')
+          : React.createElement('div', { className: 'empty-state' }, 'No gem spend data yet')
       ),
-
-      // World popularity (bar)
       React.createElement('div', { className: 'card' },
         React.createElement('div', { className: 'card-title' }, 'World Popularity — 7 days'),
         worlds?.length
@@ -350,47 +631,54 @@ function FunnelsTab() {
                 React.createElement(Bar, { dataKey: 'completions', name: 'Completions', fill: '#4ade80', radius: [0,3,3,0] }),
               )
             )
-          : React.createElement('div', { className: 'loading' }, 'No world data yet')
+          : React.createElement('div', { className: 'empty-state' }, 'No world data yet')
       ),
     ),
   );
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
-function App() {
-  const [tab, setTab]   = useState('overview');
-  const [asOf, setAsOf] = useState(null);
-  const [tick, setTick] = useState(0);  // bump to force re-fetch
+const TABS = [
+  { id: 'overview',    label: 'Overview' },
+  { id: 'retention',   label: 'Retention' },
+  { id: 'sessions',    label: 'Sessions' },
+  { id: 'players',     label: 'Players' },
+  { id: 'engagement',  label: 'Engagement' },
+  { id: 'funnels',     label: 'Funnels & Economy' },
+];
 
+function App() {
+  const [tab,  setTab]  = useState('overview');
+  const [asOf, setAsOf] = useState(null);
+  const [tick, setTick] = useState(0);
   const refresh = () => setTick(t => t + 1);
 
   return React.createElement('div', null,
-    // Header
     React.createElement('div', { className: 'header' },
       React.createElement('div', null,
         React.createElement('h1', null, '⬡ WordChain Analytics'),
-        React.createElement('div', { className: 'subtitle' }, 'Internal dashboard — data from analytics_events'),
+        React.createElement('div', { className: 'subtitle' }, 'Internal dashboard · analytics_events'),
       ),
       React.createElement('div', { className: 'spacer' }),
       asOf && React.createElement('div', { className: 'as-of' }, 'Updated ' + new Date(asOf).toLocaleTimeString()),
       React.createElement('button', { className: 'refresh-btn', onClick: refresh }, '↻ Refresh'),
     ),
-
-    // Tabs
     React.createElement('div', { className: 'tabs' },
-      ['overview', 'funnels'].map(t =>
+      TABS.map(t =>
         React.createElement('div', {
-          key: t, className: 'tab' + (tab === t ? ' active' : ''),
-          onClick: () => setTab(t),
-        }, t === 'overview' ? 'Overview' : 'Funnels & Economy')
+          key: t.id,
+          className: 'tab' + (tab === t.id ? ' active' : ''),
+          onClick: () => setTab(t.id),
+        }, t.label)
       )
     ),
-
-    // Content
     React.createElement('div', { className: 'content' },
-      tab === 'overview'
-        ? React.createElement(OverviewTab, { key: tick, onAsOf: setAsOf })
-        : React.createElement(FunnelsTab,  { key: tick })
+      tab === 'overview'   && React.createElement(OverviewTab,   { key: tick, tick, onAsOf: setAsOf }),
+      tab === 'retention'  && React.createElement(RetentionTab,  { key: tick, tick }),
+      tab === 'sessions'   && React.createElement(SessionsTab,   { key: tick, tick }),
+      tab === 'players'    && React.createElement(PlayersTab,    { key: tick, tick }),
+      tab === 'engagement' && React.createElement(EngagementTab, { key: tick, tick }),
+      tab === 'funnels'    && React.createElement(FunnelsTab,    { key: tick, tick }),
     ),
   );
 }
