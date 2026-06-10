@@ -107,6 +107,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   await appendHintReveal(roundId, reveal)
 
+  track('hint_used', {
+    address,
+    round_id:       roundId,
+    world_id:       round.world_id,
+    level_index:    round.level_index,
+    hints_remaining: newBalance,
+  })
+
   return res.status(200).json({
     slot:           { len: reveal.len, ordinal: reveal.ordinal },
     position:       reveal.position,

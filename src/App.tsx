@@ -19,6 +19,7 @@ import WorldRewardOverlay from './components/WorldRewardOverlay'
 import WelcomeBonusOverlay from './components/WelcomeBonusOverlay'
 import DiscordCallback from './components/DiscordCallback'
 import { pullAndApply, schedulePush, flushPush, cancelPendingPush } from './utils/profileSync'
+import { track } from './utils/analytics'
 import './styles/global.css'
 
 // Render the Discord OAuth callback page when Discord redirects here.
@@ -51,6 +52,18 @@ export default function App() {
   // the overlay opens at most once per session; dismissal both flips the
   // flag and removes the overlay.
   const [showOnboarding, setShowOnboarding] = useState(() => !hasSeenOnboarding())
+
+  // Session tracking — fire once on mount, clean up on unload.
+  // duration_ms is measured from mount so it covers the full tab lifetime.
+  useEffect(() => {
+    const sessionStart = Date.now()
+    track('session_started')
+    const onUnload = () => {
+      track('session_ended', { duration_ms: Date.now() - sessionStart })
+    }
+    window.addEventListener('beforeunload', onUnload)
+    return () => window.removeEventListener('beforeunload', onUnload)
+  }, [])
 
   useEffect(() => {
     const allLevels = WORLDS.flatMap(w => w.levels)

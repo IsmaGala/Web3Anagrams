@@ -29,6 +29,7 @@ import { applyCors } from '../_lib/cors.js'
 import { requireAuth } from '../_lib/jwt.js'
 import { spendGems, grantHints, type SpendReason } from '../_lib/economy.js'
 import { alreadyOwns } from '../_lib/inventory.js'
+import { track } from '../_lib/analytics.js'
 
 // In-game hint pack catalog — keep in sync with PACKS in
 // src/components/ShopModal.tsx. Server is authoritative on pricing; the
@@ -184,6 +185,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         address, amount: pack.hints, reason: 'store_purchase',
         metadata: { packId, source: 'in_game_shop' },
       })
+      track('gem_spent', {
+        address,
+        amount:  pack.gems,
+        reason:  'hint_pack',
+        pack_id: packId,
+        hints_granted: pack.hints,
+        new_balance: spent.newBalance,
+      })
       return res.status(200).json({
         ok:           true,
         newBalance:   spent.newBalance,
@@ -214,6 +223,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
+    track('gem_spent', {
+      address,
+      amount,
+      reason,
+      new_balance: result.newBalance,
+      ...persistMeta,
+    })
     return res.status(200).json({
       ok:         true,
       newBalance: result.newBalance,

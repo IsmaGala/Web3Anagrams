@@ -195,7 +195,7 @@ async function handleDaily(req: VercelRequest, res: VercelResponse) {
           CASE WHEN event = 'gala_purchase_success'
           THEN (properties->>'gala_spent')::numeric ELSE 0 END
         ), 0)                                                          AS gala_spent,
-        COUNT(*) FILTER (WHERE event = 'daily_challenge_completed')   AS daily_completions,
+        COUNT(*) FILTER (WHERE event = 'daily_win_reward_granted')    AS daily_completions,
         COUNT(*) FILTER (WHERE event = 'shop_opened')                 AS shop_opens
       FROM analytics_events
       WHERE received_at >= (NOW() - (${days} || ' days')::interval)::date
